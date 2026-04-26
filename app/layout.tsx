@@ -9,7 +9,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Tably — Tab Time Tracker for Engineers",
+  title: "Klokr — Tab Time Tracker for Engineers",
   description:
     "A silent tab tracker built for engineers who want honest data about their day. Install the extension, work normally, see everything.",
   keywords: [

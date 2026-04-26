@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Daily planner — Tably",
+  title: "Daily planner — Klokr",
   description:
     "Routines, task dump, domain-tagged tasks, and tab time attribution.",
 };

@@ -4,8 +4,8 @@ import { Footer } from "@/components/landing/Footer";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Terms of Service — Tably",
-  description: "Terms of service for Tably, the tab time tracking app.",
+  title: "Terms of Service — Klokr",
+  description: "Terms of service for Klokr, the tab time tracking app.",
 };
 
 const LAST_UPDATED = "April 26, 2026";
@@ -41,14 +41,14 @@ export default function TermsPage() {
 
         {/* Intro */}
         <p className="mb-10 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-5 text-sm leading-relaxed text-white/55">
-          Please read these Terms of Service carefully before using Tably. By
+          Please read these Terms of Service carefully before using Klokr. By
           accessing or using the service you agree to be bound by these terms.
-          If you do not agree, do not use Tably.
+          If you do not agree, do not use Klokr.
         </p>
 
         <Section title="1. Acceptance of Terms">
           <p>
-            By creating an account or using the Tably browser extension or web
+            By creating an account or using the Klokr browser extension or web
             application (collectively, the &ldquo;Service&rdquo;), you agree to
             these Terms of Service and our{" "}
             <Link
@@ -69,7 +69,7 @@ export default function TermsPage() {
 
         <Section title="2. Description of Service">
           <p>
-            Tably is a productivity tool that tracks time spent on browser tabs,
+            Klokr is a productivity tool that tracks time spent on browser tabs,
             provides analytics dashboards, and offers planning features including
             a daily planner, routine templates, and a Pomodoro timer.
           </p>
@@ -82,7 +82,7 @@ export default function TermsPage() {
 
         <Section title="3. Account Registration">
           <p>
-            You must create an account to use Tably. You agree to provide
+            You must create an account to use Klokr. You agree to provide
             accurate, complete information and to keep your login credentials
             secure. You are solely responsible for all activity that occurs
             under your account.
@@ -99,7 +99,7 @@ export default function TermsPage() {
 
         <Section title="4. Data Collection and Use">
           <p>
-            The Tably extension collects data about the domains and page titles
+            The Klokr extension collects data about the domains and page titles
             you visit in your browser. This data is transmitted to our servers
             and associated with your account to generate analytics and reports.
           </p>

@@ -307,7 +307,7 @@ export default function DashboardPage() {
                   No data yet for today
                 </h3>
                 <p className="mx-auto mb-8 max-w-md text-sm leading-relaxed text-white/45">
-                  Keep the Tably extension enabled and use Chrome as usual. Time
+                  Keep the Klokr extension enabled and use Chrome as usual. Time
                   per domain will show up here as sessions sync—usually within a
                   few seconds of browsing.
                 </p>

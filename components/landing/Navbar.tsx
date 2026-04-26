@@ -54,7 +54,7 @@ export function Navbar() {
               </linearGradient>
             </defs>
           </svg>
-          <span className="font-bold text-lg tracking-tight">Tably</span>
+          <span className="font-bold text-lg tracking-tight">Klokr</span>
         </Link>
 
         <div className="hidden md:flex items-center gap-8">

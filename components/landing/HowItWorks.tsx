@@ -46,7 +46,7 @@ const steps = [
     ),
     title: "Work normally. It tracks in the background.",
     description:
-      "No timers to start. No tasks to log. Tably silently records every tab, every domain, every second — including when you're idle.",
+      "No timers to start. No tasks to log. Klokr silently records every tab, every domain, every second — including when you're idle.",
   },
   {
     number: "03",

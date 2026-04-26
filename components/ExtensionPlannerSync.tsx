@@ -14,14 +14,14 @@ type ChromeRuntime = {
 
 /**
  * Sends domain–task rules to the extension for tab-time attribution.
- * Requires NEXT_PUBLIC_TABLY_EXTENSION_ID.
+ * Requires NEXT_PUBLIC_Klokr_EXTENSION_ID.
  */
 export function ExtensionPlannerSync({
   rules,
 }: {
   rules: PlannerTaskRule[];
 }) {
-  const extId = process.env.NEXT_PUBLIC_TABLY_EXTENSION_ID;
+  const extId = process.env.NEXT_PUBLIC_Klokr_EXTENSION_ID;
   const lastJson = useRef<string>("");
 
   useEffect(() => {

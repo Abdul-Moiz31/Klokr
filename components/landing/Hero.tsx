@@ -41,7 +41,7 @@ function DashboardMockup() {
           <div className="w-3 h-3 rounded-full bg-red-400/70" />
           <div className="w-3 h-3 rounded-full bg-yellow-400/70" />
           <div className="w-3 h-3 rounded-full bg-green-400/70" />
-          <span className="ml-2 text-white/40 text-xs">tably.app/dashboard</span>
+          <span className="ml-2 text-white/40 text-xs">klokr.app/dashboard</span>
         </div>
 
         {/* Mock dashboard content */}

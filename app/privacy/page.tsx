@@ -4,8 +4,8 @@ import { Footer } from "@/components/landing/Footer";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy — Tably",
-  description: "Privacy policy for Tably, the tab time tracking app.",
+  title: "Privacy Policy — Klokr",
+  description: "Privacy policy for Klokr, the tab time tracking app.",
 };
 
 const LAST_UPDATED = "April 26, 2026";
@@ -41,14 +41,14 @@ export default function PrivacyPage() {
 
         {/* Intro */}
         <p className="mb-10 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-5 text-sm leading-relaxed text-white/55">
-          Your privacy matters to us. This policy explains what data Tably
+          Your privacy matters to us. This policy explains what data Klokr
           collects, why we collect it, and how we use and protect it. We will
           never sell your personal data to third parties.
         </p>
 
         <Section title="1. Who We Are">
           <p>
-            Tably is operated by DevWeekends. If you have any questions about
+            Klokr is operated by DevWeekends. If you have any questions about
             this policy, contact us at{" "}
             <a
               href="mailto:hello@devweekends.com"
@@ -76,7 +76,7 @@ export default function PrivacyPage() {
               <p className="mb-1.5 font-semibold text-white/75">Browsing activity</p>
               <p>
                 The domain names and page titles of browser tabs you visit
-                while the Tably extension is active and tracking is enabled.
+                while the Klokr extension is active and tracking is enabled.
                 We record the start time, end time, and duration of each
                 visit. We do not capture full URLs, passwords, form inputs,
                 page content, or any personally identifiable information from
@@ -212,7 +212,7 @@ export default function PrivacyPage() {
 
         <Section title="8. Cookies and Local Storage">
           <p>
-            Tably uses browser local storage and cookies solely for session
+            Klokr uses browser local storage and cookies solely for session
             management (keeping you logged in) and storing your preferences such
             as tracking state and theme settings. We do not use tracking cookies,
             third-party analytics cookies, or advertising cookies.
@@ -221,7 +221,7 @@ export default function PrivacyPage() {
 
         <Section title="9. Children's Privacy">
           <p>
-            Tably is not directed at children under 13. We do not knowingly
+            Klokr is not directed at children under 13. We do not knowingly
             collect data from children under 13. If you believe a child under
             13 has created an account, contact us and we will delete the account
             promptly.

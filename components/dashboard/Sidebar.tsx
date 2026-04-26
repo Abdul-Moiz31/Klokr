@@ -280,7 +280,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: Props) {
               </linearGradient>
             </defs>
           </svg>
-          <span className="font-bold text-white">Tably</span>
+          <span className="font-bold text-white">Klokr</span>
         </Link>
       </div>
 

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Reports — Tably",
+  title: "Reports — Klokr",
   description: "Weekly, monthly, and daily time reports with PDF export.",
 };
 

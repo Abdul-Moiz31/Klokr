@@ -85,7 +85,7 @@ export function AppShell({
             href="/"
             className="shrink-0 text-xs font-medium text-violet-400/90 hover:text-violet-300"
           >
-            Tably
+            Klokr
           </Link>
         </header>
 

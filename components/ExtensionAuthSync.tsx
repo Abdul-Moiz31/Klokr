@@ -13,11 +13,11 @@ type ChromeRuntime = {
 };
 
 /**
- * Pushes the Supabase session to the Tably extension so the popup can call /api.
- * Set NEXT_PUBLIC_TABLY_EXTENSION_ID in .env.local to your id from chrome://extensions.
+ * Pushes the Supabase session to the Klokr extension so the popup can call /api.
+ * Set NEXT_PUBLIC_Klokr_EXTENSION_ID in .env.local to your id from chrome://extensions.
  */
 function sendSessionToExtension(accessToken: string, userId: string) {
-  const extId = process.env.NEXT_PUBLIC_TABLY_EXTENSION_ID;
+  const extId = process.env.NEXT_PUBLIC_Klokr_EXTENSION_ID;
   if (!extId) return;
   if (typeof window === "undefined") return;
   const runtime = (window as unknown as { chrome?: { runtime?: ChromeRuntime } })
@@ -35,7 +35,7 @@ function sendSessionToExtension(accessToken: string, userId: string) {
 
 export function ExtensionAuthSync() {
   useEffect(() => {
-    if (!process.env.NEXT_PUBLIC_TABLY_EXTENSION_ID) return;
+    if (!process.env.NEXT_PUBLIC_Klokr_EXTENSION_ID) return;
 
     const supabase = createClient();
 

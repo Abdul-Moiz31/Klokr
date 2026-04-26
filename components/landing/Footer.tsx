@@ -49,7 +49,7 @@ export function Footer() {
                 </linearGradient>
               </defs>
             </svg>
-            <span className="font-bold text-white">Tably</span>
+            <span className="font-bold text-white">Klokr</span>
             <span className="text-white/30 text-sm ml-2">by DevWeekends</span>
           </div>
 

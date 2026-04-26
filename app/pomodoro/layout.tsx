@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Pomodoro — Tably",
+  title: "Pomodoro — Klokr",
   description: "Focus timer with breaks and a quick task list.",
 };
 
