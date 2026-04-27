@@ -1,10 +1,15 @@
-# Klokr
-
-Know exactly where your time goes.
+<div align="center">
+  <img src="public/icon128.png" width="96" height="96" alt="Klokr" />
+  <h1>Klokr</h1>
+  <p><strong>Know exactly where your time goes.</strong></p>
+  <p>A silent tab tracker built for engineers who want honest data about their day.</p>
+  <br />
+  <a href="https://github.com/Abdul-Moiz31">Built by Abdul-Moiz31</a>
+</div>
 
 ---
 
-![Klokr Dashboard](website/public/images/Screenshot%202026-04-27%20at%2011.54.24%20AM.png)
+![Klokr Dashboard](public/images/Web.png)
 
 ---
 
@@ -16,7 +21,7 @@ Most engineers end their day with no real idea where the hours went. You opened 
 
 ## What it does
 
-![Problem section](website/public/images/Screenshot%202026-04-27%20at%2011.54.39%20AM.png)
+![Problem section](public/images/Web2.png)
 
 **Tab Time Tracker**
 Automatically tracks every domain you visit. Cumulative time per site, number of visits, page titles. Idle detection means if you step away from the computer the clock stops. Everything syncs to your dashboard the moment it happens. No manual input. No timers to start.
@@ -43,7 +48,7 @@ A silent background process that runs while you work. The popup shows today's to
 
 ## How it works
 
-![How it works](website/public/images/Screenshot%202026-04-27%20at%2011.54.51%20AM.png)
+![How it works](public/images/Web3.png)
 
 Install the Chrome extension from the Chrome Web Store. One click. No sign-in required to start. It begins watching immediately.
 
@@ -55,7 +60,7 @@ Open your dashboard when you are ready to look. Every domain you visited, every 
 
 ## Who it is for
 
-![Features overview](website/public/images/Screenshot%202026-04-27%20at%2011.55.23%20AM.png)
+![Features overview](public/images/Web4.png)
 
 **Software engineers** who want honest data about their workday and are tired of guessing where the hours go.
 
@@ -63,11 +68,11 @@ Open your dashboard when you are ready to look. Every domain you visited, every 
 
 **Freelancers** who need to understand how they spend billable time across clients and projects, without expensive time-tracking software.
 
-**The DevWeekends community** and anyone serious about owning how they spend their time, not just tracking it.
+**Anyone serious about their time** who wants to own how they spend their day, not just track it.
 
 ---
 
-![Benefits](website/public/images/Screenshot%202026-04-27%20at%2011.55.05%20AM.png)
+![Benefits](public/images/Web5.png)
 
 ---
 
@@ -75,4 +80,6 @@ You built things today. Klokr just makes sure you can prove it.
 
 ---
 
-Built by [Abdul-Moiz31](https://github.com/Abdul-Moiz31)
+<div align="center">
+  Built by <a href="https://github.com/Abdul-Moiz31">Abdul-Moiz31</a>
+</div>
