@@ -17,26 +17,26 @@ type ChromeRuntime = {
  * Set NEXT_PUBLIC_Klokr_EXTENSION_ID in .env.local to your id from chrome://extensions.
  */
 function sendSessionToExtension(accessToken: string, userId: string) {
+  if (typeof window === "undefined") return;
+
+  // Path 1: content script is injected on this page — postMessage is always available.
+  window.postMessage({ type: "Klokr_AUTH", token: accessToken, userId }, window.location.origin);
+
+  // Path 2: if the extension ID is configured, also send directly (faster, no round-trip).
   const extId = process.env.NEXT_PUBLIC_Klokr_EXTENSION_ID;
   if (!extId) return;
-  if (typeof window === "undefined") return;
   const runtime = (window as unknown as { chrome?: { runtime?: ChromeRuntime } })
     .chrome?.runtime;
   if (!runtime?.sendMessage) return;
-
   runtime.sendMessage(
     extId,
     { type: "SET_AUTH", token: accessToken, userId },
-    () => {
-      void runtime.lastError;
-    }
+    () => { void runtime.lastError; }
   );
 }
 
 export function ExtensionAuthSync() {
   useEffect(() => {
-    if (!process.env.NEXT_PUBLIC_Klokr_EXTENSION_ID) return;
-
     const supabase = createClient();
 
     const pushFromSession = (

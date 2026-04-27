@@ -5,6 +5,7 @@ import { Problem } from "@/components/landing/Problem";
 import { HowItWorks } from "@/components/landing/HowItWorks";
 import { BenefitsClock } from "@/components/landing/BenefitsClock";
 import { Features } from "@/components/landing/Features";
+import { Pricing } from "@/components/landing/Pricing";
 import { FAQ } from "@/components/landing/FAQ";
 import { Community } from "@/components/landing/Community";
 import { CTA } from "@/components/landing/CTA";
@@ -20,6 +21,7 @@ export default function LandingPage() {
       <HowItWorks />
       <BenefitsClock />
       <Features />
+      <Pricing />
       <FAQ />
       <Community />
       <CTA />

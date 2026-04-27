@@ -24,16 +24,18 @@ function ClockFace({ size = 80 }: { size?: number }) {
   const r  = size / 2 - 3;
 
   // 12 tick marks — major at 3/6/9/12
+  // Round to 4 dp to prevent server/client floating-point divergence.
+  const round = (n: number) => Math.round(n * 10000) / 10000;
   const ticks = Array.from({ length: 12 }, (_, i) => {
     const rad    = (i * 30 * Math.PI) / 180;
     const isMaj  = i % 3 === 0;
     const outer  = r - 1;
     const inner  = outer - (isMaj ? size * 0.09 : size * 0.05);
     return {
-      x1: cx + outer * Math.sin(rad),
-      y1: cy - outer * Math.cos(rad),
-      x2: cx + inner * Math.sin(rad),
-      y2: cy - inner * Math.cos(rad),
+      x1: round(cx + outer * Math.sin(rad)),
+      y1: round(cy - outer * Math.cos(rad)),
+      x2: round(cx + inner * Math.sin(rad)),
+      y2: round(cy - inner * Math.cos(rad)),
       isMaj,
     };
   });
@@ -134,8 +136,13 @@ interface LoaderProps {
 }
 
 export function Loader({ className = "", clockSize = 80 }: LoaderProps) {
-  const [idx, setIdx]         = useState(() => Math.floor(Math.random() * QUOTES.length));
+  // Start at 0 (deterministic for SSR), randomise after first paint.
+  const [idx, setIdx]         = useState(0);
   const [visible, setVisible] = useState(true);
+
+  useEffect(() => {
+    setIdx(Math.floor(Math.random() * QUOTES.length));
+  }, []);
 
   useEffect(() => {
     const id = setInterval(() => {

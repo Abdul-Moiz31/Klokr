@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   description: "Privacy policy for Klokr, the tab time tracking app.",
 };
 
-const LAST_UPDATED = "April 26, 2026";
+const LAST_UPDATED = "April 27, 2026";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -41,20 +41,20 @@ export default function PrivacyPage() {
 
         {/* Intro */}
         <p className="mb-10 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-5 text-sm leading-relaxed text-white/55">
-          Your privacy matters to us. This policy explains what data Klokr
-          collects, why we collect it, and how we use and protect it. We will
-          never sell your personal data to third parties.
+          Your privacy matters. This policy explains what data Klokr collects,
+          why we collect it, and how we use and protect it. We will never sell
+          your personal data to third parties.
         </p>
 
         <Section title="1. Who We Are">
           <p>
-            Klokr is operated by DevWeekends. If you have any questions about
-            this policy, contact us at{" "}
+            Klokr is an independently built productivity tool. If you have any
+            questions about this policy, contact us at{" "}
             <a
-              href="mailto:hello@devweekends.com"
+              href="mailto:abdulmoiz3140@gmail.com"
               className="text-violet-400 underline-offset-2 hover:underline"
             >
-              hello@devweekends.com
+              abdulmoiz3140@gmail.com
             </a>
             .
           </p>
@@ -122,7 +122,7 @@ export default function PrivacyPage() {
             <li>Sync your planner tasks and routine templates across sessions</li>
             <li>Send essential transactional emails (account verification, password reset)</li>
             <li>Detect and prevent abuse or security incidents</li>
-            <li>Improve the Service based on aggregated, anonymised usage patterns</li>
+            <li>Improve the service based on aggregated, anonymised usage patterns</li>
           </ul>
           <p>
             We do not use your data for advertising, and we do not share it
@@ -133,9 +133,9 @@ export default function PrivacyPage() {
         <Section title="5. Data Storage and Security">
           <p>
             Your data is stored securely using{" "}
-            <span className="text-white/75">Supabase</span>, which is hosted on
-            AWS infrastructure with encryption at rest and in transit (TLS 1.2+).
-            Row-level security ensures that your data is only accessible to your
+            <span className="text-white/75">Supabase</span>, hosted on AWS
+            infrastructure with encryption at rest and in transit (TLS 1.2+).
+            Row-level security ensures your data is only accessible to your
             own account.
           </p>
           <p>
@@ -144,9 +144,9 @@ export default function PrivacyPage() {
             the risk of token compromise.
           </p>
           <p>
-            Despite our best efforts, no security system is impenetrable. In
-            the event of a data breach that affects your personal data, we will
-            notify you as required by applicable law.
+            No security system is impenetrable. In the event of a data breach
+            that affects your personal data, we will notify you as required by
+            applicable law.
           </p>
         </Section>
 
@@ -158,18 +158,12 @@ export default function PrivacyPage() {
             <li>
               <span className="text-white/75">Infrastructure providers:</span>{" "}
               Supabase (database and auth), Vercel (web hosting). These
-              providers process data only as necessary to operate the Service.
+              providers process data only as necessary to operate the service.
             </li>
             <li>
               <span className="text-white/75">Legal requirements:</span> If
               required by law, court order, or governmental authority, we may
               disclose your data to the extent legally required.
-            </li>
-            <li>
-              <span className="text-white/75">Business transfers:</span> If
-              DevWeekends is acquired or merges with another entity, your data
-              may be transferred as part of that transaction. We will notify
-              you in advance.
             </li>
           </ul>
           <p>We will never sell your data.</p>
@@ -185,25 +179,25 @@ export default function PrivacyPage() {
             </li>
             <li>
               <span className="text-white/75">Export your data:</span> Download
-              all your tracked sessions as a CSV file from Settings → Data.
+              all your tracked sessions as a CSV file from Settings.
             </li>
             <li>
               <span className="text-white/75">Delete your account:</span>{" "}
-              Permanently erase all your data from Settings → Data → Delete
-              Account. Deletion is irreversible and processed within 30 days.
+              Permanently erase all your data from Settings. Deletion is
+              irreversible and processed within 30 days.
             </li>
             <li>
               <span className="text-white/75">Correct your data:</span> Update
-              your display name and email from Settings → General.
+              your display name and email from Settings.
             </li>
             <li>
               <span className="text-white/75">Request a copy:</span> Email us
               at{" "}
               <a
-                href="mailto:hello@devweekends.com"
+                href="mailto:abdulmoiz3140@gmail.com"
                 className="text-violet-400 underline-offset-2 hover:underline"
               >
-                hello@devweekends.com
+                abdulmoiz3140@gmail.com
               </a>{" "}
               to request a full export of your personal data.
             </li>
@@ -214,17 +208,16 @@ export default function PrivacyPage() {
           <p>
             Klokr uses browser local storage and cookies solely for session
             management (keeping you logged in) and storing your preferences such
-            as tracking state and theme settings. We do not use tracking cookies,
-            third-party analytics cookies, or advertising cookies.
+            as tracking state. We do not use tracking cookies, third-party
+            analytics cookies, or advertising cookies.
           </p>
         </Section>
 
-        <Section title="9. Children's Privacy">
+        <Section title="9. Children&apos;s Privacy">
           <p>
             Klokr is not directed at children under 13. We do not knowingly
             collect data from children under 13. If you believe a child under
-            13 has created an account, contact us and we will delete the account
-            promptly.
+            13 has created an account, contact us and we will delete it promptly.
           </p>
         </Section>
 
@@ -233,23 +226,23 @@ export default function PrivacyPage() {
             We may update this Privacy Policy from time to time. When we make
             material changes, we will update the &ldquo;Last updated&rdquo; date
             at the top of this page and, where appropriate, notify you by email.
-            Continued use of the Service after changes constitutes acceptance of
+            Continued use of the service after changes constitutes acceptance of
             the updated policy.
           </p>
         </Section>
 
-        <Section title="11. Contact Us">
+        <Section title="11. Contact">
           <p>
             If you have questions, concerns, or requests regarding this Privacy
-            Policy or your personal data, please contact us:
+            Policy or your personal data, contact us at:
           </p>
           <div className="mt-3 rounded-xl border border-white/[0.07] bg-white/[0.02] p-4">
-            <p className="text-white/70">DevWeekends</p>
+            <p className="text-white/70">Klokr</p>
             <a
-              href="mailto:hello@devweekends.com"
+              href="mailto:abdulmoiz3140@gmail.com"
               className="mt-1 block text-violet-400 underline-offset-2 hover:underline"
             >
-              hello@devweekends.com
+              abdulmoiz3140@gmail.com
             </a>
           </div>
           <p className="mt-4">

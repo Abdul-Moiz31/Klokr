@@ -245,7 +245,10 @@ export default function ReportsPage() {
   const [hourlyData, setHourlyData] = useState<HourRow[]>([]);
   const [drilldown, setDrilldown] = useState<DrillTarget | null>(null);
   const [pdfBusy, setPdfBusy] = useState(false);
+  const [chartMounted, setChartMounted] = useState(false);
   const router = useRouter();
+
+  useEffect(() => { setChartMounted(true); }, []);
 
   // ── Auth ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -799,7 +802,7 @@ export default function ReportsPage() {
                   </div>
                   <div className="px-2 pb-6 pt-4 sm:px-4 sm:pb-8 sm:pt-6">
                     <div className="h-64 w-full">
-                      <ResponsiveContainer width="100%" height="100%">
+                      {chartMounted && <ResponsiveContainer width="100%" height="100%">
                         {tab === "monthly" ? (
                           <LineChart
                             data={monthlyChartData}
@@ -960,7 +963,7 @@ export default function ReportsPage() {
                             />
                           </BarChart>
                         )}
-                      </ResponsiveContainer>
+                      </ResponsiveContainer>}
                     </div>
                   </div>
                 </motion.div>

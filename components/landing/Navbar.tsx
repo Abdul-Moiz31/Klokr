@@ -58,14 +58,17 @@ export function Navbar() {
         </Link>
 
         <div className="hidden md:flex items-center gap-8">
-          <Link href="#features" className="text-white/60 hover:text-white text-sm transition-colors">
-            Features
-          </Link>
-          <Link href="#how-it-works" className="text-white/60 hover:text-white text-sm transition-colors">
+           <Link href="#how-it-works" className="text-white/60 hover:text-white text-sm transition-colors">
             How It Works
           </Link>
           <Link href="#benefits" className="text-white/60 hover:text-white text-sm transition-colors">
             Benefits
+          </Link>
+          <Link href="#features" className="text-white/60 hover:text-white text-sm transition-colors">
+            Features
+          </Link>
+          <Link href="#pricing" className="text-white/60 hover:text-white text-sm transition-colors">
+            Pricing
           </Link>
           <Link href="#faq" className="text-white/60 hover:text-white text-sm transition-colors">
             FAQ

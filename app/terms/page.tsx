@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   description: "Terms of service for Klokr, the tab time tracking app.",
 };
 
-const LAST_UPDATED = "April 26, 2026";
+const LAST_UPDATED = "April 27, 2026";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -58,7 +58,7 @@ export default function TermsPage() {
               Privacy Policy
             </Link>
             . These terms constitute a legally binding agreement between you and
-            DevWeekends (&ldquo;we&rdquo;, &ldquo;us&rdquo;, or &ldquo;our&rdquo;).
+            Klokr (&ldquo;we&rdquo;, &ldquo;us&rdquo;, or &ldquo;our&rdquo;).
           </p>
           <p>
             We reserve the right to update these terms at any time. Continued
@@ -89,11 +89,11 @@ export default function TermsPage() {
           </p>
           <p>
             You must be at least 13 years old to use the Service. By registering,
-            you represent that you meet this age requirement.
+            you confirm that you meet this age requirement.
           </p>
           <p>
-            We reserve the right to terminate accounts that violate these terms
-            or that have been inactive for an extended period.
+            We reserve the right to suspend or terminate accounts that violate
+            these terms or that have been inactive for an extended period.
           </p>
         </Section>
 
@@ -134,10 +134,10 @@ export default function TermsPage() {
 
         <Section title="6. Intellectual Property">
           <p>
-            All content, features, and functionality of the Service — including
-            but not limited to the software, design, text, graphics, and logos —
-            are the exclusive property of DevWeekends and are protected by
-            applicable intellectual property laws.
+            All content, features, and functionality of the Service, including
+            but not limited to the software, design, text, graphics, and logos,
+            are the exclusive property of Klokr and are protected by applicable
+            intellectual property laws.
           </p>
           <p>
             You retain full ownership of the data you generate through use of the
@@ -151,7 +151,7 @@ export default function TermsPage() {
           <p>
             You may export your tracked session data at any time in CSV format
             from the Settings page. You may permanently delete your account and
-            all associated data from Settings → Data. Deletion is irreversible.
+            all associated data from Settings. Deletion is irreversible.
           </p>
           <p>
             We retain deleted account data for up to 30 days in backups before
@@ -167,9 +167,9 @@ export default function TermsPage() {
             or free of harmful components.
           </p>
           <p>
-            To the maximum extent permitted by law, DevWeekends shall not be
-            liable for any indirect, incidental, special, consequential, or
-            punitive damages arising out of or related to your use of the Service.
+            To the maximum extent permitted by law, Klokr shall not be liable
+            for any indirect, incidental, special, consequential, or punitive
+            damages arising out of or related to your use of the Service.
           </p>
           <p>
             Our total liability to you for any claim arising from these terms or
@@ -185,27 +185,28 @@ export default function TermsPage() {
             discontinue the Service.
           </p>
           <p>
-            You may stop using the Service at any time. To delete your account
-            permanently, use the account deletion option in Settings → Data.
+            You may stop using the Service at any time. To permanently delete
+            your account, use the account deletion option in Settings.
           </p>
         </Section>
 
         <Section title="10. Governing Law">
           <p>
-            These terms are governed by the laws of the jurisdiction in which
-            DevWeekends operates, without regard to conflict-of-law provisions.
-            Any disputes shall be resolved in the courts of that jurisdiction.
+            These terms are governed by applicable law without regard to
+            conflict-of-law provisions. Any disputes will be resolved through
+            good-faith negotiation in the first instance. If you have a concern,
+            reach out to us directly before pursuing any formal action.
           </p>
         </Section>
 
         <Section title="11. Contact">
           <p>
-            If you have questions about these Terms, please contact us at{" "}
+            If you have questions about these Terms, contact us at{" "}
             <a
-              href="mailto:hello@devweekends.com"
+              href="mailto:abdulmoiz3140@gmail.com"
               className="text-violet-400 underline-offset-2 hover:underline"
             >
-              hello@devweekends.com
+              abdulmoiz3140@gmail.com
             </a>
             .
           </p>

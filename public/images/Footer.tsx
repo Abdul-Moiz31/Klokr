@@ -61,7 +61,7 @@ export function Footer() {
               Terms
             </Link>
             <Link
-              href="abdulmoiz3140@gmail.com"
+              href="mailto:hello@devweekends.com"
               className="hover:text-white transition-colors"
             >
               Contact
@@ -69,7 +69,7 @@ export function Footer() {
           </div>
 
           <p className="text-white/30 text-sm">
-            Built with ♥ for engineers.
+            Klokr
           </p>
         </div>
       </div>
