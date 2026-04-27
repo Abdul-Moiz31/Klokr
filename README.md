@@ -4,7 +4,7 @@ Know exactly where your time goes.
 
 ---
 
-![Klokr Dashboard](website/public/images/Screenshot%202026-04-27%20at%2011.54.24%20AM.png)
+![Klokr Dashboard](website/public/images/Web.png)
 
 ---
 
@@ -16,7 +16,7 @@ Most engineers end their day with no real idea where the hours went. You opened 
 
 ## What it does
 
-![Problem section](website/public/images/Screenshot%202026-04-27%20at%2011.54.39%20AM.png)
+![Problem section](website/public/images/Web2.png)
 
 **Tab Time Tracker**
 Automatically tracks every domain you visit. Cumulative time per site, number of visits, page titles. Idle detection means if you step away from the computer the clock stops. Everything syncs to your dashboard the moment it happens. No manual input. No timers to start.
@@ -43,7 +43,7 @@ A silent background process that runs while you work. The popup shows today's to
 
 ## How it works
 
-![How it works](website/public/images/Screenshot%202026-04-27%20at%2011.54.51%20AM.png)
+![How it works](website/public/images/Web3.png)
 
 Install the Chrome extension from the Chrome Web Store. One click. No sign-in required to start. It begins watching immediately.
 
@@ -55,7 +55,7 @@ Open your dashboard when you are ready to look. Every domain you visited, every 
 
 ## Who it is for
 
-![Features overview](website/public/images/Screenshot%202026-04-27%20at%2011.55.23%20AM.png)
+![Features overview](website/public/images/Web4.png)
 
 **Software engineers** who want honest data about their workday and are tired of guessing where the hours go.
 
@@ -67,7 +67,7 @@ Open your dashboard when you are ready to look. Every domain you visited, every 
 
 ---
 
-![Benefits](website/public/images/Screenshot%202026-04-27%20at%2011.55.05%20AM.png)
+![Benefits](website/public/images/Web5.png)
 
 ---
 
