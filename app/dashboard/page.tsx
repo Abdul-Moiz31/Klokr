@@ -155,7 +155,7 @@ export default function DashboardPage() {
   const totalSeconds = sessions.reduce((sum, s) => sum + s.duration_seconds, 0);
   const topDomain = domainStats[0]?.domain ?? "—";
   const domainCount = domainStats.length;
-  const displayName = user?.email?.split("@")[0] ?? "there";
+  const displayName = user?.user_metadata?.full_name ?? user?.email?.split("@")[0] ?? "there";
 
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "long",

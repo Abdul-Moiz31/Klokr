@@ -173,6 +173,10 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabId>("general");
 
+  const [displayName, setDisplayName] = useState("");
+  const [nameSaving, setNameSaving] = useState(false);
+  const [nameMsg, setNameMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [passwordMsg, setPasswordMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
@@ -195,6 +199,7 @@ export default function SettingsPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push("/login"); return; }
       setUser(user);
+      setDisplayName(user.user_metadata?.full_name ?? "");
       setLoading(false);
     })();
   }, [router]);
@@ -204,6 +209,21 @@ export default function SettingsPage() {
     if (typeof Notification !== "undefined") setNotifPermission(Notification.permission);
     else setNotifPermission("unsupported");
   }, []);
+
+  const handleSaveName = async (e: { preventDefault(): void }) => {
+    e.preventDefault();
+    const trimmed = displayName.trim();
+    if (!trimmed) { setNameMsg({ type: "err", text: "Name cannot be empty." }); return; }
+    setNameSaving(true);
+    setNameMsg(null);
+    const supabase = createClient();
+    const { error } = await supabase.auth.updateUser({ data: { full_name: trimmed } });
+    setNameSaving(false);
+    if (error) { setNameMsg({ type: "err", text: error.message }); return; }
+    setUser((u) => u ? { ...u, user_metadata: { ...u.user_metadata, full_name: trimmed } } : u);
+    setNameMsg({ type: "ok", text: "Name updated." });
+    setTimeout(() => setNameMsg(null), 3000);
+  };
 
   const updatePrefs = (patch: Partial<KlokrPrefs>) => {
     setPrefs((p) => {
@@ -325,6 +345,32 @@ export default function SettingsPage() {
           {/* ── General ── */}
           {activeTab === "general" && (
             <>
+              <div>
+                <SectionTitle tooltip="Your display name shown in the dashboard greeting.">Profile</SectionTitle>
+                <Card>
+                  <form onSubmit={handleSaveName} className="py-3 space-y-4 max-w-sm">
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-medium text-white/50">Full name</label>
+                      <input
+                        type="text"
+                        value={displayName}
+                        onChange={(e) => setDisplayName(e.target.value)}
+                        placeholder="Abdul Moiz"
+                        className="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-sm text-white/90 placeholder-white/20 outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30 transition-colors"
+                      />
+                    </div>
+                    {nameMsg && (
+                      <p className={`text-sm ${nameMsg.type === "ok" ? "text-emerald-400/90" : "text-red-400/90"}`}>
+                        {nameMsg.text}
+                      </p>
+                    )}
+                    <Button type="submit" disabled={nameSaving} variant="primary">
+                      {nameSaving ? "Saving…" : "Save name"}
+                    </Button>
+                  </form>
+                </Card>
+              </div>
+
               <div>
                 <SectionTitle tooltip="Your Klokr account details. Tab data is tied to this email address.">Account</SectionTitle>
                 <Card>
