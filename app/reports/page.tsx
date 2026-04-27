@@ -123,87 +123,218 @@ function generatePdf(
   stats: { title: string; value: string }[],
   domains: ByDomain[]
 ) {
-  const doc = new jsPDF();
-  const pageW = doc.internal.pageSize.getWidth();
-  const pageH = doc.internal.pageSize.getHeight();
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const pageW = doc.internal.pageSize.getWidth();   // 210
+  const pageH = doc.internal.pageSize.getHeight();  // 297
+  const M = 10; // margin
 
-  // Dark header bar
-  doc.setFillColor(10, 10, 15);
-  doc.rect(0, 0, pageW, 22, "F");
+  // ── Palette (RGB) ────────────────────────────────────────────
+  const C = {
+    bg:     [10,  10,  15]  as [number, number, number], // #0A0A0F
+    violet: [124, 58,  237] as [number, number, number], // #7C3AED
+    cyan:   [6,   182, 212] as [number, number, number], // #06B6D4
+    card:   [17,  17,  24]  as [number, number, number], // #111118
+    border: [31,  31,  46]  as [number, number, number], // #1F1F2E
+    body:   [226, 232, 240] as [number, number, number], // #E2E8F0
+    muted:  [100, 116, 139] as [number, number, number], // #64748B
+    white:  [255, 255, 255] as [number, number, number], // #FFFFFF
+  };
+
+  // ── Fill page background ─────────────────────────────────────
+  const fillBg = () => {
+    doc.setFillColor(...C.bg);
+    doc.rect(0, 0, pageW, pageH, "F");
+  };
+  fillBg();
+
+  // Patch addPage so every new page gets the dark background
+  // before autoTable draws cells on it.
+  const _addPage = doc.addPage.bind(doc);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (doc as any).addPage = (...args: unknown[]) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const r = (_addPage as any)(...args);
+    fillBg();
+    return r;
+  };
+
+  const today = new Date().toLocaleDateString("en-US", {
+    year: "numeric", month: "long", day: "numeric",
+  });
+
+  // ── 1. Header bar ────────────────────────────────────────────
+  const hdrH = 20;
+  doc.setFillColor(...C.violet);
+  doc.rect(0, 0, pageW, hdrH, "F");
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(13);
-  doc.setTextColor(124, 58, 237);
-  doc.text("Klokr", 14, 14);
+  doc.setFontSize(18);
+  doc.setTextColor(...C.white);
+  doc.text("Klokr", M, 13.5);
 
+  const tabCap = tab.charAt(0).toUpperCase() + tab.slice(1);
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
-  doc.setTextColor(160, 160, 180);
-  const reportLabel = `${tab.charAt(0).toUpperCase() + tab.slice(1)} Report · ${label}`;
-  doc.text(reportLabel, pageW - 14, 14, { align: "right" });
+  doc.setFontSize(11);
+  doc.text(`${tabCap} Report  |  ${label}`, pageW - M, 13.5, { align: "right" });
 
-  // Divider
-  doc.setDrawColor(50, 50, 70);
-  doc.line(14, 25, pageW - 14, 25);
+  // ── 2. Divider — #7C3AED @ 40% blended onto #0A0A0F ────────
+  doc.setDrawColor(56, 29, 104);
+  doc.setLineWidth(0.4);
+  doc.line(M, hdrH + 1, pageW - M, hdrH + 1);
 
-  // Summary stats
-  let y = 36;
-  const colW = (pageW - 28) / (stats.length || 1);
-  for (let i = 0; i < stats.length; i++) {
-    const x = 14 + i * colW;
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7);
-    doc.setTextColor(110, 110, 130);
-    doc.text(stats[i]!.title.toUpperCase(), x, y);
+  // ── 3. Summary section ───────────────────────────────────────
+  let y = hdrH + 10;
 
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(13);
-    doc.setTextColor(230, 230, 240);
-    doc.text(stats[i]!.value, x, y + 9);
-  }
-  y += 22;
-
-  // Section title
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
-  doc.setTextColor(190, 190, 210);
-  doc.text("Time by Domain", 14, y);
+  doc.setTextColor(...C.cyan);
+  doc.text("OVERVIEW", M, y);
   y += 5;
 
+  const n = Math.min(stats.length, 3);
+  const gap = 3;
+  const boxW = (pageW - M * 2 - gap * (n - 1)) / n;
+  const boxH = 26;
+
+  for (let i = 0; i < n; i++) {
+    const bx = M + i * (boxW + gap);
+    const by = y;
+
+    doc.setFillColor(...C.card);
+    doc.roundedRect(bx, by, boxW, boxH, 1.5, 1.5, "F");
+    doc.setDrawColor(...C.border);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(bx, by, boxW, boxH, 1.5, 1.5, "D");
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(...C.muted);
+    doc.text(stats[i]!.title.toUpperCase(), bx + 5, by + 8);
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.setTextColor(...C.body);
+    doc.text(stats[i]!.value, bx + 5, by + 18.5);
+
+    // Violet accent underline beneath value
+    doc.setFillColor(...C.violet);
+    doc.rect(bx + 5, by + 21, 9, 0.7, "F");
+  }
+  y += boxH + 8;
+
+  // ── 4. Section title ─────────────────────────────────────────
+  // Small violet accent bar to the left of the label
+  doc.setFillColor(...C.violet);
+  doc.rect(M, y - 3.5, 1.2, 4.5, "F");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  doc.setTextColor(...C.cyan);
+  doc.text("TIME BY DOMAIN", M + 3.5, y);
+  y += 4;
+
+  // ── 5. Domain table ──────────────────────────────────────────
   autoTable(doc, {
     startY: y,
+    margin: { left: M, right: M, bottom: 16 },
     head: [["#", "Domain", "Total Time", "Visits", "% of Total"]],
     body: domains.map((d, i) => [
       String(i + 1),
-      d.domain,
+      d.domain.replace(/^www\./, ""),
       formatTime(d.total_seconds),
       String(d.visit_count),
       `${d.percentage_of_total}%`,
     ]),
-    headStyles: {
-      fillColor: [124, 58, 237],
-      textColor: [255, 255, 255],
-      fontStyle: "bold",
-      fontSize: 8,
+    columnStyles: {
+      0: { cellWidth: 11, halign: "center" as const },
+      1: { cellWidth: "auto" as const },
+      2: { cellWidth: 28, halign: "right" as const },
+      3: { cellWidth: 20, halign: "right" as const },
+      4: { cellWidth: 38 },
     },
-    bodyStyles: { fontSize: 8, textColor: [200, 200, 215] },
-    alternateRowStyles: { fillColor: [18, 18, 28] },
-    styles: { fillColor: [12, 12, 20] },
-    margin: { left: 14, right: 14 },
+    headStyles: {
+      fillColor: C.violet,
+      textColor: C.white,
+      fontStyle: "bold",
+      fontSize: 10,
+      cellPadding: { top: 3, bottom: 3, left: 3, right: 3 },
+    },
+    bodyStyles: {
+      fillColor: C.bg,
+      textColor: C.body,
+      fontSize: 9,
+      lineColor: C.border,
+      lineWidth: 0.2,
+      cellPadding: { top: 3, bottom: 3, left: 3, right: 3 },
+    },
+    alternateRowStyles: { fillColor: C.card },
+    showHead: "everyPage",
+
+    // Footer on every page
+    didDrawPage: () => {
+      doc.setFillColor(...C.card);
+      doc.rect(0, pageH - 12, pageW, 12, "F");
+      doc.setDrawColor(...C.border);
+      doc.setLineWidth(0.3);
+      doc.line(0, pageH - 12, pageW, pageH - 12);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.setTextColor(...C.muted);
+      doc.text("Generated by Klokr", M, pageH - 5);
+      doc.text(today, pageW - M, pageH - 5, { align: "right" });
+    },
+
+    didDrawCell: (data) => {
+      if (data.section !== "body") return;
+
+      // Row 0, Total Time column (idx 2) → repaint cyan bold
+      if (data.row.index === 0 && data.column.index === 2) {
+        doc.setFillColor(...C.bg); // row 0 = non-alternate = bg
+        doc.rect(data.cell.x, data.cell.y, data.cell.width, data.cell.height, "F");
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(9);
+        doc.setTextColor(...C.cyan);
+        doc.text(
+          String(data.cell.raw),
+          data.cell.x + data.cell.width - 3,
+          data.cell.y + data.cell.height / 2,
+          { align: "right", baseline: "middle" as const }
+        );
+      }
+
+      // % of Total column (idx 4) → progress bar + repaint text
+      if (data.column.index === 4) {
+        const rawStr = String(data.cell.raw);
+        const pct = parseFloat(rawStr);
+        if (isNaN(pct)) return;
+
+        const isAlt = data.row.index % 2 === 1;
+
+        // 1. Repaint cell background
+        doc.setFillColor(...(isAlt ? C.card : C.bg));
+        doc.rect(data.cell.x, data.cell.y, data.cell.width, data.cell.height, "F");
+
+        // 2. Progress bar — pre-blended 30% #7C3AED on each bg
+        //    On #0A0A0F: rgb(44, 24, 82)   On #111118: rgb(51, 31, 92)
+        const barColor: [number, number, number] = isAlt ? [51, 31, 92] : [44, 24, 82];
+        const maxBarW = data.cell.width - 6;
+        const barW = Math.max(0.5, (pct / 100) * maxBarW);
+        doc.setFillColor(...barColor);
+        doc.rect(data.cell.x + 3, data.cell.y + 1.8, barW, data.cell.height - 3.6, "F");
+
+        // 3. Text on top of bar
+        doc.setFont("helvetica", data.row.index === 0 ? "bold" : "normal");
+        doc.setFontSize(9);
+        doc.setTextColor(...C.body);
+        doc.text(rawStr, data.cell.x + 3, data.cell.y + data.cell.height / 2, {
+          baseline: "middle" as const,
+        });
+      }
+    },
   });
 
-  // Footer
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(7);
-  doc.setTextColor(70, 70, 90);
-  const today = new Date().toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-  doc.text(`Generated by Klokr on ${today}`, 14, pageH - 8);
-
-  doc.save(`report-${tab}-${startDate}.pdf`);
+  // ── Save ─────────────────────────────────────────────────────
+  doc.save(`klokr-report-${tab}-${startDate}.pdf`);
 }
 
 // ─── Empty state ──────────────────────────────────────────────────
