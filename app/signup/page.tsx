@@ -20,7 +20,30 @@ function GoogleIcon() {
   );
 }
 
+// Splits camelCase or title-cases spaced names.
+// "abdulMoiz" → "Abdul Moiz"  |  "Abdul moiz" → "Abdul Moiz"
+function formatDisplayName(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+  // Already has spaces — title case each word
+  if (trimmed.includes(" ")) {
+    return trimmed.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
+  }
+  // camelCase — split on uppercase boundaries
+  if (/[A-Z]/.test(trimmed)) {
+    return trimmed
+      .replace(/([A-Z])/g, " $1")
+      .trim()
+      .split(/\s+/)
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+      .join(" ");
+  }
+  // All lowercase — just capitalize first letter
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+}
+
 function SignupForm() {
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -31,7 +54,12 @@ function SignupForm() {
   const prefillEmail = searchParams.get("email") || "";
 
   useEffect(() => {
-    if (prefillEmail) setEmail(prefillEmail);
+    if (prefillEmail) {
+      setEmail(prefillEmail);
+      // Suggest a name from the email prefix (strip numbers/symbols)
+      const prefix = prefillEmail.split("@")[0]?.replace(/[^a-zA-Z]/g, "") ?? "";
+      if (prefix) setName(formatDisplayName(prefix));
+    }
   }, [prefillEmail]);
 
   const handleSignup = async (e: { preventDefault(): void }) => {
@@ -43,7 +71,10 @@ function SignupForm() {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { emailRedirectTo: `${window.location.origin}/dashboard` },
+      options: {
+        emailRedirectTo: `${window.location.origin}/dashboard`,
+        data: { full_name: formatDisplayName(name) },
+      },
     });
 
     if (error) {
@@ -94,6 +125,14 @@ function SignupForm() {
       </div>
 
       <form onSubmit={handleSignup} className="space-y-5">
+        <Input
+          label="Full name"
+          type="text"
+          placeholder="Abdul Moiz"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          required
+        />
         <Input
           label="Email"
           type="email"
