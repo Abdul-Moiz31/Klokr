@@ -15,7 +15,22 @@ import {
 
 interface DomainData {
   domain: string;
+  pageTitle: string;
   totalSeconds: number;
+}
+
+function getSiteName(domain: string, pageTitle: string): string {
+  const cleanDomain = domain.replace(/^www\./, "");
+  if (pageTitle && pageTitle !== cleanDomain && pageTitle !== domain) {
+    const parts = pageTitle.split(/\s[\|\-·—–]\s/);
+    if (parts.length > 1) {
+      const last = parts[parts.length - 1]!.trim();
+      if (last.length > 0 && last.length <= 40) return last;
+    }
+    if (pageTitle.length <= 40) return pageTitle;
+  }
+  const name = cleanDomain.split(".")[0] ?? cleanDomain;
+  return name.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 function formatTime(seconds: number): string {
@@ -60,7 +75,7 @@ export function DomainChart({
   if (data.length === 0) return null;
 
   const chartData = data.slice(0, 8).map((d) => ({
-    domain: d.domain.replace("www.", ""),
+    domain: getSiteName(d.domain, d.pageTitle),
     seconds: d.totalSeconds,
   }));
 

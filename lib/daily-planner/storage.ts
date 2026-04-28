@@ -50,19 +50,6 @@ export function dayDataWithFreshIds(d: DayData): DayData {
   return { groups, tasks };
 }
 
-function mergeV1WeekendToDayData(sat: DayData, sun: DayData): DayData {
-  const a = dayDataWithFreshIds(migrateDayData(sat));
-  const b0 = dayDataWithFreshIds(migrateDayData(sun));
-  const maxOrder = a.groups.length
-    ? Math.max(...a.groups.map((g) => g.order))
-    : -1;
-  const bSorted = [...b0.groups].sort((x, y) => x.order - y.order);
-  const bGroups = bSorted.map((g, i) => ({ ...g, order: maxOrder + 1 + i }));
-  return {
-    groups: [...a.groups, ...bGroups],
-    tasks: [...a.tasks, ...b0.tasks],
-  };
-}
 
 function defaultRoutineTemplates(
   v1ForMigration?: DailyPlannerV1
@@ -73,13 +60,15 @@ function defaultRoutineTemplates(
     return {
       fallback: createEmptyDayData(),
       weekdays: d(t.weekday),
-      weekend: mergeV1WeekendToDayData(t.saturday, t.sunday),
+      saturday: d(t.saturday),
+      sunday: d(t.sunday),
     };
   }
   return {
     fallback: createEmptyDayData(),
     weekdays: createEmptyDayData(),
-    weekend: createEmptyDayData(),
+    saturday: createEmptyDayData(),
+    sunday: createEmptyDayData(),
   };
 }
 
@@ -154,7 +143,9 @@ function normalizeV2(p: DailyPlannerV2): DailyPlannerV2 {
     routineTemplates: {
       fallback: migrateDayData(rt?.fallback ?? defRt.fallback),
       weekdays: migrateDayData(rt?.weekdays ?? defRt.weekdays),
-      weekend: migrateDayData(rt?.weekend ?? defRt.weekend),
+      // Migrate old single "weekend" key to both saturday and sunday
+      saturday: migrateDayData(rt?.saturday ?? (rt as Record<string, DayData | undefined>)?.["weekend"] ?? defRt.saturday),
+      sunday: migrateDayData(rt?.sunday ?? (rt as Record<string, DayData | undefined>)?.["weekend"] ?? defRt.sunday),
     },
   };
 }
