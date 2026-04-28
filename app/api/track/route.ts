@@ -13,6 +13,7 @@ export async function POST(request: NextRequest) {
       date: string;
       auth_token: string;
       planner_task_id?: string | null;
+      is_new_visit?: boolean;
     };
 
     const {
@@ -25,6 +26,7 @@ export async function POST(request: NextRequest) {
       date,
       auth_token,
       planner_task_id,
+      is_new_visit = false,
     } = body;
 
     if (
@@ -96,7 +98,7 @@ export async function POST(request: NextRequest) {
         .from("tab_sessions")
         .update({
           duration_seconds: existing.duration_seconds + duration_seconds,
-          visits: (existing.visits ?? 0) + 1,
+          visits: (existing.visits ?? 0) + (is_new_visit ? 1 : 0),
           end_time,
           page_title: page_title || domain,
           ...(planner_task_id ? { planner_task_id } : {}),

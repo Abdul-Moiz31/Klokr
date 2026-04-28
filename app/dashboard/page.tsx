@@ -17,10 +17,27 @@ import type { User } from "@supabase/supabase-js";
 
 interface DomainStat {
   domain: string;
+  pageTitle: string;
   totalSeconds: number;
   visits: number;
   hours: number;
   minutes: number;
+}
+
+function getSiteName(domain: string, pageTitle: string): string {
+  const cleanDomain = domain.replace(/^www\./, "");
+  if (pageTitle && pageTitle !== cleanDomain && pageTitle !== domain) {
+    // Extract brand: last segment after common separators like " | ", " - ", " · ", " — "
+    const parts = pageTitle.split(/\s[\|\-·—–]\s/);
+    if (parts.length > 1) {
+      const last = parts[parts.length - 1]!.trim();
+      if (last.length > 0 && last.length <= 40) return last;
+    }
+    if (pageTitle.length <= 40) return pageTitle;
+  }
+  // Fall back: strip subdomains, TLD, capitalize
+  const name = cleanDomain.split(".")[0] ?? cleanDomain;
+  return name.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 function getGreeting(): string {
@@ -38,7 +55,12 @@ function formatTotalTime(seconds: number): string {
 }
 
 function getTodayString() {
-  return new Date().toISOString().split("T")[0];
+  const d = new Date();
+  return [
+    d.getFullYear(),
+    String(d.getMonth() + 1).padStart(2, "0"),
+    String(d.getDate()).padStart(2, "0"),
+  ].join("-");
 }
 
 
@@ -131,6 +153,7 @@ export default function DashboardPage() {
         if (!acc[domain]) {
           acc[domain] = {
             domain,
+            pageTitle: session.page_title ?? domain,
             totalSeconds: 0,
             visits: 0,
             hours: 0,
@@ -140,6 +163,10 @@ export default function DashboardPage() {
         acc[domain].totalSeconds += session.duration_seconds;
         // Use stored visit count from the upserted row, not row count.
         acc[domain].visits += session.visits ?? 1;
+        // Keep page_title from the session with most duration.
+        if (session.duration_seconds > (acc[domain].totalSeconds - session.duration_seconds)) {
+          acc[domain].pageTitle = session.page_title ?? domain;
+        }
         return acc;
       },
       {} as Record<string, DomainStat>
@@ -153,7 +180,9 @@ export default function DashboardPage() {
     .sort((a, b) => b.totalSeconds - a.totalSeconds);
 
   const totalSeconds = sessions.reduce((sum, s) => sum + s.duration_seconds, 0);
-  const topDomain = domainStats[0]?.domain ?? "—";
+  const topDomain = domainStats[0]
+    ? getSiteName(domainStats[0].domain, domainStats[0].pageTitle)
+    : "—";
   const domainCount = domainStats.length;
   const displayName = user?.user_metadata?.full_name ?? user?.email?.split("@")[0] ?? "there";
 

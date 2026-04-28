@@ -36,12 +36,22 @@ const KINDS: {
     ),
   },
   {
-    id: "weekend",
-    label: "Weekend",
-    tooltip: "Suggested Sat–Sun in the daily planner. Set up a different rhythm for your days off.",
+    id: "saturday",
+    label: "Saturday",
+    tooltip: "Suggested every Saturday in the daily planner. Set up a different rhythm for your Saturday.",
     icon: (
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 3a6 6 0 009 9 9 9 0 11-9-9z" />
+      </svg>
+    ),
+  },
+  {
+    id: "sunday",
+    label: "Sunday",
+    tooltip: "Suggested every Sunday in the daily planner. Set up your rest day routine.",
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="5" /><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
       </svg>
     ),
   },

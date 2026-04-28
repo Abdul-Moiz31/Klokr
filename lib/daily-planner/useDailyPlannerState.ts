@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   DailyPlannerV2,
   DayData,
@@ -16,6 +16,10 @@ import {
   saveDailyPlanner,
 } from "./storage";
 import { completionKey } from "./recurrence";
+import { fetchRemotePlanner, upsertRemotePlanner } from "@/lib/services/plannerSync";
+import { getAuthUser } from "@/lib/services/userPreferences";
+
+const SYNC_DEBOUNCE_MS = 2000;
 
 function deepClone<T>(x: T): T {
   if (typeof structuredClone === "function") return structuredClone(x);
@@ -25,15 +29,56 @@ function deepClone<T>(x: T): T {
 export function useDailyPlannerState() {
   const [state, setState] = useState<DailyPlannerV2 | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isInitialLoad = useRef(true);
 
+  // 1. Hydrate from localStorage immediately, then merge with Supabase in background.
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- load from localStorage
-    setState(loadDailyPlanner());
+    const local = loadDailyPlanner();
+    setState(local);
     setHydrated(true);
+
+    void (async () => {
+      const user = await getAuthUser();
+      if (!user) return;
+
+      const remote = await fetchRemotePlanner(user.id);
+      if (!remote) return;
+
+      // If remote is newer than what we loaded from localStorage, adopt it.
+      const localTs = localStorage.getItem("klokr_planner_synced_at") ?? "0";
+      if (remote.updated_at > localTs) {
+        setState(remote.data);
+        saveDailyPlanner(remote.data);
+        localStorage.setItem("klokr_planner_synced_at", remote.updated_at);
+      }
+    })();
   }, []);
 
+  // 2. On every state change: save to localStorage immediately, debounce Supabase write.
   useEffect(() => {
-    if (state) saveDailyPlanner(state);
+    if (!state) return;
+    saveDailyPlanner(state);
+
+    // Skip the debounced remote write on the very first load (we just loaded from remote).
+    if (isInitialLoad.current) {
+      isInitialLoad.current = false;
+      return;
+    }
+
+    if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
+    syncTimerRef.current = setTimeout(() => {
+      void (async () => {
+        const user = await getAuthUser();
+        if (!user) return;
+        await upsertRemotePlanner(user.id, state);
+        localStorage.setItem("klokr_planner_synced_at", new Date().toISOString());
+      })();
+    }, SYNC_DEBOUNCE_MS);
+
+    return () => {
+      if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
+    };
   }, [state]);
 
   const update = useCallback((fn: (s: DailyPlannerV2) => DailyPlannerV2) => {

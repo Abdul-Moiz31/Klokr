@@ -22,10 +22,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const today = new Date().toISOString().split("T")[0];
+    // Use the timezone offset from the request to match the extension's local date.
+    // Falls back to UTC if header is absent.
+    const tzOffset = parseInt(request.headers.get("x-tz-offset") ?? "0", 10) || 0;
+    const now = new Date();
+    const localNow = new Date(now.getTime() - tzOffset * 60 * 1000);
+    const today = localNow.toISOString().split("T")[0]!;
     const { data, error } = await supabase
       .from("tab_sessions")
-      .select("domain, duration_seconds, page_title")
+      .select("domain, duration_seconds, page_title, visits")
       .eq("user_id", user.id)
       .eq("date", today);
 
@@ -37,6 +42,7 @@ export async function GET(request: NextRequest) {
       domain: string;
       duration_seconds: number;
       page_title: string;
+      visits: number | null;
     };
     const aggregated = Object.values(
       (data as Session[]).reduce(
@@ -49,7 +55,7 @@ export async function GET(request: NextRequest) {
             };
           }
           acc[session.domain].total_seconds += session.duration_seconds;
-          acc[session.domain].visits += 1;
+          acc[session.domain].visits += session.visits ?? 1;
           return acc;
         },
         {} as Record<

@@ -53,7 +53,7 @@ export type RecurringRule = {
 };
 
 /** Saved ad-hoc-style task groups used as “start from this” for a class of days */
-export type RoutineTemplateKind = "fallback" | "weekdays" | "weekend";
+export type RoutineTemplateKind = "fallback" | "weekdays" | "saturday" | "sunday";
 
 /**
  * v2: recurring rules + ad-hoc per calendar day + task dump.
@@ -68,7 +68,7 @@ export type DailyPlannerV2 = {
   /** `${ruleId}:${yyyy-mm-dd}` -> done for that calendar day */
   recurringCompletions: Record<string, boolean>;
   /**
-   * Fallback = generic starter; weekdays = Mon–Fri; weekend = Sat–Sun.
+   * Fallback = generic starter; weekdays = Mon–Fri; saturday / sunday = each day separately.
    * Applying copies a deep clone with fresh group/task ids into ad-hoc for that day.
    */
   routineTemplates: Record<RoutineTemplateKind, DayData>;
