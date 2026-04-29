@@ -89,7 +89,7 @@ const cards = [
     ),
     title: "Idle Detection",
     description:
-      "If you step away, Klokr knows. Tracking automatically pauses after 5 minutes of inactivity and resumes the moment you return.",
+      "If you step away, Klokrs knows. Tracking automatically pauses after 5 minutes of inactivity and resumes the moment you return.",
     tags: ["Smart Pause", "Auto Resume"],
     gradient: "from-violet-600/20 to-pink-600/10",
     color: "text-violet-400",

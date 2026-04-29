@@ -1,6 +1,6 @@
 <div align="center">
-  <img src="public/icon128.png" width="96" height="96" alt="Klokr" />
-  <h1>Klokr</h1>
+  <img src="public/icon128.png" width="96" height="96" alt="Klokrs" />
+  <h1>Klokrs</h1>
   <p><strong>Know exactly where your time goes.</strong></p>
   <p>A silent tab tracker built for engineers who want honest data about their day.</p>
   <br />
@@ -9,13 +9,13 @@
 
 ---
 
-![Klokr Dashboard](public/images/Web.png)
+![Klokrs Dashboard](public/images/Web.png)
 
 ---
 
 ## Why this exists
 
-Most engineers end their day with no real idea where the hours went. You opened tabs. You worked. Eight hours passed. But if someone asked you to account for the day you would struggle to give an honest answer. That is not a discipline problem. It is a data problem. You never had accurate information about your own digital behavior, so you could not do anything about it. Klokr fixes that.
+Most engineers end their day with no real idea where the hours went. You opened tabs. You worked. Eight hours passed. But if someone asked you to account for the day you would struggle to give an honest answer. That is not a discipline problem. It is a data problem. You never had accurate information about your own digital behavior, so you could not do anything about it. Klokrs fixes that.
 
 ---
 
@@ -52,7 +52,7 @@ A silent background process that runs while you work. The popup shows today's to
 
 Install the Chrome extension from the Chrome Web Store. One click. No sign-in required to start. It begins watching immediately.
 
-Work normally. Klokr records every tab, every domain, and every second in the background. You do not touch it. There are no timers to start and no logs to fill in. It even detects when you go idle and pauses automatically.
+Work normally. Klokrs records every tab, every domain, and every second in the background. You do not touch it. There are no timers to start and no logs to fill in. It even detects when you go idle and pauses automatically.
 
 Open your dashboard when you are ready to look. Every domain you visited, every minute you spent, organized by day, week, and month. You will know within thirty seconds where your time actually went.
 
@@ -76,7 +76,7 @@ Open your dashboard when you are ready to look. Every domain you visited, every 
 
 ---
 
-You built things today. Klokr just makes sure you can prove it.
+You built things today. Klokrs just makes sure you can prove it.
 
 ---
 

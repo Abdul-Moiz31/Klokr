@@ -37,7 +37,7 @@ function formatDate(d: Date) {
 
 type Task = { id: string; text: string; done: boolean };
 
-const TASKS_KEY = "klokr_pomodoro_tasks";
+const TASKS_KEY = "Klokrs_pomodoro_tasks";
 
 export function PomodoroApp() {
   const [mode, setMode] = useState<Mode>("focus");
@@ -98,7 +98,7 @@ export function PomodoroApp() {
         if (r <= 1) {
           beep();
           setIsRunning(false);
-          if (typeof document !== "undefined") document.title = "Klokr — Dashboard";
+          if (typeof document !== "undefined") document.title = "Klokrs — Dashboard";
           return 0;
         }
         return r - 1;
@@ -109,7 +109,7 @@ export function PomodoroApp() {
 
   useEffect(() => {
     if (typeof document === "undefined") return;
-    if (!isRunning) { document.title = "Klokr — Dashboard"; return; }
+    if (!isRunning) { document.title = "Klokrs — Dashboard"; return; }
     document.title = `${formatHms(remaining)} — ${MODE_LABEL[mode]}`;
   }, [isRunning, remaining, mode]);
 

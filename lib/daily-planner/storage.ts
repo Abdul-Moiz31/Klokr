@@ -10,7 +10,7 @@ import { isRecurringDone, rulesForDate } from "./recurrence";
 export { dayKey } from "./date";
 export { ruleAppliesOnDate, rulesForDate, completionKey, isRecurringDone } from "./recurrence";
 
-const STORAGE_KEY = "klokr_daily_planner_v1";
+const STORAGE_KEY = "Klokrs_daily_planner_v1";
 
 function newId() {
   return typeof crypto !== "undefined" && crypto.randomUUID
