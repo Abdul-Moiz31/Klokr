@@ -15,14 +15,14 @@ const ITEMS: { q: string; a: string }[] = [
   },
   {
     q: "Do I have to start a timer every day?",
-    a: "No. Klokr is designed for passive tracking while you work. The daily planner and Pomodoro are optional layers on top if you want structure.",
+    a: "No. Klokrs is designed for passive tracking while you work. The daily planner and Pomodoro are optional layers on top if you want structure.",
   },
   {
     q: "Can I use the dashboard without the extension?",
     a: "You can sign in and use the app, but tab time and domain analytics require the Chrome extension to send session data from the browser you want measured.",
   },
   {
-    q: "What if I delete my account or stop using Klokr?",
+    q: "What if I delete my account or stop using Klokrs?",
     a: "You can sign out and stop the extension. For account or data questions, use your app settings and provider policies (Supabase) as we wire them in over time.",
   },
 ];

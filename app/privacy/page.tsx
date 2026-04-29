@@ -4,8 +4,8 @@ import { Footer } from "@/components/landing/Footer";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy — Klokr",
-  description: "Privacy policy for Klokr, the tab time tracking app.",
+  title: "Privacy Policy — Klokrs",
+  description: "Privacy policy for Klokrs, the tab time tracking app.",
 };
 
 const LAST_UPDATED = "April 27, 2026";
@@ -41,14 +41,14 @@ export default function PrivacyPage() {
 
         {/* Intro */}
         <p className="mb-10 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-5 text-sm leading-relaxed text-white/55">
-          Your privacy matters. This policy explains what data Klokr collects,
+          Your privacy matters. This policy explains what data Klokrs collects,
           why we collect it, and how we use and protect it. We will never sell
           your personal data to third parties.
         </p>
 
         <Section title="1. Who We Are">
           <p>
-            Klokr is an independently built productivity tool. If you have any
+            Klokrs is an independently built productivity tool. If you have any
             questions about this policy, contact us at{" "}
             <a
               href="mailto:abdulmoiz3140@gmail.com"
@@ -76,7 +76,7 @@ export default function PrivacyPage() {
               <p className="mb-1.5 font-semibold text-white/75">Browsing activity</p>
               <p>
                 The domain names and page titles of browser tabs you visit
-                while the Klokr extension is active and tracking is enabled.
+                while the Klokrs extension is active and tracking is enabled.
                 We record the start time, end time, and duration of each
                 visit. We do not capture full URLs, passwords, form inputs,
                 page content, or any personally identifiable information from
@@ -206,7 +206,7 @@ export default function PrivacyPage() {
 
         <Section title="8. Cookies and Local Storage">
           <p>
-            Klokr uses browser local storage and cookies solely for session
+            Klokrs uses browser local storage and cookies solely for session
             management (keeping you logged in) and storing your preferences such
             as tracking state. We do not use tracking cookies, third-party
             analytics cookies, or advertising cookies.
@@ -215,7 +215,7 @@ export default function PrivacyPage() {
 
         <Section title="9. Children&apos;s Privacy">
           <p>
-            Klokr is not directed at children under 13. We do not knowingly
+            Klokrs is not directed at children under 13. We do not knowingly
             collect data from children under 13. If you believe a child under
             13 has created an account, contact us and we will delete it promptly.
           </p>
@@ -237,7 +237,7 @@ export default function PrivacyPage() {
             Policy or your personal data, contact us at:
           </p>
           <div className="mt-3 rounded-xl border border-white/[0.07] bg-white/[0.02] p-4">
-            <p className="text-white/70">Klokr</p>
+            <p className="text-white/70">Klokrs</p>
             <a
               href="mailto:abdulmoiz3140@gmail.com"
               className="mt-1 block text-violet-400 underline-offset-2 hover:underline"

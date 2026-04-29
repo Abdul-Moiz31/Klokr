@@ -13,17 +13,17 @@ type ChromeRuntime = {
 };
 
 /**
- * Pushes the Supabase session to the Klokr extension so the popup can call /api.
- * Set NEXT_PUBLIC_Klokr_EXTENSION_ID in .env.local to your id from chrome://extensions.
+ * Pushes the Supabase session to the Klokrs extension so the popup can call /api.
+ * Set NEXT_PUBLIC_Klokrs_EXTENSION_ID in .env.local to your id from chrome://extensions.
  */
 function sendSessionToExtension(accessToken: string, userId: string) {
   if (typeof window === "undefined") return;
 
   // Path 1: content script is injected on this page — postMessage is always available.
-  window.postMessage({ type: "Klokr_AUTH", token: accessToken, userId }, window.location.origin);
+  window.postMessage({ type: "Klokrs_AUTH", token: accessToken, userId }, window.location.origin);
 
   // Path 2: if the extension ID is configured, also send directly (faster, no round-trip).
-  const extId = process.env.NEXT_PUBLIC_Klokr_EXTENSION_ID;
+  const extId = process.env.NEXT_PUBLIC_Klokrs_EXTENSION_ID;
   if (!extId) return;
   const runtime = (window as unknown as { chrome?: { runtime?: ChromeRuntime } })
     .chrome?.runtime;

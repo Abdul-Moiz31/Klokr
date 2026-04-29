@@ -83,7 +83,7 @@ function SignupForm() {
     } else {
       if (data.session) {
         window.postMessage(
-          { type: "Klokr_AUTH", token: data.session.access_token, userId: data.session.user.id },
+          { type: "Klokrs_AUTH", token: data.session.access_token, userId: data.session.user.id },
           window.location.origin
         );
       }
@@ -187,7 +187,7 @@ export default function SignupPage() {
               </linearGradient>
             </defs>
           </svg>
-          <span className="font-bold text-xl">Klokr</span>
+          <span className="font-bold text-xl">Klokrs</span>
         </Link>
 
         <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-8">

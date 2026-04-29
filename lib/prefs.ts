@@ -1,4 +1,4 @@
-export interface KlokrPrefs {
+export interface KlokrsPrefs {
   minSessionSeconds: number;
   idleTimeoutMinutes: number;
   workStartHour: number;
@@ -7,7 +7,7 @@ export interface KlokrPrefs {
   productiveHoursThreshold: number;
 }
 
-export const DEFAULT_PREFS: KlokrPrefs = {
+export const DEFAULT_PREFS: KlokrsPrefs = {
   minSessionSeconds: 10,
   idleTimeoutMinutes: 2,
   workStartHour: 9,
@@ -16,18 +16,18 @@ export const DEFAULT_PREFS: KlokrPrefs = {
   productiveHoursThreshold: 4,
 };
 
-export const PREFS_KEY = "klokr_prefs";
+export const PREFS_KEY = "Klokrs_prefs";
 
-export function loadPrefs(): KlokrPrefs {
+export function loadPrefs(): KlokrsPrefs {
   if (typeof window === "undefined") return DEFAULT_PREFS;
   try {
     const raw = localStorage.getItem(PREFS_KEY);
-    if (raw) return { ...DEFAULT_PREFS, ...(JSON.parse(raw) as Partial<KlokrPrefs>) };
+    if (raw) return { ...DEFAULT_PREFS, ...(JSON.parse(raw) as Partial<KlokrsPrefs>) };
   } catch { /* ignore */ }
   return DEFAULT_PREFS;
 }
 
-export function savePrefs(p: KlokrPrefs): void {
+export function savePrefs(p: KlokrsPrefs): void {
   try { localStorage.setItem(PREFS_KEY, JSON.stringify(p)); }
   catch { /* ignore */ }
 }
