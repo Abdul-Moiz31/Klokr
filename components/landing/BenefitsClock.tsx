@@ -62,7 +62,7 @@ export function BenefitsClock() {
           <h2 className="text-4xl lg:text-5xl font-bold text-white">
             Every turn of the clock,{" "}
             <span className="bg-gradient-to-r from-violet-400 to-cyan-400 bg-clip-text text-transparent">
-              a reason to use Klokr
+              a reason to use Klokrs
             </span>
           </h2>
           <p className="mt-4 text-white/50 text-lg max-w-2xl mx-auto">

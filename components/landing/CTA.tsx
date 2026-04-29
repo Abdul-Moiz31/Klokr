@@ -57,7 +57,7 @@ export function CTA() {
           </form>
 
           <p className="text-white/30 text-sm">
-            Join 2,000+ engineers already tracking their time with Klokr
+            Join 2,000+ engineers already tracking their time with Klokrs
           </p>
         </motion.div>
       </div>

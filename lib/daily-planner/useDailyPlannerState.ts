@@ -46,11 +46,11 @@ export function useDailyPlannerState() {
       if (!remote) return;
 
       // If remote is newer than what we loaded from localStorage, adopt it.
-      const localTs = localStorage.getItem("klokr_planner_synced_at") ?? "0";
+      const localTs = localStorage.getItem("Klokrs_planner_synced_at") ?? "0";
       if (remote.updated_at > localTs) {
         setState(remote.data);
         saveDailyPlanner(remote.data);
-        localStorage.setItem("klokr_planner_synced_at", remote.updated_at);
+        localStorage.setItem("Klokrs_planner_synced_at", remote.updated_at);
       }
     })();
   }, []);
@@ -72,7 +72,7 @@ export function useDailyPlannerState() {
         const user = await getAuthUser();
         if (!user) return;
         await upsertRemotePlanner(user.id, state);
-        localStorage.setItem("klokr_planner_synced_at", new Date().toISOString());
+        localStorage.setItem("Klokrs_planner_synced_at", new Date().toISOString());
       })();
     }, SYNC_DEBOUNCE_MS);
 

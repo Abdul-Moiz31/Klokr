@@ -27,7 +27,7 @@ export function PostHero() {
         >
           <div className="space-y-1.5 max-w-2xl">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-violet-400/90">
-              Why Klokr
+              Why Klokrs
             </p>
             <p className="text-lg text-white/80 md:text-xl font-medium leading-snug">
               Automatic tab time, a dashboard that makes sense, and a planner
