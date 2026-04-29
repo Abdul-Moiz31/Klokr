@@ -10,7 +10,7 @@ import { PasswordInput } from "@/components/ui/PasswordInput";
 import { Button } from "@/components/ui/Button";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { Loader } from "@/components/ui/Loader";
-import { DEFAULT_PREFS, loadPrefs, savePrefs, type KlokrPrefs } from "@/lib/prefs";
+import { DEFAULT_PREFS, loadPrefs, savePrefs, type KlokrsPrefs } from "@/lib/prefs";
 import type { User } from "@supabase/supabase-js";
 
 /* ─── Primitives ─────────────────────────────────────────── */
@@ -182,7 +182,7 @@ export default function SettingsPage() {
   const [passwordMsg, setPasswordMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const [prefs, setPrefs] = useState<KlokrPrefs>(DEFAULT_PREFS);
+  const [prefs, setPrefs] = useState<KlokrsPrefs>(DEFAULT_PREFS);
   const [prefsSaved, setPrefsSaved] = useState(false);
 
   const [notifPermission, setNotifPermission] = useState<NotificationPermission | "unsupported">("default");
@@ -225,7 +225,7 @@ export default function SettingsPage() {
     setTimeout(() => setNameMsg(null), 3000);
   };
 
-  const updatePrefs = (patch: Partial<KlokrPrefs>) => {
+  const updatePrefs = (patch: Partial<KlokrsPrefs>) => {
     setPrefs((p) => {
       const next = { ...p, ...patch };
       savePrefs(next);
@@ -282,7 +282,7 @@ export default function SettingsPage() {
     setExporting(false);
     if (error || !data) { setExportMsg("Export failed: " + (error?.message ?? "no data")); return; }
     if (data.length === 0) { setExportMsg("No data in this range."); return; }
-    downloadCSV(toCSV(data as Record<string, unknown>[]), `klokr-export-${exportRange}-${todayStr}.csv`);
+    downloadCSV(toCSV(data as Record<string, unknown>[]), `Klokrs-export-${exportRange}-${todayStr}.csv`);
     setExportMsg(`Exported ${data.length} rows.`);
   };
 
@@ -372,7 +372,7 @@ export default function SettingsPage() {
               </div>
 
               <div>
-                <SectionTitle tooltip="Your Klokr account details. Tab data is tied to this email address.">Account</SectionTitle>
+                <SectionTitle tooltip="Your Klokrs account details. Tab data is tied to this email address.">Account</SectionTitle>
                 <Card>
                   <PrefRow label="Email">
                     <span className="text-sm text-white/70 break-all">{user?.email ?? "—"}</span>
@@ -396,7 +396,7 @@ export default function SettingsPage() {
                   <div className="py-3 space-y-3">
                     {[
                       "Keep this tab signed in so the extension can read your auth session.",
-                      "Pin the Klokr icon from your Chrome extensions menu for quick access.",
+                      "Pin the Klokrs icon from your Chrome extensions menu for quick access.",
                       "Browse in a normal window (not Incognito) for sessions to be tracked.",
                       "The extension syncs every ~60 seconds and when you switch tabs.",
                     ].map((tip, i) => (
@@ -416,7 +416,7 @@ export default function SettingsPage() {
           {/* ── Security ── */}
           {activeTab === "security" && (
             <div>
-              <SectionTitle tooltip="Change your Klokr login password. Must be at least 8 characters.">Password</SectionTitle>
+              <SectionTitle tooltip="Change your Klokrs login password. Must be at least 8 characters.">Password</SectionTitle>
               <Card>
                 <form onSubmit={handleChangePassword} className="py-3 space-y-4 max-w-sm">
                   <PasswordInput
@@ -534,13 +534,13 @@ export default function SettingsPage() {
           {/* ── Notifications ── */}
           {activeTab === "notifications" && (
             <div>
-              <SectionTitle tooltip="Browser notifications let Klokr alert you when a focus session ends or your workday summary is ready.">Browser notifications</SectionTitle>
+              <SectionTitle tooltip="Browser notifications let Klokrs alert you when a focus session ends or your workday summary is ready.">Browser notifications</SectionTitle>
               <Card>
                 <PrefRow
                   label="Permission"
                   hint={
                     notifPermission === "granted"
-                      ? "Klokr can send you browser alerts."
+                      ? "Klokrs can send you browser alerts."
                       : notifPermission === "denied"
                         ? "Permission denied — reset in your browser settings."
                         : notifPermission === "unsupported"
@@ -614,7 +614,7 @@ export default function SettingsPage() {
               </div>
 
               <div>
-                <SectionTitle tooltip="A summary of exactly what data Klokr records — and what it never touches.">What we store</SectionTitle>
+                <SectionTitle tooltip="A summary of exactly what data Klokrs records — and what it never touches.">What we store</SectionTitle>
                 <Card>
                   <div className="py-3 space-y-2.5 text-sm text-white/50 leading-relaxed">
                     <p>One row per tab session: domain, page title, start/end time, duration, and visit count.</p>

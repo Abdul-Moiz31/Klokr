@@ -184,7 +184,7 @@ export function Loader({ className = "", clockSize = 80 }: LoaderProps) {
 
       {/* Brand wordmark */}
       <p className="text-[10px] font-bold uppercase tracking-[0.22em] bg-gradient-to-r from-violet-400 to-cyan-400 bg-clip-text text-transparent">
-        Klokr
+        Klokrs
       </p>
 
       {/* Cycling productivity quote */}
