@@ -28,12 +28,18 @@ function formatTime(s: number): string {
   return `${m}m`;
 }
 
-function calcStreak(dailyMap: Map<string, number>, thresholdS: number, todayStr: string): number {
+// Counts consecutive days with any tracked time.
+// If today has no data yet (day just started), checks from yesterday so the
+// streak doesn't reset at midnight before you've had a chance to browse.
+function calcStreak(dailyMap: Map<string, number>, todayStr: string): number {
   let streak = 0;
   const cursor = new Date(todayStr + "T00:00:00");
+  if ((dailyMap.get(todayStr) ?? 0) === 0) {
+    cursor.setDate(cursor.getDate() - 1);
+  }
   while (true) {
     const key = localDateStr(cursor);
-    if ((dailyMap.get(key) ?? 0) >= thresholdS) {
+    if ((dailyMap.get(key) ?? 0) > 0) {
       streak++;
       cursor.setDate(cursor.getDate() - 1);
     } else {
@@ -107,8 +113,8 @@ export default function ActivityPage() {
   );
 
   const streak = useMemo(
-    () => calcStreak(dailyMap, thresholdS, todayStr),
-    [dailyMap, thresholdS, todayStr]
+    () => calcStreak(dailyMap, todayStr),
+    [dailyMap, todayStr]
   );
 
   const bestDay = useMemo(() => {
@@ -164,8 +170,8 @@ export default function ActivityPage() {
         <StatsCard
           title="Current streak"
           value={`${streak}d`}
-          subtitle={streak > 0 ? "consecutive productive days" : "Start your streak today"}
-          tooltip="Consecutive days ending today where you hit your productivity goal. Missing a day resets the streak."
+          subtitle={streak > 0 ? "consecutive days tracked" : "Start your streak today"}
+          tooltip="Consecutive days with any tracked browsing, ending today (or yesterday if you haven't browsed yet today). Missing a full day resets the streak."
           accent={streak >= 7 ? "violet" : "neutral"}
           delay={0.1}
           icon={
@@ -194,6 +200,9 @@ export default function ActivityPage() {
         stats={stats}
         productiveThresholdSeconds={thresholdS}
         todayStr={todayStr}
+        streak={streak}
+        productiveDays={productiveDays}
+        bestDayStr={bestDay?.date ?? null}
         onDayClick={handleDayClick}
       />
 
@@ -203,6 +212,9 @@ export default function ActivityPage() {
           date={selectedDate}
           userId={user.id}
           productiveThresholdSeconds={thresholdS}
+          streak={streak}
+          productiveDays={productiveDays}
+          totalDays={stats.length}
           onClose={() => setSelectedDate(null)}
         />
       )}

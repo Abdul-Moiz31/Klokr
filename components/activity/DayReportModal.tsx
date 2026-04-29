@@ -15,6 +15,9 @@ interface Props {
   date: string | null; // YYYY-MM-DD
   userId: string;
   productiveThresholdSeconds: number;
+  streak: number;
+  productiveDays: number;
+  totalDays: number;
   onClose: () => void;
 }
 
@@ -78,9 +81,12 @@ function HorizontalBar({ domain, seconds, maxSeconds, visits }: {
   );
 }
 
-export function DayReportModal({ date, userId, productiveThresholdSeconds, onClose }: Props) {
+const MINOR_THRESHOLD_S = 5 * 60;
+
+export function DayReportModal({ date, userId, productiveThresholdSeconds, streak, productiveDays, totalDays, onClose }: Props) {
   const [domains, setDomains] = useState<DomainRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [minorExpanded, setMinorExpanded] = useState(false);
 
   useEffect(() => {
     if (!date) return;
@@ -167,12 +173,22 @@ export function DayReportModal({ date, userId, productiveThresholdSeconds, onClo
                     {date ? formatDate(date) : ""}
                   </h2>
                 </div>
-                <div className="flex items-center gap-2 shrink-0 mt-0.5">
+                <div className="flex items-center gap-2 shrink-0 mt-0.5 flex-wrap justify-end">
                   {!loading && isProductive && (
                     <span className="rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-semibold text-emerald-400">
                       Productive
                     </span>
                   )}
+                  <div className="flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.04] px-2.5 py-1">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-orange-400">
+                      <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                    </svg>
+                    <span className="text-[10px] font-semibold text-white/80 tabular-nums">{streak}d streak</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.04] px-2.5 py-1">
+                    <div className="h-2 w-2 rounded-sm bg-gradient-to-br from-violet-500 to-cyan-400" />
+                    <span className="text-[10px] font-semibold text-white/80 tabular-nums">{productiveDays}/{totalDays} productive</span>
+                  </div>
                   <button
                     type="button"
                     onClick={onClose}
@@ -213,47 +229,81 @@ export function DayReportModal({ date, userId, productiveThresholdSeconds, onClo
                   </div>
                 ) : domains.length === 0 ? (
                   <p className="py-6 text-center text-sm text-white/30">No sessions recorded for this day.</p>
-                ) : (
-                  <>
-                    <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-white/25">
-                      Time breakdown
-                    </p>
-                    <div className="divide-y divide-white/[0.04]">
-                      {domains.slice(0, 10).map((d) => (
-                        <HorizontalBar
-                          key={d.domain}
-                          domain={d.domain}
-                          seconds={d.totalSeconds}
-                          maxSeconds={maxSeconds}
-                          visits={d.visits}
-                        />
-                      ))}
-                    </div>
-                    {domains.length > 10 && (
-                      <p className="mt-2 text-center text-xs text-white/25">
-                        +{domains.length - 10} more domains
+                ) : (() => {
+                  const major = domains.filter((d) => d.totalSeconds >= MINOR_THRESHOLD_S);
+                  const minor = domains.filter((d) => d.totalSeconds < MINOR_THRESHOLD_S);
+                  const minorSeconds = minor.reduce((s, d) => s + d.totalSeconds, 0);
+                  return (
+                    <>
+                      <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-white/25">
+                        Time breakdown
                       </p>
-                    )}
-                  </>
-                )}
+                      <div className="divide-y divide-white/[0.04]">
+                        {major.map((d) => (
+                          <HorizontalBar
+                            key={d.domain}
+                            domain={d.domain}
+                            seconds={d.totalSeconds}
+                            maxSeconds={maxSeconds}
+                            visits={d.visits}
+                          />
+                        ))}
+                      </div>
+
+                      {minor.length > 0 && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => setMinorExpanded((v) => !v)}
+                            className="mt-1 flex w-full items-center gap-3 rounded-lg py-2 text-left transition-colors hover:bg-white/[0.03]"
+                          >
+                            <div className="flex w-5 h-5 shrink-0 items-center justify-center rounded border border-white/[0.08] bg-white/[0.04]">
+                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-white/25">
+                                <circle cx="12" cy="12" r="10" /><path d="M12 8v4M12 16h.01" />
+                              </svg>
+                            </div>
+                            <span className="flex-1 text-xs font-medium text-white/40">
+                              Other — {minor.length} domain{minor.length !== 1 ? "s" : ""} under 5 min
+                            </span>
+                            <span className="text-xs text-white/30 tabular-nums">{formatTime(minorSeconds)}</span>
+                            <svg
+                              width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                              className={`text-white/25 transition-transform duration-200 ${minorExpanded ? "rotate-180" : ""}`}
+                            >
+                              <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          </button>
+
+                          <AnimatePresence>
+                            {minorExpanded && (
+                              <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: "auto", opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                transition={{ duration: 0.2, ease: "easeInOut" }}
+                                className="overflow-hidden rounded-lg bg-white/[0.02] px-3"
+                              >
+                                <div className="divide-y divide-white/[0.04]">
+                                  {minor.map((d) => (
+                                    <HorizontalBar
+                                      key={d.domain}
+                                      domain={d.domain}
+                                      seconds={d.totalSeconds}
+                                      maxSeconds={maxSeconds}
+                                      visits={d.visits}
+                                    />
+                                  ))}
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
 
-              {/* Footer */}
-              <div className="flex items-center justify-between border-t border-white/[0.06] px-5 py-3">
-                <p className="text-[10px] text-white/25">
-                  Download report available in a future release
-                </p>
-                <button
-                  type="button"
-                  disabled
-                  className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs text-white/25 cursor-not-allowed"
-                >
-                  <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M5.5 1v7M3 6l2.5 2L8 6M1 9.5h9" />
-                  </svg>
-                  Export PDF
-                </button>
-              </div>
             </div>
           </motion.div>
         </>
