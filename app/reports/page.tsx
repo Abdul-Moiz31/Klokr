@@ -23,6 +23,7 @@ import { StatsCard } from "@/components/dashboard/StatsCard";
 import { Loader } from "@/components/ui/Loader";
 import { ReportsDomainTable } from "@/components/reports/ReportsDomainTable";
 import { DomainDrilldownModal } from "@/components/reports/DomainDrilldownModal";
+import { getSiteName } from "@/lib/domain";
 import type { User } from "@supabase/supabase-js";
 
 // ─── Types ────────────────────────────────────────────────────────
@@ -240,7 +241,7 @@ function generatePdf(
     head: [["#", "Domain", "Total Time", "Visits", "% of Total"]],
     body: domains.map((d, i) => [
       String(i + 1),
-      d.domain.replace(/^www\./, ""),
+      getSiteName(d.domain),
       formatTime(d.total_seconds),
       String(d.visit_count),
       `${d.percentage_of_total}%`,
@@ -505,7 +506,9 @@ export default function ReportsPage() {
     () => (reportData?.by_domain ?? []).reduce((s, d) => s + d.total_seconds, 0),
     [reportData]
   );
-  const topDomain = reportData?.by_domain[0]?.domain ?? "—";
+  const topDomain = reportData?.by_domain[0]?.domain
+    ? getSiteName(reportData.by_domain[0].domain)
+    : "—";
   const domainCount = reportData?.by_domain.length ?? 0;
 
   const mostProductiveDay = useMemo(() => {

@@ -3,6 +3,7 @@
 import { useId, useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
+import { getSiteName } from "@/lib/domain";
 import {
   BarChart,
   Bar,
@@ -17,20 +18,6 @@ interface DomainData {
   domain: string;
   pageTitle: string;
   totalSeconds: number;
-}
-
-function getSiteName(domain: string, pageTitle: string): string {
-  const cleanDomain = domain.replace(/^www\./, "");
-  if (pageTitle && pageTitle !== cleanDomain && pageTitle !== domain) {
-    const parts = pageTitle.split(/\s[\|\-·—–]\s/);
-    if (parts.length > 1) {
-      const last = parts[parts.length - 1]!.trim();
-      if (last.length > 0 && last.length <= 40) return last;
-    }
-    if (pageTitle.length <= 40) return pageTitle;
-  }
-  const name = cleanDomain.split(".")[0] ?? cleanDomain;
-  return name.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 function formatTime(seconds: number): string {
