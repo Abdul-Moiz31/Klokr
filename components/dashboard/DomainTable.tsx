@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
+import { getSiteName } from "@/lib/domain";
 
 interface DomainRow {
   domain: string;
@@ -19,20 +20,6 @@ function formatTime(seconds: number): string {
   const m = Math.floor((seconds % 3600) / 60);
   if (h > 0) return `${h}h ${m}m`;
   return `${m}m`;
-}
-
-function getSiteName(domain: string, pageTitle: string): string {
-  const cleanDomain = domain.replace(/^www\./, "");
-  if (pageTitle && pageTitle !== cleanDomain && pageTitle !== domain) {
-    const parts = pageTitle.split(/\s[\|\-·—–]\s/);
-    if (parts.length > 1) {
-      const last = parts[parts.length - 1]!.trim();
-      if (last.length > 0 && last.length <= 40) return last;
-    }
-    if (pageTitle.length <= 40) return pageTitle;
-  }
-  const name = cleanDomain.split(".")[0] ?? cleanDomain;
-  return name.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 const RANK_STYLES = [
@@ -105,11 +92,6 @@ export function DomainTable({
               <span className="block truncate text-sm font-semibold text-white/90" title={row.domain}>
                 {siteName}
               </span>
-              {siteName !== row.domain.replace(/^www\./, "") && (
-                <span className="block truncate text-[11px] text-white/30" title={row.domain}>
-                  {row.domain.replace(/^www\./, "")}
-                </span>
-              )}
             </div>
             <span className="shrink-0 text-xs text-white/35 tabular-nums">
               {share < 1 ? "<1" : Math.round(share)}%
