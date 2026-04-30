@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { getSiteName } from "@/lib/domain";
 import {
   BarChart,
   Bar,
@@ -157,6 +158,8 @@ export function DomainDrilldownModal({
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  const displayName = getSiteName(domain);
+
   return (
     <AnimatePresence>
       <motion.div
@@ -193,7 +196,7 @@ export function DomainDrilldownModal({
             </div>
             <div className="min-w-0 flex-1">
               <h2 className="truncate text-sm font-semibold text-white/95">
-                {domain}
+                {displayName}
               </h2>
               <p className="text-xs text-white/40">
                 {formatTime(totalSeconds)} total
