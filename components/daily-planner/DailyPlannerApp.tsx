@@ -74,7 +74,7 @@ export function DailyPlannerApp() {
 
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("today");
   const todayK = getTodayKey();
-  const now = useMemo(() => new Date(), [todayK]);
+  const now = new Date();
 
   const todayAdHoc: DayData = useMemo(() => {
     if (!state) return createEmptyDayData();
@@ -82,10 +82,7 @@ export function DailyPlannerApp() {
   }, [state, todayK]);
 
   const rules = getTrackingRules();
-  const suggestedKind = useMemo(
-    () => suggestedRoutineTemplateKind(new Date()),
-    [todayK]
-  );
+  const suggestedKind = suggestedRoutineTemplateKind(now);
 
   const tryApplyTemplate = (kind: RoutineTemplateKind) => {
     if (!state) return;
@@ -103,7 +100,7 @@ export function DailyPlannerApp() {
   }
 
   return (
-    <div className="w-full max-w-4xl">
+    <div className="w-full max-w-7xl">
       <ExtensionPlannerSync rules={rules} />
 
       {/* Tab bar */}

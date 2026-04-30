@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@/lib/supabase";
+import { getSiteName } from "@/lib/domain";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 
 interface DomainRow {
