@@ -12,6 +12,7 @@ import { DomainChart } from "@/components/dashboard/DomainChart";
 import { DomainTable } from "@/components/dashboard/DomainTable";
 import { DomainDrilldownModal } from "@/components/reports/DomainDrilldownModal";
 import { Loader } from "@/components/ui/Loader";
+import { getSiteName } from "@/lib/domain";
 import type { TabSession } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
 
@@ -22,22 +23,6 @@ interface DomainStat {
   visits: number;
   hours: number;
   minutes: number;
-}
-
-function getSiteName(domain: string, pageTitle: string): string {
-  const cleanDomain = domain.replace(/^www\./, "");
-  if (pageTitle && pageTitle !== cleanDomain && pageTitle !== domain) {
-    // Extract brand: last segment after common separators like " | ", " - ", " · ", " — "
-    const parts = pageTitle.split(/\s[\|\-·—–]\s/);
-    if (parts.length > 1) {
-      const last = parts[parts.length - 1]!.trim();
-      if (last.length > 0 && last.length <= 40) return last;
-    }
-    if (pageTitle.length <= 40) return pageTitle;
-  }
-  // Fall back: strip subdomains, TLD, capitalize
-  const name = cleanDomain.split(".")[0] ?? cleanDomain;
-  return name.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 function getGreeting(): string {

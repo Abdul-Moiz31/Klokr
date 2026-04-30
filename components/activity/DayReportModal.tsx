@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@/lib/supabase";
+import { getSiteName } from "@/lib/domain";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 
 interface DomainRow {
@@ -60,7 +61,7 @@ function HorizontalBar({ domain, seconds, maxSeconds, visits }: {
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2 mb-1">
-          <span className="text-xs font-medium text-white/80 truncate">{domain.replace("www.", "")}</span>
+          <span className="text-xs font-medium text-white/80 truncate">{getSiteName(domain)}</span>
           <div className="flex items-center gap-2 shrink-0">
             <span className="text-xs text-white/40 tabular-nums">{formatTime(seconds)}</span>
             <span className="rounded-full border border-white/10 bg-white/5 px-1.5 py-0.5 text-[9px] text-white/35 tabular-nums">
@@ -207,7 +208,7 @@ export function DayReportModal({ date, userId, productiveThresholdSeconds, strea
                 {[
                   { label: "Total time", value: loading ? "—" : formatTime(totalSeconds), tooltip: "Sum of all tracked browsing time for this day." },
                   { label: "Domains", value: loading ? "—" : String(domains.length), tooltip: "Number of unique domains visited." },
-                  { label: "Top site", value: loading ? "—" : topDomain.replace("www.", ""), tooltip: "The domain with the most tracked time that day." },
+                  { label: "Top site", value: loading ? "—" : getSiteName(topDomain), tooltip: "The domain with the most tracked time that day." },
                 ].map(({ label, value, tooltip }) => (
                   <div key={label} className="px-4 py-3">
                     <div className="flex items-center gap-1">

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { getSiteName } from "@/lib/domain";
 
 export interface ReportsDomainRow {
   domain: string;
@@ -69,7 +70,7 @@ function DomainRow({
       {/* Domain + bar */}
       <div className="min-w-0 flex-1">
         <p className="mb-1.5 truncate text-sm font-medium text-white/85" title={row.domain}>
-          {row.domain.replace("www.", "")}
+          {getSiteName(row.domain)}
         </p>
         <div className="h-1 w-full overflow-hidden rounded-full bg-white/[0.06]">
           <motion.div
