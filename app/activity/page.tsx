@@ -94,10 +94,10 @@ export default function ActivityPage() {
   useEffect(() => {
     const supabase = createClient();
     void (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push("/login"); return; }
-      setUser(user);
-      await fetchStats(user.id);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { router.push("/login"); return; }
+      setUser(session.user);
+      await fetchStats(session.user.id);
       setLoading(false);
     })();
   }, [router, fetchStats]);
