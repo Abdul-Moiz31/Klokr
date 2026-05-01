@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase";
 import { Input } from "@/components/ui/Input";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 import { Button } from "@/components/ui/Button";
+import { AuthAmbientBackground } from "@/components/auth/AuthAmbientBackground";
 
 function GoogleIcon() {
   return (
@@ -165,14 +166,14 @@ function SignupForm() {
 
 export default function SignupPage() {
   return (
-    <div className="min-h-screen bg-[#0A0A0F] flex items-center justify-center p-6 relative">
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-violet-600/10 rounded-full blur-3xl pointer-events-none" />
+    <div className="min-h-screen bg-[#0A0A0F] flex items-center justify-center p-6 relative overflow-hidden">
+      <AuthAmbientBackground />
 
       <motion.div
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="relative w-full max-w-md"
+        className="relative z-[2] w-full max-w-md"
       >
         <Link href="/" className="flex items-center gap-2 mb-8 justify-center">
           <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
