@@ -78,16 +78,15 @@ export default function DashboardPage() {
     const supabase = createClient();
 
     void (async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const { data: { session } } = await supabase.auth.getSession();
 
-      if (!user) {
+      if (!session) {
         router.push("/login");
         return;
       }
       if (cancelled) return;
 
+      const user = session.user;
       setUser(user);
       await fetchSessions(user.id);
       if (cancelled) return;
