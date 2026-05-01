@@ -1,3 +1,4 @@
+import { LandingShell } from "@/components/landing/LandingShell";
 import { Navbar } from "@/components/landing/Navbar";
 import { Hero } from "@/components/landing/Hero";
 import { PostHero } from "@/components/landing/PostHero";
@@ -14,20 +15,22 @@ import { Footer } from "@/components/landing/Footer";
 
 export default function LandingPage() {
   return (
-    <main className="min-h-screen bg-[#0A0A0F] overflow-x-hidden">
-      <Navbar />
-      <Hero />
-      <PostHero />
-      <Problem />
-      <HowItWorks />
-      <BenefitsClock />
-      <Features />
-      {/* Pricing — ship later */}
-      {/* <Pricing /> */}
-      <FAQ />
-      <Community />
-      <CTA />
-      <Footer />
-    </main>
+    <LandingShell>
+      <main className="min-h-screen bg-[#0A0A0F] overflow-x-hidden">
+        <Navbar />
+        <Hero />
+        <PostHero />
+        <Problem />
+        <HowItWorks />
+        <BenefitsClock />
+        <Features />
+        {/* Pricing — ship later */}
+        {/* <Pricing /> */}
+        <FAQ />
+        <Community />
+        <CTA />
+        <Footer />
+      </main>
+    </LandingShell>
   );
 }
