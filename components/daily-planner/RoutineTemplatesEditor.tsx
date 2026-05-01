@@ -3,13 +3,10 @@
 import { useState } from "react";
 import { DayDataEditor } from "./DayDataEditor";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
-import { Loader } from "@/components/ui/Loader";
-import { useDailyPlannerState } from "@/lib/daily-planner/useDailyPlannerState";
-import type { RoutineTemplateKind } from "@/lib/daily-planner/types";
+import type { DailyPlannerV2, DayData, RoutineTemplateKind } from "@/lib/daily-planner/types";
 import { createEmptyDayData } from "@/lib/daily-planner/storage";
 
 type MainRoutineTab = "weekdays" | "weekend" | "fallback";
-
 type WeekendSubTab = "saturday" | "sunday";
 
 const MAIN_TABS: {
@@ -53,13 +50,6 @@ const MAIN_TABS: {
   },
 ];
 
-function routineTabFromMain(
-  kind: Extract<MainRoutineTab, RoutineTemplateKind>,
-): { id: RoutineTemplateKind; label: string; tooltip: string; icon: React.ReactNode } {
-  const tab = MAIN_TABS.find((t) => t.id === kind)!;
-  return { ...tab, id: kind };
-}
-
 const WEEKEND_SUB_TABS: {
   id: WeekendSubTab;
   label: string;
@@ -95,19 +85,20 @@ const ROUTINE_TEMPLATE_KINDS: {
   tooltip: string;
   icon: React.ReactNode;
 }[] = [
-  routineTabFromMain("weekdays"),
-  routineTabFromMain("fallback"),
+  { ...MAIN_TABS.find((t) => t.id === "weekdays")!, id: "weekdays" },
+  { ...MAIN_TABS.find((t) => t.id === "fallback")!, id: "fallback" },
   ...WEEKEND_SUB_TABS,
 ];
 
-export function RoutineTemplatesEditor() {
-  const { state, hydrated, setRoutineTemplate, newId: newIdFn } = useDailyPlannerState();
+type Props = {
+  state: DailyPlannerV2;
+  setRoutineTemplate: (kind: RoutineTemplateKind, data: DayData) => void;
+  newIdFn: () => string;
+};
+
+export function RoutineTemplatesEditor({ state, setRoutineTemplate, newIdFn }: Props) {
   const [mainTab, setMainTab] = useState<MainRoutineTab>("weekdays");
   const [weekendTab, setWeekendTab] = useState<WeekendSubTab>("saturday");
-
-  if (!hydrated || !state) {
-    return <Loader />;
-  }
 
   const selectedKind: RoutineTemplateKind = mainTab === "weekend" ? weekendTab : mainTab;
   const data = state.routineTemplates[selectedKind] ?? createEmptyDayData();

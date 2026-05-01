@@ -7,12 +7,14 @@ import { AppShell } from "@/components/dashboard/AppShell";
 import { PageHeader } from "@/components/dashboard/PageHeader";
 import { RoutineTemplatesEditor } from "@/components/daily-planner/RoutineTemplatesEditor";
 import { Loader } from "@/components/ui/Loader";
+import { useDailyPlannerState } from "@/lib/daily-planner/useDailyPlannerState";
 import type { User } from "@supabase/supabase-js";
 
 export default function RoutineTemplatesPage() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const { state, hydrated, setRoutineTemplate, newId } = useDailyPlannerState();
 
   useEffect(() => {
     const supabase = createClient();
@@ -24,7 +26,7 @@ export default function RoutineTemplatesPage() {
     })();
   }, [router]);
 
-  if (loading) {
+  if (loading || !hydrated || !state) {
     return (
       <AppShell title="Routine templates">
         <Loader />
@@ -37,7 +39,7 @@ export default function RoutineTemplatesPage() {
   return (
     <AppShell title="Routine templates">
       <PageHeader eyebrow="Templates" title="Routine templates" />
-      <RoutineTemplatesEditor />
+      <RoutineTemplatesEditor state={state} setRoutineTemplate={setRoutineTemplate} newIdFn={newId} />
     </AppShell>
   );
 }
