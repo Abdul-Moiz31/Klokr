@@ -3,8 +3,8 @@ import type { User } from "@supabase/supabase-js";
 
 export async function getAuthUser(): Promise<User | null> {
   const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  return user;
+  const { data: { session } } = await supabase.auth.getSession();
+  return session?.user ?? null;
 }
 
 export async function getAuthSession(): Promise<{
@@ -12,11 +12,8 @@ export async function getAuthSession(): Promise<{
   accessToken: string | null;
 }> {
   const supabase = createClient();
-  const [{ data: { user } }, { data: { session } }] = await Promise.all([
-    supabase.auth.getUser(),
-    supabase.auth.getSession(),
-  ]);
-  return { user, accessToken: session?.access_token ?? null };
+  const { data: { session } } = await supabase.auth.getSession();
+  return { user: session?.user ?? null, accessToken: session?.access_token ?? null };
 }
 
 export async function updateDisplayName(name: string): Promise<void> {

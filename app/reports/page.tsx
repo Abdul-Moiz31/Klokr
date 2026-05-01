@@ -386,18 +386,13 @@ export default function ReportsPage() {
   useEffect(() => {
     const supabase = createClient();
     void (async () => {
-      const {
-        data: { user: u },
-      } = await supabase.auth.getUser();
-      if (!u) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
         router.push("/login");
         return;
       }
-      setUser(u);
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      setAuthToken(session?.access_token ?? null);
+      setUser(session.user);
+      setAuthToken(session.access_token ?? null);
       setPageLoading(false);
     })();
   }, [router]);

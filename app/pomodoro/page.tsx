@@ -17,14 +17,12 @@ export default function PomodoroPage() {
   useEffect(() => {
     const supabase = createClient();
     void (async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
         router.push("/login");
         return;
       }
-      setUser(user);
+      setUser(session.user);
       setLoading(false);
     })();
   }, [router]);

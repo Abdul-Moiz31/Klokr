@@ -19,9 +19,9 @@ export default function RoutineTemplatesPage() {
   useEffect(() => {
     const supabase = createClient();
     void (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push("/login"); return; }
-      setUser(user);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { router.push("/login"); return; }
+      setUser(session.user);
       setLoading(false);
     })();
   }, [router]);

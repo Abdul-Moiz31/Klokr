@@ -43,9 +43,10 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: Props) {
 
   useEffect(() => {
     const supabase = createClient();
-    void supabase.auth.getUser().then(({ data: { user: u } }: { data: { user: User | null } }) => {
-      setUser(u);
-    });
+    void (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setUser(session?.user ?? null);
+    })();
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_e: string, session: Session | null) => {
