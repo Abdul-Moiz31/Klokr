@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ExtensionAuthSync } from "@/components/ExtensionAuthSync";
 import { Sidebar } from "./Sidebar";
+import { RestrictedNotice } from "./RestrictedNotice";
 
 type AppShellProps = {
   children: ReactNode;
@@ -55,6 +56,7 @@ export function AppShell({
 
       <div className="relative z-[1] flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden">
         <ExtensionAuthSync />
+        <RestrictedNotice />
 
         <header className="supports-[padding:env(safe-area-inset-top)]:pt-[env(safe-area-inset-top)] z-30 flex h-14 min-h-[3.5rem] shrink-0 items-center justify-between gap-2 border-b border-white/10 bg-[#0A0A0F]/90 px-3 backdrop-blur-xl lg:hidden">
           <div className="flex min-w-0 flex-1 items-center gap-2">
