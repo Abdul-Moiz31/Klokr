@@ -79,14 +79,14 @@ export default function DashboardPage() {
 
     void (async () => {
       const { data: { session } } = await supabase.auth.getSession();
-
-      if (!session) {
-        router.push("/login");
-        return;
-      }
+      if (!session) { router.push("/login"); return; }
       if (cancelled) return;
 
-      const user = session.user;
+      // Use getUser() for a live server fetch so admin-updated metadata is always fresh
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { router.push("/login"); return; }
+      if (cancelled) return;
+
       setUser(user);
       await fetchSessions(user.id);
       if (cancelled) return;

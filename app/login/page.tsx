@@ -27,6 +27,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState("");
+  const [restricted, setRestricted] = useState(false);
   const router = useRouter();
 
   const handleLogin = async (e: { preventDefault(): void }) => {
@@ -38,7 +39,12 @@ export default function LoginPage() {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
-      setError(error.message);
+      const msg = error.message.toLowerCase();
+      if (msg.includes("banned") || msg.includes("restricted")) {
+        setRestricted(true);
+      } else {
+        setError(error.message);
+      }
       setLoading(false);
     } else {
       if (data.session) {
@@ -67,6 +73,39 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-[#0A0A0F] flex items-center justify-center p-6 relative overflow-hidden">
+      {/* Restricted account modal */}
+      {restricted && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-md">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-sm rounded-2xl border border-red-500/20 bg-[#0f0f16] p-8 text-center shadow-2xl shadow-black/60"
+          >
+            <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-red-500/10 ring-1 ring-red-500/20">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+              </svg>
+            </div>
+            <h2 className="mb-2 text-xl font-bold text-white">Account Restricted</h2>
+            <p className="mb-1 text-sm leading-relaxed text-white/55">
+              Your account has been restricted by an administrator.
+            </p>
+            <p className="mb-6 text-sm leading-relaxed text-white/55">
+              To restore access, please contact{" "}
+              <a href="mailto:admin@klokrs.com" className="font-medium text-violet-400 hover:text-violet-300 transition-colors">
+                admin@klokrs.com
+              </a>
+            </p>
+            <button
+              onClick={() => setRestricted(false)}
+              className="w-full rounded-xl border border-white/10 py-2.5 text-sm text-white/50 transition hover:text-white/80"
+            >
+              Close
+            </button>
+          </motion.div>
+        </div>
+      )}
       <AuthAmbientBackground quotesAnchor="right" />
 
       <motion.div
