@@ -3,6 +3,10 @@ import { createSupabaseForUserJwt } from "@/lib/supabase-user-client";
 
 export async function POST(request: NextRequest) {
   try {
+    // Auth token comes from the Authorization header, not the body.
+    const authHeader = request.headers.get("authorization") ?? "";
+    const auth_token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+
     const body = (await request.json()) as {
       user_id: string;
       domain: string;
@@ -11,7 +15,6 @@ export async function POST(request: NextRequest) {
       end_time: string;
       duration_seconds: number;
       date: string;
-      auth_token: string;
       planner_task_id?: string | null;
       is_new_visit?: boolean;
     };
@@ -24,7 +27,6 @@ export async function POST(request: NextRequest) {
       end_time,
       duration_seconds,
       date,
-      auth_token,
       planner_task_id,
       is_new_visit = false,
     } = body;
