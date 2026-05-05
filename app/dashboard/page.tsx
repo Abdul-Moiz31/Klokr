@@ -92,12 +92,15 @@ export default function DashboardPage() {
       if (cancelled) return;
       setLoading(false);
 
+      // Listen to both INSERT (new domain first seen today) and UPDATE
+      // (heartbeat incrementing duration on an existing row) so the dashboard
+      // refreshes in real-time throughout the session, not just on first visit.
       const channel = supabase
         .channel(`tab_sessions:${user.id}:${crypto.randomUUID()}`)
         .on(
           "postgres_changes",
           {
-            event: "INSERT",
+            event: "*",
             schema: "public",
             table: "tab_sessions",
             filter: `user_id=eq.${user.id}`,
@@ -283,12 +286,13 @@ export default function DashboardPage() {
                 }
               />
               <StatsCard
-                title="Tracking status"
-                value="Active"
-                tooltip="Live data — the dashboard polls every 30s and updates instantly via Supabase Realtime when a new session arrives."
+                title="Last synced"
+                value={lastSynced ? lastSynced.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}
+                subtitle={lastSynced ? "Extension connected" : "Install the extension to begin"}
+                tooltip="Time of the last successful data sync. The dashboard polls every 30s and also updates instantly when a new session is saved."
                 delay={0.15}
                 accent="cyan"
-                badge={{ label: "● Live", color: "green" }}
+                badge={lastSynced ? { label: "● Live", color: "green" } : undefined}
                 icon={
                   <svg
                     width="20"

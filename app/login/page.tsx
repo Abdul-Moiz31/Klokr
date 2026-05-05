@@ -28,6 +28,10 @@ export default function LoginPage() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState("");
   const [restricted, setRestricted] = useState(false);
+  const [forgotMode, setForgotMode] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetMsg, setResetMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
   const router = useRouter();
 
   const handleLogin = async (e: { preventDefault(): void }) => {
@@ -54,6 +58,24 @@ export default function LoginPage() {
         );
       }
       router.push("/dashboard");
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const addr = resetEmail.trim();
+    if (!addr) return;
+    setResetLoading(true);
+    setResetMsg(null);
+    const supabase = createClient();
+    const { error } = await supabase.auth.resetPasswordForEmail(addr, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setResetLoading(false);
+    if (error) {
+      setResetMsg({ type: "err", text: error.message });
+    } else {
+      setResetMsg({ type: "ok", text: "Check your inbox — we sent a reset link." });
     }
   };
 
@@ -153,32 +175,79 @@ export default function LoginPage() {
             <div className="flex-1 h-px bg-white/10" />
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-5">
-            <Input
-              label="Email"
-              type="email"
-              placeholder="you@company.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-            <PasswordInput
-              label="Password"
-              placeholder="Your password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="current-password"
-              required
-            />
-            {error && (
-              <div className="px-4 py-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">
-                {error}
+          {!forgotMode ? (
+            <form onSubmit={handleLogin} className="space-y-5">
+              <Input
+                label="Email"
+                type="email"
+                placeholder="you@company.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+              <div className="space-y-1">
+                <PasswordInput
+                  label="Password"
+                  placeholder="Your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="current-password"
+                  required
+                />
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => { setForgotMode(true); setResetEmail(email); setResetMsg(null); }}
+                    className="text-xs text-white/35 hover:text-violet-400 transition-colors"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
               </div>
-            )}
-            <Button type="submit" className="w-full" disabled={loading || googleLoading}>
-              {loading ? "Signing in…" : "Sign In"}
-            </Button>
-          </form>
+              {error && (
+                <div className="px-4 py-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">
+                  {error}
+                </div>
+              )}
+              <Button type="submit" className="w-full" disabled={loading || googleLoading}>
+                {loading ? "Signing in…" : "Sign In"}
+              </Button>
+            </form>
+          ) : (
+            <form onSubmit={handleForgotPassword} className="space-y-5">
+              <div className="space-y-1.5">
+                <p className="text-sm font-semibold text-white/80">Reset your password</p>
+                <p className="text-xs text-white/40">Enter your email and we&apos;ll send a reset link.</p>
+              </div>
+              <Input
+                label="Email"
+                type="email"
+                placeholder="you@company.com"
+                value={resetEmail}
+                onChange={(e) => setResetEmail(e.target.value)}
+                required
+              />
+              {resetMsg && (
+                <div className={`px-4 py-3 rounded-xl text-sm border ${
+                  resetMsg.type === "ok"
+                    ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                    : "bg-red-500/10 border-red-500/20 text-red-400"
+                }`}>
+                  {resetMsg.text}
+                </div>
+              )}
+              <Button type="submit" className="w-full" disabled={resetLoading}>
+                {resetLoading ? "Sending…" : "Send reset link"}
+              </Button>
+              <button
+                type="button"
+                onClick={() => { setForgotMode(false); setResetMsg(null); }}
+                className="w-full text-center text-sm text-white/35 hover:text-white/60 transition-colors"
+              >
+                ← Back to sign in
+              </button>
+            </form>
+          )}
 
           <p className="text-center text-white/40 text-sm mt-6">
             Don&apos;t have an account?{" "}
