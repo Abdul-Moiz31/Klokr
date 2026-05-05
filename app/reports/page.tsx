@@ -382,6 +382,14 @@ export default function ReportsPage() {
 
   useEffect(() => { setChartMounted(true); }, []);
 
+  // True when the current period is "now" — disables the Next button.
+  const isAtCurrentPeriod = useMemo(() => {
+    const today = new Date();
+    if (tab === "daily") return localDateStr(selectedDate) === localDateStr(today);
+    if (tab === "weekly") return localDateStr(weekStart) === localDateStr(getMonday(today));
+    return monthDate.getFullYear() === today.getFullYear() && monthDate.getMonth() === today.getMonth();
+  }, [tab, selectedDate, weekStart, monthDate]);
+
   // ── Auth ────────────────────────────────────────────────────────
   useEffect(() => {
     const supabase = createClient();
@@ -732,6 +740,7 @@ export default function ReportsPage() {
 
           {/* Next */}
           <button
+            disabled={isAtCurrentPeriod}
             onClick={() => {
               if (tab === "daily") {
                 const d = new Date(selectedDate);
@@ -750,7 +759,7 @@ export default function ReportsPage() {
                 setMonthDate(d);
               }
             }}
-            className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 text-white/40 transition hover:border-white/20 hover:text-white/80"
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 text-white/40 transition hover:border-white/20 hover:text-white/80 disabled:cursor-not-allowed disabled:opacity-30"
             aria-label="Next"
           >
             <svg

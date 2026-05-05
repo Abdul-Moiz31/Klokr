@@ -205,9 +205,14 @@ export default function SettingsPage() {
   }, [router]);
 
   useEffect(() => {
-    setPrefs(loadPrefs());
+    const loaded = loadPrefs();
+    setPrefs(loaded);
     if (typeof Notification !== "undefined") setNotifPermission(Notification.permission);
     else setNotifPermission("unsupported");
+    // Re-sync prefs to extension on page open (covers reinstall/first-login scenarios).
+    try {
+      window.postMessage({ type: "Klokrs_PREFS", prefs: loaded }, window.location.origin);
+    } catch { /* no extension */ }
   }, []);
 
   const handleSaveName = async (e: { preventDefault(): void }) => {
@@ -231,6 +236,10 @@ export default function SettingsPage() {
       savePrefs(next);
       setPrefsSaved(true);
       setTimeout(() => setPrefsSaved(false), 2000);
+      // Push to extension so idle threshold and min session apply immediately.
+      try {
+        window.postMessage({ type: "Klokrs_PREFS", prefs: next }, window.location.origin);
+      } catch { /* no extension installed — silent */ }
       return next;
     });
   };
@@ -508,7 +517,7 @@ export default function SettingsPage() {
               </div>
 
               <div>
-                <SectionTitle tooltip="Fine-tune how the extension counts sessions. Changes apply the next time the extension syncs.">Tracking</SectionTitle>
+                <SectionTitle tooltip="Fine-tune how the extension counts sessions. Changes apply immediately to the running extension.">Tracking</SectionTitle>
                 <Card>
                   <PrefRow label="Minimum session duration" hint="Sessions shorter than this are ignored">
                     <ChipSelect
