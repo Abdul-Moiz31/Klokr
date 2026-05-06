@@ -158,6 +158,7 @@ export function Pricing() {
                 <span className="mb-1 text-sm text-white/35">/ month</span>
               </div>
               <p className="mt-2 text-xs text-white/40">No credit card required. No catch.</p>
+              <p className="mt-2 text-xs text-white/40">LIMITED TIME OFFER.</p>
             </div>
 
             <ul className="mb-8 flex-1 space-y-3">

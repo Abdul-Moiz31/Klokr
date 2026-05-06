@@ -100,6 +100,7 @@ export function DailyPlannerApp() {
 
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("today");
   const [viewDate, setViewDate] = useState<Date>(() => new Date());
+  const [confirmTemplate, setConfirmTemplate] = useState<RoutineTemplateKind | null>(null);
 
   const todayK = getTodayKey();
   const viewK = dayKey(viewDate);
@@ -117,10 +118,8 @@ export function DailyPlannerApp() {
   const tryApplyTemplate = (kind: RoutineTemplateKind) => {
     if (!state) return;
     if (state.adHocByDate[todayK] != null) {
-      const ok = window.confirm(
-        "Replace today's ad-hoc list with this template? Your current ad-hoc tasks for today will be overwritten."
-      );
-      if (!ok) return;
+      setConfirmTemplate(kind);
+      return;
     }
     applyRoutineTemplateToToday(kind);
   };
@@ -345,6 +344,39 @@ export function DailyPlannerApp() {
           )}
         </motion.div>
       </AnimatePresence>
+
+      {/* Confirm-template modal — replaces native window.confirm */}
+      {confirmTemplate !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#0f0f16] p-7 shadow-2xl"
+          >
+            <h3 className="mb-2 text-base font-semibold text-white">Replace today&apos;s tasks?</h3>
+            <p className="mb-6 text-sm leading-relaxed text-white/50">
+              Your current ad-hoc tasks for today will be overwritten with this template.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmTemplate(null)}
+                className="flex-1 rounded-xl border border-white/10 py-2.5 text-sm text-white/50 transition hover:text-white/80"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  applyRoutineTemplateToToday(confirmTemplate);
+                  setConfirmTemplate(null);
+                }}
+                className="flex-1 rounded-xl bg-violet-600 py-2.5 text-sm font-medium text-white transition hover:bg-violet-500"
+              >
+                Replace
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }
