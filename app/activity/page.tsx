@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { AppShell } from "@/components/dashboard/AppShell";
@@ -55,6 +55,7 @@ export default function ActivityPage() {
   const [stats, setStats] = useState<DayStat[]>([]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedSeconds, setSelectedSeconds] = useState(0);
+  const userIdRef = useRef<string | null>(null);
   const router = useRouter();
 
   const prefs = useMemo(() => loadPrefs(), []);
@@ -97,10 +98,22 @@ export default function ActivityPage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { router.push("/login"); return; }
       setUser(session.user);
+      userIdRef.current = session.user.id;
       await fetchStats(session.user.id);
       setLoading(false);
     })();
   }, [router, fetchStats]);
+
+  // Re-fetch when the user switches back to this tab after being away.
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible" && userIdRef.current) {
+        void fetchStats(userIdRef.current);
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [fetchStats]);
 
   // Derived stats
   const dailyMap = useMemo(() => new Map(stats.map((s) => [s.date, s.totalSeconds])), [stats]);

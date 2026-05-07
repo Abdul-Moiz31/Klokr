@@ -53,7 +53,12 @@ export default function LoginPage() {
     } else {
       if (data.session) {
         window.postMessage(
-          { type: "Klokrs_AUTH", token: data.session.access_token, userId: data.session.user.id },
+          {
+            type: "Klokrs_AUTH",
+            token: data.session.access_token,
+            refreshToken: data.session.refresh_token,
+            userId: data.session.user.id,
+          },
           window.location.origin
         );
       }

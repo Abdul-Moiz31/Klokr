@@ -256,6 +256,7 @@ export default function SettingsPage() {
     if (error) { setPasswordMsg({ type: "err", text: error.message }); return; }
     setPassword(""); setPasswordConfirm("");
     setPasswordMsg({ type: "ok", text: "Password updated." });
+    setTimeout(() => setPasswordMsg(null), 3000);
   };
 
   const requestNotifications = async () => {
