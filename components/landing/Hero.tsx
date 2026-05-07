@@ -175,7 +175,7 @@ export function Hero() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.3 }}
-              className="flex flex-col sm:flex-row items-start sm:items-center gap-4"
+              className="flex flex-col sm:flex-row items-start sm:items-center gap-3"
             >
               <Link
                 href="/signup"
@@ -183,10 +183,30 @@ export function Hero() {
               >
                 Get Started Free
               </Link>
-              <p className="text-white/40 text-sm">
-                No credit card required. No setup needed.
-              </p>
+              <a
+                href="https://chromewebstore.google.com/detail/klokrs-tab-time-tracker/blmfhmebeklbekobmamhidobkafpnnfg"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2.5 font-medium rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 hover:border-white/25 text-white/80 hover:text-white transition-all duration-300 px-6 py-4 text-base"
+              >
+                {/* Chrome logo */}
+                <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
+                  <circle cx="12" cy="12" r="4.5" fill="white" fillOpacity="0.9" />
+                  <path d="M12 7.5h9.18A10.5 10.5 0 0 0 2.93 6.27L7.42 14a4.5 4.5 0 0 1 4.58-6.5z" fill="#4285F4" />
+                  <path d="M12 16.5a4.5 4.5 0 0 1-3.9-2.25L3.6 6.4A10.5 10.5 0 0 0 12 22.5a10.45 10.45 0 0 0 9.18-5.4L16.5 9a4.5 4.5 0 0 1-4.5 7.5z" fill="#34A853" />
+                  <path d="M16.5 9H7.42a4.5 4.5 0 0 0-.32.5L2.6 17.55A10.5 10.5 0 0 0 21.18 7.5H12" fill="#FBBC05" />
+                </svg>
+                Add to Chrome
+              </a>
             </motion.div>
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.6, delay: 0.38 }}
+              className="text-white/35 text-sm"
+            >
+              Free · No credit card required · Works instantly after install
+            </motion.p>
 
             <motion.div
               initial={{ opacity: 0 }}

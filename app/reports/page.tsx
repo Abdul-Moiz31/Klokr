@@ -520,7 +520,9 @@ export default function ReportsPage() {
       b.total_seconds > a.total_seconds ? b : a
     );
     return new Date(best.date + "T00:00:00").toLocaleDateString("en-US", {
-      weekday: "long",
+      weekday: "short",
+      month: "short",
+      day: "numeric",
     });
   }, [reportData]);
 
