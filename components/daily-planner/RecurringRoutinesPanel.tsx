@@ -1,7 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import type { RecurrenceFrequency, RecurringRule } from "@/lib/daily-planner/types";
+import { useEffect, useRef, useState } from "react";
+import type {
+  RecurrenceFrequency,
+  RecurringRule,
+  RoutineTemplateKind,
+} from "@/lib/daily-planner/types";
 import { dayKey } from "@/lib/daily-planner/date";
 
 const FREQ: { value: RecurrenceFrequency; label: string }[] = [
@@ -29,6 +33,8 @@ type Props = {
   onAdd: (r: RecurringRule) => void;
   onReplace: (r: RecurringRule) => void;
   onRemove: (id: string) => void;
+  onAppendToTemplate: (kind: RoutineTemplateKind, rule: RecurringRule) => void;
+  onAppendToToday: (rule: RecurringRule) => void;
 };
 
 function emptyForm(): Omit<RecurringRule, "id" | "order"> {
@@ -65,21 +71,85 @@ function freqLabel(r: RecurringRule) {
   }
 }
 
+const TEMPLATE_OPTIONS: { kind: RoutineTemplateKind; label: string }[] = [
+  { kind: "weekdays", label: "Weekdays template" },
+  { kind: "saturday", label: "Saturday template" },
+  { kind: "sunday", label: "Sunday template" },
+  { kind: "fallback", label: "Fallback template" },
+];
+
+function AddToPlanMenu({
+  rule,
+  onClose,
+  onAppendToToday,
+  onAppendToTemplate,
+}: {
+  rule: RecurringRule;
+  onClose: () => void;
+  onAppendToToday: (r: RecurringRule) => void;
+  onAppendToTemplate: (kind: RoutineTemplateKind, r: RecurringRule) => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const fn = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    };
+    document.addEventListener("mousedown", fn);
+    return () => document.removeEventListener("mousedown", fn);
+  }, [onClose]);
+
+  return (
+    <div
+      ref={ref}
+      className="absolute right-0 top-full z-20 mt-1 min-w-[208px] overflow-hidden rounded-lg border border-white/10 bg-[#16161f] py-1 shadow-xl"
+      role="menu"
+    >
+      <button
+        type="button"
+        onClick={() => {
+          onAppendToToday(rule);
+          onClose();
+        }}
+        className="w-full px-3 py-2 text-left text-sm text-white/85 hover:bg-white/10"
+      >
+        Today&apos;s plan
+      </button>
+      <div className="my-1 border-t border-white/[0.06]" />
+      {TEMPLATE_OPTIONS.map(({ kind, label }) => (
+        <button
+          key={kind}
+          type="button"
+          onClick={() => {
+            onAppendToTemplate(kind, rule);
+            onClose();
+          }}
+          className="w-full px-3 py-2 text-left text-sm text-white/85 hover:bg-white/10"
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function RecurringRoutinesPanel({
   rules,
   newId,
   onAdd,
   onReplace,
   onRemove,
+  onAppendToTemplate,
+  onAppendToToday,
 }: Props) {
   const [editing, setEditing] = useState<RecurringRule | "new" | null>(null);
+  const [addMenuRuleId, setAddMenuRuleId] = useState<string | null>(null);
 
   return (
     <div className="space-y-4">
       <p className="text-white/50 text-sm max-w-2xl">
-        Create repeating tasks once. They appear on matching calendar days in
-        &quot;Today&quot; and send tab time to the listed domains. One rule, many
-        days — no copying across weekday / weekend templates.
+        Build a library of routines (schedule + domain tags for tab time). They stay here
+        until you use Add to copy one into a template or onto today&apos;s plan — then it
+        appears in your blocks (for example Daily Routine) and tracks time like any other task.
       </p>
 
       <div className="space-y-2">
@@ -89,13 +159,30 @@ export function RecurringRoutinesPanel({
           .map((r) => (
             <div
               key={r.id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3"
+              className="relative flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3"
             >
               <div className="min-w-0">
                 <p className="text-white/90 font-medium truncate">{r.title || "(no title)"}</p>
                 <p className="text-white/40 text-xs mt-0.5">{freqLabel(r)}</p>
               </div>
-              <div className="flex gap-2 shrink-0">
+              <div className="flex gap-2 shrink-0 items-center">
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setAddMenuRuleId((id) => (id === r.id ? null : r.id))}
+                    className="text-sm text-emerald-400/90 hover:text-emerald-300"
+                  >
+                    Add
+                  </button>
+                  {addMenuRuleId === r.id && (
+                    <AddToPlanMenu
+                      rule={r}
+                      onClose={() => setAddMenuRuleId(null)}
+                      onAppendToToday={onAppendToToday}
+                      onAppendToTemplate={onAppendToTemplate}
+                    />
+                  )}
+                </div>
                 <button
                   type="button"
                   onClick={() => setEditing(r)}
