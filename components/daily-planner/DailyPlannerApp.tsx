@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { Loader } from "@/components/ui/Loader";
 import { DayDataEditor } from "./DayDataEditor";
-import { TodayRecurringTable } from "./TodayRecurringTable";
 import { RecurringRoutinesPanel } from "./RecurringRoutinesPanel";
 import { PastDayView } from "./PastDayView";
 import { RoutineTemplatesEditor } from "./RoutineTemplatesEditor";
@@ -24,7 +23,7 @@ const TABS = [
         <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
       </svg>
     ),
-    tooltip: "Today's recurring routines + your one-off ad-hoc tasks. Use the date arrows to browse past days in journal mode.",
+    tooltip: "Your plan for the day: load a template or edit tasks directly. Use the date arrows to browse past days in journal mode.",
   },
   {
     id: "routines",
@@ -34,7 +33,7 @@ const TABS = [
         <path d="M17 2l4 4-4 4" /><path d="M3 11V9a4 4 0 014-4h14" /><path d="M7 22l-4-4 4-4" /><path d="M21 13v2a4 4 0 01-4 4H3" />
       </svg>
     ),
-    tooltip: "Define repeating routines — set frequency, weekdays, and domain tags. They appear automatically on Today for matching days.",
+    tooltip: "Library of routines (frequency + domains). Use Add to copy a row into a weekday/weekend template or straight onto today’s plan.",
   },
   {
     id: "templates",
@@ -91,7 +90,8 @@ export function DailyPlannerApp() {
     addRecurringRule,
     replaceRecurringRule,
     removeRecurringRule,
-    toggleRecurringDone,
+    appendRecurringRuleToTemplate,
+    appendRecurringRuleToToday,
     getTrackingRules,
     applyRoutineTemplateToToday,
     setRoutineTemplate,
@@ -242,20 +242,9 @@ export function DailyPlannerApp() {
                 /* Today: editable view */
                 <>
                   <SectionHeader
-                    label="Recurring for today"
-                    tooltip="Routines from your Recurring tab that match today's day of week. Check them off — they reset tomorrow."
+                    label="Today's plan"
+                    tooltip="Load a template for weekdays or weekend, edit blocks like Daily Routine, or add tasks manually. Routines from the Recurring tab land here when you use Add → Today's plan or add them into a template first."
                   />
-                  <TodayRecurringTable
-                    state={state}
-                    forDate={now}
-                    onToggleDone={(ruleId) => toggleRecurringDone(ruleId, now)}
-                  />
-
-                  <div className="mt-8">
-                    <SectionHeader
-                      label="Ad-hoc tasks"
-                      tooltip="One-off tasks just for today. Use a template to pre-fill groups, or add tasks manually. Domain tags link to tab tracking."
-                    />
 
                     {/* Template loader */}
                     <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-white/[0.07] bg-white/[0.02] px-4 py-3">
@@ -299,7 +288,6 @@ export function DailyPlannerApp() {
                       onChange={(d) => setTodayAdHoc(d)}
                       newIdFn={newIdFn}
                     />
-                  </div>
                 </>
               )}
             </div>
@@ -309,7 +297,7 @@ export function DailyPlannerApp() {
             <div>
               <SectionHeader
                 label="Recurring routines"
-                tooltip="One row per routine. Set frequency and weekdays — it surfaces on Today automatically and you check it off per day."
+                tooltip="Define each routine once (frequency + domain tags). Add copies it into a template or today’s first task block — it does not appear on Today until you add it."
               />
               <RecurringRoutinesPanel
                 rules={state.recurringRules}
@@ -317,6 +305,8 @@ export function DailyPlannerApp() {
                 onAdd={addRecurringRule}
                 onReplace={replaceRecurringRule}
                 onRemove={removeRecurringRule}
+                onAppendToTemplate={appendRecurringRuleToTemplate}
+                onAppendToToday={appendRecurringRuleToToday}
               />
             </div>
           )}

@@ -3,10 +3,10 @@ import type {
   DailyPlannerV2,
   DayData,
   PlannerTask,
+  RecurringRule,
   RoutineTemplateKind,
 } from "./types";
 import { dayKey } from "./date";
-import { isRecurringDone, rulesForDate } from "./recurrence";
 export { dayKey } from "./date";
 export { ruleAppliesOnDate, rulesForDate, completionKey, isRecurringDone } from "./recurrence";
 
@@ -48,6 +48,42 @@ export function dayDataWithFreshIds(d: DayData): DayData {
     };
   });
   return { groups, tasks };
+}
+
+/**
+ * Appends a task cloned from a recurring rule into the first group (by order).
+ * Tab tracking follows ad-hoc/template tasks only, not the rule list itself.
+ */
+export function appendRecurringRuleAsTaskToDayData(
+  dayData: DayData,
+  rule: Pick<RecurringRule, "title" | "urgent" | "estimateMinutes" | "domainTags">,
+  newIdFn: () => string
+): DayData {
+  let groups = dayData.groups;
+  let tasks = dayData.tasks;
+  if (groups.length === 0) {
+    const empty = createEmptyDayData();
+    groups = empty.groups;
+  }
+  const sorted = [...groups].sort((a, b) => a.order - b.order);
+  const dailyRoutine = sorted.find((g) => /daily\s+routine/i.test(g.title.trim()));
+  const target = dailyRoutine ?? sorted[0];
+  const tasksInG = tasks.filter((t) => t.groupId === target.id);
+  const maxOrder = tasksInG.reduce((m, t) => Math.max(m, t.order), -1);
+  const domainTags = (rule.domainTags ?? [])
+    .map((d) => d.trim().toLowerCase().replace(/^www\./, ""))
+    .filter(Boolean);
+  const newTask: PlannerTask = {
+    id: newIdFn(),
+    groupId: target.id,
+    title: rule.title,
+    urgent: rule.urgent,
+    done: false,
+    estimateMinutes: rule.estimateMinutes,
+    domainTags,
+    order: maxOrder + 1,
+  };
+  return { groups, tasks: [...tasks, newTask] };
 }
 
 
@@ -219,23 +255,14 @@ function pushGroupTasks(
 }
 
 /**
- * Tab-time rules: recurring (by date) → ad-hoc for that day → task dump.
+ * Tab-time rules: planned tasks for that day → task dump.
+ * Recurring-rule rows are a library only until added to a template or today.
  */
 export function buildTabTrackingRules(
   state: DailyPlannerV2,
   forDate: Date
 ): { taskId: string; domains: string[] }[] {
   const order: { taskId: string; domains: string[] }[] = [];
-
-  for (const r of rulesForDate(state.recurringRules, forDate)) {
-    if (isRecurringDone(state, r.id, forDate)) continue;
-    if (!r.domainTags?.length) continue;
-    const domains = r.domainTags
-      .map((d) => d.trim().toLowerCase().replace(/^www\./, ""))
-      .filter(Boolean);
-    if (domains.length === 0) continue;
-    order.push({ taskId: `recurring:${r.id}`, domains });
-  }
 
   const k = dayKey(forDate);
   const adHoc = state.adHocByDate[k] ?? { groups: [], tasks: [] };
