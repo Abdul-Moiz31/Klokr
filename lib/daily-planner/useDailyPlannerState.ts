@@ -8,14 +8,15 @@ import type {
   RoutineTemplateKind,
 } from "./types";
 import {
+  appendRecurringRuleAsTaskToDayData,
   buildTabTrackingRules,
+  createEmptyDayData,
   dayDataWithFreshIds,
   dayKey,
   loadDailyPlanner,
   newId,
   saveDailyPlanner,
 } from "./storage";
-import { completionKey } from "./recurrence";
 import { suggestedRoutineTemplateKind } from "./date";
 import { fetchRemotePlanner, upsertRemotePlanner } from "@/lib/services/plannerSync";
 import { getAuthUser } from "@/lib/services/userPreferences";
@@ -211,17 +212,27 @@ export function useDailyPlannerState() {
     [update]
   );
 
-  const toggleRecurringDone = useCallback(
-    (ruleId: string, d: Date) => {
-      const key = completionKey(ruleId, d);
+  const appendRecurringRuleToTemplate = useCallback(
+    (kind: RoutineTemplateKind, rule: RecurringRule) => {
       update((s) => {
-        const next = { ...s.recurringCompletions };
-        if (next[key]) {
-          delete next[key];
-        } else {
-          next[key] = true;
-        }
-        s.recurringCompletions = next;
+        const cur = s.routineTemplates[kind];
+        s.routineTemplates[kind] = appendRecurringRuleAsTaskToDayData(
+          deepClone(cur),
+          rule,
+          newId
+        );
+        return s;
+      });
+    },
+    [update]
+  );
+
+  const appendRecurringRuleToToday = useCallback(
+    (rule: RecurringRule) => {
+      update((s) => {
+        const k = dayKey(new Date());
+        const cur = s.adHocByDate[k] ?? createEmptyDayData();
+        s.adHocByDate[k] = appendRecurringRuleAsTaskToDayData(deepClone(cur), rule, newId);
         return s;
       });
     },
@@ -269,7 +280,8 @@ export function useDailyPlannerState() {
     updateRecurringRule,
     replaceRecurringRule,
     removeRecurringRule,
-    toggleRecurringDone,
+    appendRecurringRuleToTemplate,
+    appendRecurringRuleToToday,
     newId,
     getTrackingRules,
     setRoutineTemplate,
