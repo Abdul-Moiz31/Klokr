@@ -37,9 +37,10 @@ export default function LoginPage() {
   // Redirect already-logged-in users straight to dashboard
   useEffect(() => {
     const supabase = createClient();
-    void supabase.auth.getSession().then(({ data }) => {
-      if (data.session) router.replace("/dashboard");
-    });
+    void (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) router.replace("/dashboard");
+    })();
   }, [router]);
 
   const handleLogin = async (e: { preventDefault(): void }) => {
