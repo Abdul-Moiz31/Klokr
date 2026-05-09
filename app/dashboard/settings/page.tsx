@@ -44,25 +44,25 @@ function Card({ children }: { children: ReactNode }) {
   );
 }
 
-function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border transition-colors duration-200 focus:outline-none ${
-        checked ? "border-violet-500/50 bg-violet-600" : "border-white/15 bg-white/10"
-      }`}
-    >
-      <span
-        className={`inline-block h-3.5 w-3.5 self-center rounded-full bg-white shadow transition-transform duration-200 ${
-          checked ? "translate-x-4" : "translate-x-0.5"
-        }`}
-      />
-    </button>
-  );
-}
+// function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) { // coming soon
+//   return (
+//     <button
+//       type="button"
+//       role="switch"
+//       aria-checked={checked}
+//       onClick={() => onChange(!checked)}
+//       className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border transition-colors duration-200 focus:outline-none ${
+//         checked ? "border-violet-500/50 bg-violet-600" : "border-white/15 bg-white/10"
+//       }`}
+//     >
+//       <span
+//         className={`inline-block h-3.5 w-3.5 self-center rounded-full bg-white shadow transition-transform duration-200 ${
+//           checked ? "translate-x-4" : "translate-x-0.5"
+//         }`}
+//       />
+//     </button>
+//   );
+// }
 
 function ChipSelect<T extends number | string>({
   options,
@@ -97,22 +97,22 @@ function ChipSelect<T extends number | string>({
 
 /* ─── Export ─────────────────────────────────────────────── */
 
-function toCSV(rows: Record<string, unknown>[]): string {
-  if (!rows.length) return "";
-  const headers = Object.keys(rows[0]!);
-  const escape = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-  return [headers.join(","), ...rows.map((r) => headers.map((h) => escape(r[h])).join(","))].join("\n");
-}
+// function toCSV(rows: Record<string, unknown>[]): string { // coming soon
+//   if (!rows.length) return "";
+//   const headers = Object.keys(rows[0]!);
+//   const escape = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+//   return [headers.join(","), ...rows.map((r) => headers.map((h) => escape(r[h])).join(","))].join("\n");
+// }
 
-function downloadCSV(content: string, filename: string) {
-  const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
+// function downloadCSV(content: string, filename: string) { // coming soon
+//   const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
+//   const url = URL.createObjectURL(blob);
+//   const a = document.createElement("a");
+//   a.href = url;
+//   a.download = filename;
+//   a.click();
+//   URL.revokeObjectURL(url);
+// }
 
 /* ─── Tab definitions ────────────────────────────────────── */
 
@@ -144,24 +144,16 @@ const TABS = [
       </svg>
     ),
   },
-  {
-    id: "notifications",
-    label: "Notifications",
-    icon: (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 01-3.46 0" />
-      </svg>
-    ),
-  },
-  {
-    id: "data",
-    label: "Data",
-    icon: (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-        <ellipse cx="12" cy="5" rx="9" ry="3" /><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" /><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
-      </svg>
-    ),
-  },
+  // {
+  //   id: "notifications",
+  //   label: "Notifications",
+  //   icon: (
+  //     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+  //       <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 01-3.46 0" />
+  //     </svg>
+  //   ),
+  // },
+  // { id: "data", label: "Data" }, // coming soon
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -185,11 +177,11 @@ export default function SettingsPage() {
   const [prefs, setPrefs] = useState<KlokrsPrefs>(DEFAULT_PREFS);
   const [prefsSaved, setPrefsSaved] = useState(false);
 
-  const [notifPermission, setNotifPermission] = useState<NotificationPermission | "unsupported">("default");
+  // const [notifPermission, setNotifPermission] = useState<NotificationPermission | "unsupported">("default"); // coming soon
 
-  const [exportRange, setExportRange] = useState<"today" | "week" | "month">("week");
-  const [exporting, setExporting] = useState(false);
-  const [exportMsg, setExportMsg] = useState<string | null>(null);
+  // const [exportRange, setExportRange] = useState<"today" | "week" | "month">("week"); // coming soon
+  // const [exporting, setExporting] = useState(false); // coming soon
+  // const [exportMsg, setExportMsg] = useState<string | null>(null); // coming soon
 
   const router = useRouter();
 
@@ -207,8 +199,8 @@ export default function SettingsPage() {
   useEffect(() => {
     const loaded = loadPrefs();
     setPrefs(loaded);
-    if (typeof Notification !== "undefined") setNotifPermission(Notification.permission);
-    else setNotifPermission("unsupported");
+    // if (typeof Notification !== "undefined") setNotifPermission(Notification.permission); // coming soon
+    // else setNotifPermission("unsupported"); // coming soon
     // Re-sync prefs to extension on page open (covers reinstall/first-login scenarios).
     try {
       window.postMessage({ type: "Klokrs_PREFS", prefs: loaded }, window.location.origin);
@@ -259,42 +251,42 @@ export default function SettingsPage() {
     setTimeout(() => setPasswordMsg(null), 3000);
   };
 
-  const requestNotifications = async () => {
-    if (typeof Notification === "undefined") return;
-    const result = await Notification.requestPermission();
-    setNotifPermission(result);
-  };
+  // const requestNotifications = async () => { // coming soon
+  //   if (typeof Notification === "undefined") return;
+  //   const result = await Notification.requestPermission();
+  //   setNotifPermission(result);
+  // };
 
-  const handleExport = async () => {
-    if (!user) return;
-    setExporting(true);
-    setExportMsg(null);
-    const today = new Date();
-    const pad = (n: number) => String(n).padStart(2, "0");
-    const todayStr = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
-    let fromDate = todayStr;
-    if (exportRange === "week") {
-      const d = new Date(today); d.setDate(d.getDate() - 6);
-      fromDate = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-    } else if (exportRange === "month") {
-      const d = new Date(today); d.setDate(d.getDate() - 29);
-      fromDate = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-    }
-    const supabase = createClient();
-    const { data, error } = await supabase
-      .from("tab_sessions")
-      .select("date, domain, page_title, duration_seconds, visits, start_time, end_time")
-      .eq("user_id", user.id)
-      .gte("date", fromDate)
-      .lte("date", todayStr)
-      .order("date", { ascending: false })
-      .order("duration_seconds", { ascending: false });
-    setExporting(false);
-    if (error || !data) { setExportMsg("Export failed: " + (error?.message ?? "no data")); return; }
-    if (data.length === 0) { setExportMsg("No data in this range."); return; }
-    downloadCSV(toCSV(data as Record<string, unknown>[]), `Klokrs-export-${exportRange}-${todayStr}.csv`);
-    setExportMsg(`Exported ${data.length} rows.`);
-  };
+  // const handleExport = async () => { // coming soon
+  //   if (!user) return;
+  //   setExporting(true);
+  //   setExportMsg(null);
+  //   const today = new Date();
+  //   const pad = (n: number) => String(n).padStart(2, "0");
+  //   const todayStr = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+  //   let fromDate = todayStr;
+  //   if (exportRange === "week") {
+  //     const d = new Date(today); d.setDate(d.getDate() - 6);
+  //     fromDate = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  //   } else if (exportRange === "month") {
+  //     const d = new Date(today); d.setDate(d.getDate() - 29);
+  //     fromDate = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  //   }
+  //   const supabase = createClient();
+  //   const { data, error } = await supabase
+  //     .from("tab_sessions")
+  //     .select("date, domain, page_title, duration_seconds, visits, start_time, end_time")
+  //     .eq("user_id", user.id)
+  //     .gte("date", fromDate)
+  //     .lte("date", todayStr)
+  //     .order("date", { ascending: false })
+  //     .order("duration_seconds", { ascending: false });
+  //   setExporting(false);
+  //   if (error || !data) { setExportMsg("Export failed: " + (error?.message ?? "no data")); return; }
+  //   if (data.length === 0) { setExportMsg("No data in this range."); return; }
+  //   downloadCSV(toCSV(data as Record<string, unknown>[]), `Klokrs-export-${exportRange}-${todayStr}.csv`);
+  //   setExportMsg(`Exported ${data.length} rows.`);
+  // };
 
   if (loading) {
     return (
@@ -541,8 +533,8 @@ export default function SettingsPage() {
             </>
           )}
 
-          {/* ── Notifications ── */}
-          {activeTab === "notifications" && (
+          {/* ── Notifications — coming soon ── */}
+          {/* {activeTab === "notifications" && (
             <div>
               <SectionTitle tooltip="Browser notifications let Klokrs alert you when a focus session ends or your workday summary is ready.">Browser notifications</SectionTitle>
               <Card>
@@ -586,10 +578,10 @@ export default function SettingsPage() {
                 </PrefRow>
               </Card>
             </div>
-          )}
+          )} */}
 
-          {/* ── Data ── */}
-          {activeTab === "data" && (
+          {/* ── Data — coming soon ── */}
+          {/* {activeTab === "data" && (
             <>
               <div>
                 <SectionTitle tooltip="Download your raw session data as CSV — domain, page title, start/end time, duration, and visit count.">Export</SectionTitle>
@@ -634,7 +626,7 @@ export default function SettingsPage() {
                 </Card>
               </div>
             </>
-          )}
+          )} */}
 
         </motion.div>
       </AnimatePresence>
