@@ -75,7 +75,8 @@ export default function ActivityPage() {
       .select("date, duration_seconds")
       .eq("user_id", userId)
       .gte("date", fromStr)
-      .lte("date", todayStr);
+      .lte("date", todayStr)
+      .gte("duration_seconds", prefs.minSessionSeconds);
 
     if (!data) return;
 
