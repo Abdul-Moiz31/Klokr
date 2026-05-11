@@ -48,16 +48,7 @@ const TABS = [
     ),
     tooltip: "Save reusable day starters for weekdays, Saturday, Sunday, and a fallback. Load them onto any day in one click.",
   },
-  {
-    id: "inbox",
-    label: "Inbox",
-    icon: (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
-      </svg>
-    ),
-    tooltip: "A persistent backlog for tasks not tied to a specific day. Pull from here when planning or move tasks into Today's ad-hoc list.",
-  },
+  // { id: "inbox", label: "Inbox" }, // coming soon
 ] as const;
 
 function addDays(date: Date, n: number): Date {
@@ -319,7 +310,7 @@ export function DailyPlannerApp() {
             />
           )}
 
-          {tab === "inbox" && (
+          {/* {tab === "inbox" && (  // coming soon
             <div>
               <SectionHeader
                 label="Inbox"
@@ -331,7 +322,7 @@ export function DailyPlannerApp() {
                 newIdFn={newIdFn}
               />
             </div>
-          )}
+          )} */}
         </motion.div>
       </AnimatePresence>
 
