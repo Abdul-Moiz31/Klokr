@@ -163,7 +163,27 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: Props) {
         </svg>
       ),
     },
-    // { href: "/daily-planner", label: "Daily planner" }, // coming soon
+    {
+      href: "/daily-planner",
+      label: "Daily planner",
+      icon: (
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <rect x="3" y="4" width="18" height="18" rx="2" />
+          <path d="M3 10h18" />
+          <path d="M8 2v4" />
+          <path d="M16 2v4" />
+        </svg>
+      ),
+    },
     {
       href: "/dashboard/settings",
       label: "Settings",
