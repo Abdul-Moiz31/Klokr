@@ -144,7 +144,25 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: Props) {
         </svg>
       ),
     },
-    // { href: "/pomodoro", label: "Pomodoro" },       // coming soon
+    {
+      href: "/pomodoro",
+      label: "Pomodoro",
+      icon: (
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <circle cx="12" cy="12" r="10" />
+          <path d="M12 6v6l4 2" />
+        </svg>
+      ),
+    },
     // { href: "/daily-planner", label: "Daily planner" }, // coming soon
     {
       href: "/dashboard/settings",
