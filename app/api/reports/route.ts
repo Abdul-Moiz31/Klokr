@@ -35,6 +35,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const start_date = searchParams.get("start_date");
     const end_date = searchParams.get("end_date");
+    const min_seconds = parseInt(searchParams.get("min_seconds") ?? "0", 10) || 0;
 
     if (!start_date || !end_date) {
       return NextResponse.json(
@@ -45,12 +46,18 @@ export async function GET(request: NextRequest) {
 
     const supabase = createSupabaseForUserJwt(auth_token);
 
-    const { data, error } = await supabase
+    let query = supabase
       .from("tab_sessions")
       .select("domain, date, duration_seconds, visits")
       .eq("user_id", jwtSub)
       .gte("date", start_date)
       .lte("date", end_date);
+
+    if (min_seconds > 0) {
+      query = query.gte("duration_seconds", min_seconds);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
