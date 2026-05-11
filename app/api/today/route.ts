@@ -28,11 +28,19 @@ export async function GET(request: NextRequest) {
     const now = new Date();
     const localNow = new Date(now.getTime() - tzOffset * 60 * 1000);
     const today = localNow.toISOString().split("T")[0]!;
-    const { data, error } = await supabase
+    const min_seconds = parseInt(new URL(request.url).searchParams.get("min_seconds") ?? "0", 10) || 0;
+
+    let query = supabase
       .from("tab_sessions")
       .select("domain, duration_seconds, page_title, visits")
       .eq("user_id", user.id)
       .eq("date", today);
+
+    if (min_seconds > 0) {
+      query = query.gte("duration_seconds", min_seconds);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });

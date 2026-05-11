@@ -3,7 +3,7 @@
 import { useId, useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
-import { getSiteName } from "@/lib/domain";
+import { getSiteName, groupByRootDomain } from "@/lib/domain";
 import {
   BarChart,
   Bar,
@@ -61,10 +61,12 @@ export function DomainChart({
 
   if (data.length === 0) return null;
 
-  const chartData = data.slice(0, 8).map((d) => ({
-    domain: getSiteName(d.domain, d.pageTitle),
-    seconds: d.totalSeconds,
-  }));
+  const adapted = data.map((d) => ({ ...d, visits: 0 }));
+  const grouped = groupByRootDomain(adapted);
+  const chartData = grouped.slice(0, 8).map((g) => {
+    const best = g.subdomains.reduce((a, b) => a.totalSeconds >= b.totalSeconds ? a : b);
+    return { domain: getSiteName(g.rootDomain, (best as DomainData).pageTitle), seconds: g.totalSeconds };
+  });
 
   const maxSeconds = Math.max(...chartData.map((d) => d.seconds), 1);
   const useMinutes = maxSeconds < 3600;

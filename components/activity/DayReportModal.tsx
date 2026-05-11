@@ -3,13 +3,14 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@/lib/supabase";
-import { getSiteName } from "@/lib/domain";
+import { getSiteName, groupByRootDomain } from "@/lib/domain";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 
 interface DomainRow {
   domain: string;
   totalSeconds: number;
   visits: number;
+  subdomains?: DomainRow[];
 }
 
 interface Props {
@@ -88,6 +89,15 @@ export function DayReportModal({ date, userId, productiveThresholdSeconds, strea
   const [domains, setDomains] = useState<DomainRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [minorExpanded, setMinorExpanded] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+
+  const toggleGroup = (domain: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      next.has(domain) ? next.delete(domain) : next.add(domain);
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (!date) return;
@@ -113,11 +123,19 @@ export function DayReportModal({ date, userId, productiveThresholdSeconds, strea
             visits: cur.visits + (s.visits ?? 1),
           });
         }
-        const rows: DomainRow[] = Array.from(map.entries())
+        const raw: DomainRow[] = Array.from(map.entries())
           .map(([domain, v]) => ({ domain, ...v }))
           .sort((a, b) => b.totalSeconds - a.totalSeconds);
 
-        setDomains(rows);
+        // Group subdomains under root domain
+        const grouped = groupByRootDomain(raw).map((g) => ({
+          domain: g.rootDomain,
+          totalSeconds: g.totalSeconds,
+          visits: g.visits,
+          subdomains: g.subdomains.length > 1 ? g.subdomains.sort((a, b) => b.totalSeconds - a.totalSeconds) : [],
+        }));
+
+        setDomains(grouped);
         setLoading(false);
       });
   }, [date, userId]);
@@ -241,13 +259,40 @@ export function DayReportModal({ date, userId, productiveThresholdSeconds, strea
                       </p>
                       <div className="divide-y divide-white/[0.04]">
                         {major.map((d) => (
-                          <HorizontalBar
-                            key={d.domain}
-                            domain={d.domain}
-                            seconds={d.totalSeconds}
-                            maxSeconds={maxSeconds}
-                            visits={d.visits}
-                          />
+                          <div key={d.domain}>
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1">
+                                <HorizontalBar domain={d.domain} seconds={d.totalSeconds} maxSeconds={maxSeconds} visits={d.visits} />
+                              </div>
+                              {d.subdomains && d.subdomains.length > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => toggleGroup(d.domain)}
+                                  className="shrink-0 flex items-center gap-1 rounded border border-white/10 bg-white/[0.05] px-1.5 py-0.5 text-[10px] text-white/35 hover:text-white/60 transition-colors"
+                                >
+                                  {d.subdomains.length + 1}
+                                  <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`transition-transform duration-200 ${expandedGroups.has(d.domain) ? "rotate-180" : ""}`}>
+                                    <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+                                  </svg>
+                                </button>
+                              )}
+                            </div>
+                            <AnimatePresence>
+                              {d.subdomains && d.subdomains.length > 0 && expandedGroups.has(d.domain) && (
+                                <motion.div
+                                  initial={{ height: 0, opacity: 0 }}
+                                  animate={{ height: "auto", opacity: 1 }}
+                                  exit={{ height: 0, opacity: 0 }}
+                                  transition={{ duration: 0.18, ease: "easeInOut" }}
+                                  className="overflow-hidden rounded-lg bg-white/[0.02] px-3 mb-1"
+                                >
+                                  {d.subdomains.map((sub) => (
+                                    <HorizontalBar key={sub.domain} domain={sub.domain} seconds={sub.totalSeconds} maxSeconds={maxSeconds} visits={sub.visits} />
+                                  ))}
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </div>
                         ))}
                       </div>
 
