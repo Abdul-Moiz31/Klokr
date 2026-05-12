@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { DayData, PlannerGroup, PlannerTask } from "@/lib/daily-planner/types";
+import { useSparkle } from "@/components/ui/SparkleEffect";
 
 type Props = {
   data: DayData;
@@ -39,6 +40,15 @@ export function DayDataEditor({ data, onChange, newIdFn }: Props) {
   const [addingGroupId, setAddingGroupId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const { fire: fireSparkle } = useSparkle();
+
+  const handleCheckboxClick = (e: React.MouseEvent, id: string, currentDone: boolean) => {
+    if (!currentDone) {
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      fireSparkle({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
+    }
+    onChange({ ...data, tasks: data.tasks.map((t) => (t.id === id ? { ...t, done: !currentDone } as PlannerTask : t)) });
+  };
 
   const setGroups = (groups: PlannerGroup[]) => onChange({ ...data, groups });
   const setTasks = (tasks: PlannerTask[]) => onChange({ ...data, tasks });
@@ -207,7 +217,7 @@ export function DayDataEditor({ data, onChange, newIdFn }: Props) {
                           <button
                             type="button"
                             aria-label={t.done ? "Mark pending" : "Mark done"}
-                            onClick={() => updateTask(t.id, { done: !t.done })}
+                            onClick={(e) => handleCheckboxClick(e, t.id, t.done)}
                             className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
                               t.done
                                 ? "border-violet-500/50 bg-violet-500/20"
@@ -396,6 +406,7 @@ export function DayDataEditor({ data, onChange, newIdFn }: Props) {
         </svg>
         Add group
       </button>
+
     </div>
   );
 }

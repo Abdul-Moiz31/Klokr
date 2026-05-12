@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSparkle } from "@/components/ui/SparkleEffect";
 
 type Mode = "focus" | "short" | "long";
 
@@ -49,6 +50,7 @@ export function PomodoroApp() {
   const totalForMode = DEFAULTS[mode];
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const audioRef = useRef<AudioContext | null>(null);
+  const { fire: fireSparkle } = useSparkle();
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 30_000);
@@ -266,7 +268,11 @@ export function PomodoroApp() {
                   <button
                     type="button"
                     aria-label="Mark done"
-                    onClick={() => toggleTask(t.id)}
+                    onClick={(e) => {
+                      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                      fireSparkle({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
+                      toggleTask(t.id);
+                    }}
                     className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border border-white/25 hover:border-violet-400/60 transition-colors"
                   />
                   <span className="flex-1 min-w-0 text-sm text-white/80 break-words leading-snug">

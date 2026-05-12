@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
+import { toast } from "sonner";
 import { PageHeader } from "@/components/dashboard/PageHeader";
 import { createClient } from "@/lib/supabase";
 import { AppShell } from "@/components/dashboard/AppShell";
@@ -167,15 +168,11 @@ export default function SettingsPage() {
 
   const [displayName, setDisplayName] = useState("");
   const [nameSaving, setNameSaving] = useState(false);
-  const [nameMsg, setNameMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
-
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
-  const [passwordMsg, setPasswordMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
   const [saving, setSaving] = useState(false);
 
   const [prefs, setPrefs] = useState<KlokrsPrefs>(DEFAULT_PREFS);
-  const [prefsSaved, setPrefsSaved] = useState(false);
 
   // const [notifPermission, setNotifPermission] = useState<NotificationPermission | "unsupported">("default"); // coming soon
 
@@ -210,24 +207,21 @@ export default function SettingsPage() {
   const handleSaveName = async (e: { preventDefault(): void }) => {
     e.preventDefault();
     const trimmed = displayName.trim();
-    if (!trimmed) { setNameMsg({ type: "err", text: "Name cannot be empty." }); return; }
+    if (!trimmed) { toast.error("Name cannot be empty."); return; }
     setNameSaving(true);
-    setNameMsg(null);
     const supabase = createClient();
     const { error } = await supabase.auth.updateUser({ data: { full_name: trimmed } });
     setNameSaving(false);
-    if (error) { setNameMsg({ type: "err", text: error.message }); return; }
+    if (error) { toast.error(error.message); return; }
     setUser((u) => u ? { ...u, user_metadata: { ...u.user_metadata, full_name: trimmed } } : u);
-    setNameMsg({ type: "ok", text: "Name updated." });
-    setTimeout(() => setNameMsg(null), 3000);
+    toast.success("Name updated.");
   };
 
   const updatePrefs = (patch: Partial<KlokrsPrefs>) => {
     setPrefs((p) => {
       const next = { ...p, ...patch };
       savePrefs(next);
-      setPrefsSaved(true);
-      setTimeout(() => setPrefsSaved(false), 2000);
+      toast.success("Preferences saved.");
       // Push to extension so idle threshold and min session apply immediately.
       try {
         window.postMessage({ type: "Klokrs_PREFS", prefs: next }, window.location.origin);
@@ -238,17 +232,15 @@ export default function SettingsPage() {
 
   const handleChangePassword = async (e: { preventDefault(): void }) => {
     e.preventDefault();
-    setPasswordMsg(null);
-    if (password.length < 8) { setPasswordMsg({ type: "err", text: "Use at least 8 characters." }); return; }
-    if (password !== passwordConfirm) { setPasswordMsg({ type: "err", text: "Passwords do not match." }); return; }
+    if (password.length < 8) { toast.error("Use at least 8 characters."); return; }
+    if (password !== passwordConfirm) { toast.error("Passwords do not match."); return; }
     setSaving(true);
     const supabase = createClient();
     const { error } = await supabase.auth.updateUser({ password });
     setSaving(false);
-    if (error) { setPasswordMsg({ type: "err", text: error.message }); return; }
+    if (error) { toast.error(error.message); return; }
     setPassword(""); setPasswordConfirm("");
-    setPasswordMsg({ type: "ok", text: "Password updated." });
-    setTimeout(() => setPasswordMsg(null), 3000);
+    toast.success("Password updated.");
   };
 
   // const requestNotifications = async () => { // coming soon
@@ -361,11 +353,6 @@ export default function SettingsPage() {
                         className="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-sm text-white/90 placeholder-white/20 outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30 transition-colors"
                       />
                     </div>
-                    {nameMsg && (
-                      <p className={`text-sm ${nameMsg.type === "ok" ? "text-emerald-400/90" : "text-red-400/90"}`}>
-                        {nameMsg.text}
-                      </p>
-                    )}
                     <Button type="submit" disabled={nameSaving} variant="primary">
                       {nameSaving ? "Saving…" : "Save name"}
                     </Button>
@@ -435,11 +422,6 @@ export default function SettingsPage() {
                     autoComplete="new-password"
                     placeholder="••••••••"
                   />
-                  {passwordMsg && (
-                    <p className={`text-sm ${passwordMsg.type === "ok" ? "text-emerald-400/90" : "text-red-400/90"}`}>
-                      {passwordMsg.text}
-                    </p>
-                  )}
                   <Button type="submit" disabled={saving} variant="primary">
                     {saving ? "Saving…" : "Update password"}
                   </Button>
@@ -451,15 +433,6 @@ export default function SettingsPage() {
           {/* ── Preferences ── */}
           {activeTab === "preferences" && (
             <>
-              {prefsSaved && (
-                <div className="flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/8 px-4 py-2.5">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-400">
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
-                  <p className="text-xs text-emerald-400/90">Preferences saved automatically.</p>
-                </div>
-              )}
-
               <div>
                 <SectionTitle tooltip="Define what a productive day looks like — used to colour the Activity heatmap and calculate your streak.">Productivity</SectionTitle>
                 <Card>
