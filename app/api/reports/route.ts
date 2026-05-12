@@ -98,8 +98,7 @@ export async function GET(request: NextRequest) {
       .sort((a, b) => b.total_seconds - a.total_seconds);
 
     return NextResponse.json({ by_date, by_domain });
-  } catch (e) {
-    console.error("[api/reports] uncaught:", e);
+  } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

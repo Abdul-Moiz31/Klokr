@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
+import { SUPPORT_EMAIL , AdminEmail } from "@/lib/constants";
 
 export function RestrictedNotice() {
   const router = useRouter();
@@ -65,10 +66,10 @@ export function RestrictedNotice() {
         <p className="mb-6 text-sm text-white/55 leading-relaxed">
           Please contact{" "}
           <a
-            href="mailto:admin@klokrs.com"
+            href={`mailto:${AdminEmail}?subject=Account%20Restriction%20Assistance&body=Hello%20Admin%2C%0A%0AI%20noticed%20that%20my%20account%20is%20restricted.%20Could%20you%20please%20provide%20more%20details%20on%20the%20reason%20for%20this%3F%0A%0AThank%20you.`}
             className="font-medium text-violet-400 hover:text-violet-300 transition-colors"
           >
-            admin@klokrs.com
+            {AdminEmail}
           </a>{" "}
           for assistance.
         </p>

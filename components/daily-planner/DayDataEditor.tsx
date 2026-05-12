@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { DayData, PlannerGroup, PlannerTask } from "@/lib/daily-planner/types";
 import { useSparkle } from "@/components/ui/SparkleEffect";
@@ -41,6 +41,15 @@ export function DayDataEditor({ data, onChange, newIdFn }: Props) {
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [editingId, setEditingId] = useState<string | null>(null);
   const { fire: fireSparkle } = useSparkle();
+
+  // Warn before tab close when a new-task form or title edit is open
+  const hasUnsaved = addingGroupId !== null || editingId !== null;
+  useEffect(() => {
+    if (!hasUnsaved) return;
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [hasUnsaved]);
 
   const handleCheckboxClick = (e: React.MouseEvent, id: string, currentDone: boolean) => {
     if (!currentDone) {

@@ -91,8 +91,7 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
 
     if (fetchError) {
-      console.error("[api/track] read tab_sessions:", fetchError.message, fetchError);
-      return NextResponse.json({ error: fetchError.message }, { status: 500 });
+      return NextResponse.json({ error: "Database error" }, { status: 500 });
     }
 
     if (existing) {
@@ -108,8 +107,7 @@ export async function POST(request: NextRequest) {
         .eq("id", existing.id);
 
       if (error) {
-        console.error("[api/track] update tab_sessions:", error.message, error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: "Database error" }, { status: 500 });
       }
     } else {
       const row: Record<string, unknown> = {
@@ -126,14 +124,12 @@ export async function POST(request: NextRequest) {
 
       const { error } = await supabase.from("tab_sessions").insert(row);
       if (error) {
-        console.error("[api/track] insert tab_sessions:", error.message, error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: "Database error" }, { status: 500 });
       }
     }
 
     return NextResponse.json({ success: true });
-  } catch (e) {
-    console.error("[api/track] uncaught:", e);
+  } catch {
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
