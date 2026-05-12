@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { getSiteName } from "@/lib/domain";
+import { getSiteName, groupByRootDomain } from "@/lib/domain";
 
 export interface ReportsDomainRow {
   domain: string;
@@ -114,16 +114,34 @@ export function ReportsDomainTable({
   onDomainClick?: (domain: string, totalSeconds: number) => void;
 }) {
   const [minorExpanded, setMinorExpanded] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   if (data.length === 0) return null;
 
-  const maxSeconds = data[0]?.total_seconds ?? 1;
   const isClickable = !!onDomainClick;
 
-  const major = data.filter((d) => d.total_seconds >= MINOR_THRESHOLD_S);
-  const minor = data.filter((d) => d.total_seconds < MINOR_THRESHOLD_S);
-  const minorSeconds = minor.reduce((s, d) => s + d.total_seconds, 0);
-  const minorVisits = minor.reduce((s, d) => s + d.visit_count, 0);
+  const toggleGroup = (root: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      next.has(root) ? next.delete(root) : next.add(root);
+      return next;
+    });
+  };
+
+  // Adapt snake_case rows to the groupByRootDomain shape
+  const adapted = data.map((r) => ({ domain: r.domain, totalSeconds: r.total_seconds, visits: r.visit_count, percentage_of_total: r.percentage_of_total }));
+  const totalAllSeconds = adapted.reduce((s, r) => s + r.totalSeconds, 0) || 1;
+  const grouped = groupByRootDomain(adapted).map((g) => ({
+    ...g,
+    percentage_of_total: Math.round((g.totalSeconds / totalAllSeconds) * 1000) / 10,
+  }));
+
+  const maxSeconds = grouped[0]?.totalSeconds ?? 1;
+
+  const major = grouped.filter((d) => d.totalSeconds >= MINOR_THRESHOLD_S);
+  const minor = grouped.filter((d) => d.totalSeconds < MINOR_THRESHOLD_S);
+  const minorSeconds = minor.reduce((s, d) => s + d.totalSeconds, 0);
+  const minorVisits = minor.reduce((s, d) => s + d.visits, 0);
 
   return (
     <motion.div
@@ -152,17 +170,64 @@ export function ReportsDomainTable({
 
       <ul className="divide-y divide-white/[0.05]">
         {/* Major rows */}
-        {major.map((row, i) => (
-          <DomainRow
-            key={row.domain}
-            row={row}
-            rank={i + 1}
-            animDelay={0.25 + i * 0.04}
-            maxSeconds={maxSeconds}
-            isClickable={isClickable}
-            onDomainClick={onDomainClick}
-          />
-        ))}
+        {major.map((group, i) => {
+          const asRow: ReportsDomainRow = { domain: group.rootDomain, total_seconds: group.totalSeconds, visit_count: group.visits, percentage_of_total: group.percentage_of_total };
+          const hasSubdomains = group.subdomains.length > 1;
+          const isExpanded = expandedGroups.has(group.rootDomain);
+          return (
+            <div key={group.rootDomain}>
+              <div className="relative flex items-center">
+                <div className="flex-1">
+                  <DomainRow
+                    row={asRow}
+                    rank={i + 1}
+                    animDelay={0.25 + i * 0.04}
+                    maxSeconds={maxSeconds}
+                    isClickable={isClickable}
+                    onDomainClick={onDomainClick}
+                  />
+                </div>
+                {hasSubdomains && (
+                  <button
+                    type="button"
+                    onClick={() => toggleGroup(group.rootDomain)}
+                    className="absolute right-14 flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.05] px-1.5 py-0.5 text-[10px] text-white/35 hover:text-white/60 hover:bg-white/[0.08] transition-colors"
+                  >
+                    {group.subdomains.length}
+                    <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}>
+                      <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+              <AnimatePresence>
+                {hasSubdomains && isExpanded && (
+                  <motion.ul
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2, ease: "easeInOut" }}
+                    className="overflow-hidden border-t border-white/[0.04] bg-white/[0.015] divide-y divide-white/[0.04]"
+                  >
+                    {group.subdomains
+                      .sort((a, b) => b.totalSeconds - a.totalSeconds)
+                      .map((sub) => (
+                        <li key={sub.domain} className="flex items-center gap-3 px-8 py-2.5 sm:px-10">
+                          <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded border border-white/[0.08] bg-white/[0.04]">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={`https://www.google.com/s2/favicons?domain=${sub.domain}&sz=16`} alt="" width={12} height={12} className="rounded-sm opacity-70" onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0.15"; }} />
+                          </div>
+                          <span className="flex-1 truncate text-xs text-white/40">{sub.domain}</span>
+                          <span className="shrink-0 text-xs tabular-nums text-white/50">{formatTime(sub.totalSeconds)}</span>
+                          <span className="shrink-0 text-[10px] tabular-nums text-white/25">{sub.visits}v</span>
+                        </li>
+                      ))}
+                  </motion.ul>
+                )}
+              </AnimatePresence>
+            </div>
+          );
+        })}
 
         {/* "Other" grouped row */}
         {minor.length > 0 && (
@@ -188,10 +253,7 @@ export function ReportsDomainTable({
                     Other — {minor.length} domain{minor.length !== 1 ? "s" : ""} under 5 min
                   </span>
                   <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-white/[0.06]">
-                    <div
-                      className="h-full rounded-full bg-white/20"
-                      style={{ width: `${Math.max(2, (minorSeconds / maxSeconds) * 100)}%` }}
-                    />
+                    <div className="h-full rounded-full bg-white/20" style={{ width: `${Math.max(2, (minorSeconds / maxSeconds) * 100)}%` }} />
                   </div>
                 </div>
                 <div className="flex w-20 shrink-0 justify-end">
@@ -201,15 +263,11 @@ export function ReportsDomainTable({
                   <span className="text-xs tabular-nums text-white/30">{minorVisits}</span>
                 </div>
                 <div className="hidden w-16 shrink-0 justify-end sm:flex" />
-                <svg
-                  width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-                  className={`shrink-0 text-white/25 transition-transform duration-200 ${minorExpanded ? "rotate-180" : ""}`}
-                >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`shrink-0 text-white/25 transition-transform duration-200 ${minorExpanded ? "rotate-180" : ""}`}>
                   <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </button>
             </li>
-
             <AnimatePresence>
               {minorExpanded && (
                 <motion.div
@@ -220,10 +278,10 @@ export function ReportsDomainTable({
                   className="overflow-hidden border-t border-white/[0.04] bg-white/[0.02]"
                 >
                   <ul className="divide-y divide-white/[0.04]">
-                    {minor.map((row, i) => (
+                    {minor.map((group, i) => (
                       <DomainRow
-                        key={row.domain}
-                        row={row}
+                        key={group.rootDomain}
+                        row={{ domain: group.rootDomain, total_seconds: group.totalSeconds, visit_count: group.visits, percentage_of_total: group.percentage_of_total }}
                         rank={major.length + i + 1}
                         animDelay={i * 0.03}
                         maxSeconds={maxSeconds}

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase";
+import { loadPrefs } from "@/lib/prefs";
 import { AppShell } from "@/components/dashboard/AppShell";
 import { PageHeader } from "@/components/dashboard/PageHeader";
 import { StatsCard } from "@/components/dashboard/StatsCard";
@@ -59,11 +60,13 @@ export default function DashboardPage() {
 
   const fetchSessions = useCallback(async (userId: string) => {
     const supabase = createClient();
+    const { minSessionSeconds } = loadPrefs();
     const { data, error } = await supabase
       .from("tab_sessions")
       .select("*")
       .eq("user_id", userId)
       .eq("date", getTodayString())
+      .gte("duration_seconds", minSessionSeconds)
       .order("duration_seconds", { ascending: false });
 
     if (!error && data) {
