@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -33,15 +33,6 @@ export default function LoginPage() {
   const [resetLoading, setResetLoading] = useState(false);
   const [resetMsg, setResetMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
   const router = useRouter();
-
-  // Redirect already-logged-in users straight to dashboard
-  useEffect(() => {
-    const supabase = createClient();
-    void (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) router.replace("/dashboard");
-    })();
-  }, [router]);
 
   const handleLogin = async (e: { preventDefault(): void }) => {
     e.preventDefault();

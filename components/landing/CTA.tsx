@@ -5,16 +5,18 @@ import { motion, useInView } from "framer-motion";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { useRouter } from "next/navigation";
+import { useAuthCta } from "@/lib/useAuthCta";
 
 export function CTA() {
   const ref = useRef(null);
   const inView = useInView(ref, { once: true, margin: "-100px" });
   const [email, setEmail] = useState("");
   const router = useRouter();
+  const ctaHref = useAuthCta(email);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (email) router.push(`/signup?email=${encodeURIComponent(email)}`);
+    if (email) router.push(ctaHref);
   };
 
   return (

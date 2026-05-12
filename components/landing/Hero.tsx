@@ -4,6 +4,7 @@ import { useRef, useEffect, useState } from "react";
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 import Link from "next/link";
 import { ParticleField } from "./ParticleField";
+import { useAuthCta } from "@/lib/useAuthCta";
 
 function DashboardMockup() {
   const ref = useRef<HTMLDivElement>(null);
@@ -108,6 +109,7 @@ function DashboardMockup() {
 }
 
 export function Hero() {
+  const ctaHref = useAuthCta();
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
@@ -178,7 +180,7 @@ export function Hero() {
               className="flex flex-col sm:flex-row items-start sm:items-center gap-3"
             >
               <Link
-                href="/signup"
+                href={ctaHref}
                 className="inline-flex items-center justify-center font-semibold rounded-xl transition-all duration-300 cursor-pointer bg-violet-600 hover:bg-violet-500 text-white hover:shadow-[0_0_25px_rgba(124,58,237,0.6)] px-8 py-4 text-lg"
               >
                 Get Started Free
