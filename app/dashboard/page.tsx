@@ -42,11 +42,8 @@ function formatTotalTime(seconds: number): string {
 
 function getTodayString() {
   const d = new Date();
-  return [
-    d.getFullYear(),
-    String(d.getMonth() + 1).padStart(2, "0"),
-    String(d.getDate()).padStart(2, "0"),
-  ].join("-");
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60_000);
+  return local.toISOString().split("T")[0]!;
 }
 
 
@@ -55,6 +52,7 @@ export default function DashboardPage() {
   const [sessions, setSessions] = useState<TabSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastSynced, setLastSynced] = useState<Date | null>(null);
+  const [fetchError, setFetchError] = useState(false);
   const [drilldown, setDrilldown] = useState<{ domain: string; totalSeconds: number } | null>(null);
   const router = useRouter();
 
@@ -69,10 +67,13 @@ export default function DashboardPage() {
       .gte("duration_seconds", minSessionSeconds)
       .order("duration_seconds", { ascending: false });
 
-    if (!error && data) {
-      setSessions(data as TabSession[]);
-      setLastSynced(new Date());
+    if (error) {
+      setFetchError(true);
+      return;
     }
+    setFetchError(false);
+    setSessions(data as TabSession[]);
+    setLastSynced(new Date());
   }, []);
 
   useEffect(() => {
@@ -218,6 +219,20 @@ export default function DashboardPage() {
           </>
         }
       />
+
+            {/* Fetch error banner */}
+            {fetchError && (
+              <div className="mb-6 flex items-center justify-between gap-3 rounded-xl border border-red-500/20 bg-red-500/8 px-4 py-3">
+                <p className="text-sm text-red-400/90">Failed to load session data. Check your connection and try again.</p>
+                <button
+                  type="button"
+                  onClick={() => user && void fetchSessions(user.id)}
+                  className="shrink-0 rounded-lg border border-red-500/25 px-3 py-1.5 text-xs font-medium text-red-400 transition hover:bg-red-500/10"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
 
             {/* KPI row */}
             <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:mb-10 lg:grid-cols-4">

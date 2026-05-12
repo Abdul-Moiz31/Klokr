@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
+import { SUPPORT_EMAIL } from "@/lib/constants";
 import { AuthAmbientBackground } from "@/components/auth/AuthAmbientBackground";
 import { Input } from "@/components/ui/Input";
 import { PasswordInput } from "@/components/ui/PasswordInput";
@@ -120,8 +121,8 @@ export default function LoginPage() {
             </p>
             <p className="mb-6 text-sm leading-relaxed text-white/55">
               To restore access, please contact{" "}
-              <a href="mailto:admin@klokrs.com" className="font-medium text-violet-400 hover:text-violet-300 transition-colors">
-                admin@klokrs.com
+              <a href={`mailto:${SUPPORT_EMAIL}`} className="font-medium text-violet-400 hover:text-violet-300 transition-colors">
+                {SUPPORT_EMAIL}
               </a>
             </p>
             <button

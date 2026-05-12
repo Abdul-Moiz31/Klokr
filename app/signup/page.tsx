@@ -22,7 +22,6 @@ function GoogleIcon() {
 }
 
 // Splits camelCase or title-cases spaced names.
-// "abdulMoiz" → "Abdul Moiz"  |  "Abdul moiz" → "Abdul Moiz"
 function formatDisplayName(raw: string): string {
   const trimmed = raw.trim();
   if (!trimmed) return "";
@@ -129,7 +128,7 @@ function SignupForm() {
         <Input
           label="Full name"
           type="text"
-          placeholder="Abdul Moiz"
+          placeholder="Your full name"
           value={name}
           onChange={(e) => setName(e.target.value)}
           required
