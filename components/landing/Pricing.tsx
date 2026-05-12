@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
+import { useAuthCta } from "@/lib/useAuthCta";
 
 function CheckIcon() {
   return (
@@ -111,6 +112,7 @@ const PRO_FEATURES = [
 ];
 
 export function Pricing() {
+  const ctaHref = useAuthCta();
   const [modal, setModal] = useState<"Standard" | "Pro" | null>(null);
 
   return (
@@ -171,7 +173,7 @@ export function Pricing() {
             </ul>
 
             <Link
-              href="/signup"
+              href={ctaHref}
               className="block rounded-xl border border-white/10 bg-white/[0.05] py-2.5 text-center text-sm font-semibold text-white/80 transition hover:bg-white/10 hover:text-white"
             >
               Get started free
