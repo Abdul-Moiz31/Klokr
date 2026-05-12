@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "sonner";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { Loader } from "@/components/ui/Loader";
 import { DayDataEditor } from "./DayDataEditor";
@@ -12,7 +13,7 @@ import { ExtensionPlannerSync } from "@/components/ExtensionPlannerSync";
 import { useDailyPlannerState } from "@/lib/daily-planner/useDailyPlannerState";
 import { createEmptyDayData, dayKey } from "@/lib/daily-planner/storage";
 import { suggestedRoutineTemplateKind } from "@/lib/daily-planner/date";
-import type { DayData, RoutineTemplateKind } from "@/lib/daily-planner/types";
+import type { DayData, RecurringRule, RoutineTemplateKind } from "@/lib/daily-planner/types";
 
 const TABS = [
   {
@@ -83,6 +84,7 @@ export function DailyPlannerApp() {
     removeRecurringRule,
     appendRecurringRuleToTemplate,
     appendRecurringRuleToToday,
+    forceAppendRecurringRuleToToday,
     getTrackingRules,
     applyRoutineTemplateToToday,
     setRoutineTemplate,
@@ -92,6 +94,7 @@ export function DailyPlannerApp() {
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("today");
   const [viewDate, setViewDate] = useState<Date>(() => new Date());
   const [confirmTemplate, setConfirmTemplate] = useState<RoutineTemplateKind | null>(null);
+  const [confirmDuplicateRule, setConfirmDuplicateRule] = useState<RecurringRule | null>(null);
 
   const todayK = getTodayKey();
   const viewK = dayKey(viewDate);
@@ -113,6 +116,7 @@ export function DailyPlannerApp() {
       return;
     }
     applyRoutineTemplateToToday(kind);
+    toast.success(`${kind.charAt(0).toUpperCase() + kind.slice(1)} template loaded`);
   };
 
   if (!hydrated || !state) {
@@ -293,11 +297,25 @@ export function DailyPlannerApp() {
               <RecurringRoutinesPanel
                 rules={state.recurringRules}
                 newId={newIdFn}
-                onAdd={addRecurringRule}
-                onReplace={replaceRecurringRule}
-                onRemove={removeRecurringRule}
+                onAdd={(rule) => {
+                  const addedToday = addRecurringRule(rule);
+                  if (addedToday) toast.success(`"${rule.title}" added to today's plan`);
+                }}
+                onReplace={(rule) => {
+                  const effect = replaceRecurringRule(rule);
+                  const todayName = new Date().toLocaleDateString("en-US", { weekday: "long" });
+                  if (effect === "removed") toast.info(`"${rule.title}" removed from ${todayName}'s plan`);
+                  if (effect === "added") toast.success(`"${rule.title}" added to today's plan`);
+                }}
+                onRemove={(id) => {
+                  const title = removeRecurringRule(id);
+                  if (title) toast.info(`"${title}" removed from recurring tasks and today's plan`);
+                }}
                 onAppendToTemplate={appendRecurringRuleToTemplate}
-                onAppendToToday={appendRecurringRuleToToday}
+                onAppendToToday={(rule) => {
+                  const isDuplicate = appendRecurringRuleToToday(rule);
+                  if (isDuplicate) setConfirmDuplicateRule(rule);
+                }}
               />
             </div>
           )}
@@ -326,6 +344,40 @@ export function DailyPlannerApp() {
         </motion.div>
       </AnimatePresence>
 
+      {/* Duplicate recurring task modal */}
+      {confirmDuplicateRule !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#0f0f16] p-7 shadow-2xl"
+          >
+            <h3 className="mb-2 text-base font-semibold text-white">Already in today&apos;s plan</h3>
+            <p className="mb-6 text-sm leading-relaxed text-white/50">
+              <span className="text-white/75 font-medium">&ldquo;{confirmDuplicateRule.title}&rdquo;</span> is already in today&apos;s plan. Do you still want to add another copy?
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmDuplicateRule(null)}
+                className="flex-1 rounded-xl border border-white/10 py-2.5 text-sm text-white/50 transition hover:text-white/80"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  forceAppendRecurringRuleToToday(confirmDuplicateRule);
+                  toast.success(`"${confirmDuplicateRule.title}" added to today's plan`);
+                  setConfirmDuplicateRule(null);
+                }}
+                className="flex-1 rounded-xl bg-violet-600 py-2.5 text-sm font-medium text-white transition hover:bg-violet-500"
+              >
+                Add anyway
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
       {/* Confirm-template modal — replaces native window.confirm */}
       {confirmTemplate !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
@@ -348,6 +400,7 @@ export function DailyPlannerApp() {
               <button
                 onClick={() => {
                   applyRoutineTemplateToToday(confirmTemplate);
+                  toast.success(`${confirmTemplate.charAt(0).toUpperCase() + confirmTemplate.slice(1)} template loaded`);
                   setConfirmTemplate(null);
                 }}
                 className="flex-1 rounded-xl bg-violet-600 py-2.5 text-sm font-medium text-white transition hover:bg-violet-500"
