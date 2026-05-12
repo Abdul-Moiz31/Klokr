@@ -24,6 +24,7 @@ import { Loader } from "@/components/ui/Loader";
 import { ReportsDomainTable } from "@/components/reports/ReportsDomainTable";
 import { DomainDrilldownModal } from "@/components/reports/DomainDrilldownModal";
 import { getSiteName } from "@/lib/domain";
+import { loadPrefs } from "@/lib/prefs";
 import type { User } from "@supabase/supabase-js";
 
 // ─── Types ────────────────────────────────────────────────────────
@@ -460,8 +461,9 @@ export default function ReportsPage() {
     setReportLoading(true);
     setReportData(null);
     try {
+      const { minSessionSeconds } = loadPrefs();
       const res = await fetch(
-        `/api/reports?start_date=${dateRange.start}&end_date=${dateRange.end}`,
+        `/api/reports?start_date=${dateRange.start}&end_date=${dateRange.end}&min_seconds=${minSessionSeconds}`,
         { headers: { Authorization: `Bearer ${authToken}` } }
       );
       if (res.ok) {
