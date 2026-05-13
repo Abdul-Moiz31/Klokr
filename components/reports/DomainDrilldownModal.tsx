@@ -16,7 +16,7 @@ import { createClient } from "@/lib/supabase";
 import { Loader } from "@/components/ui/Loader";
 
 interface PageRow {
-  page_title: string;
+  domain: string;
   duration_seconds: number;
   visits: number;
   last_visited: string;
@@ -43,9 +43,6 @@ function formatTime(s: number): string {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
-function truncate(str: string, n: number): string {
-  return str.length > n ? str.slice(0, n - 1) + "…" : str;
-}
 
 const HourTooltip = ({
   active,
@@ -87,43 +84,38 @@ export function DomainDrilldownModal({
 
       const { data } = await supabase
         .from("tab_sessions")
-        .select("page_title, duration_seconds, visits, end_time, start_time")
+        .select("domain, duration_seconds, visits, end_time, start_time")
         .eq("user_id", user.id)
-        .eq("domain", domain)
+        .ilike("domain", `%${domain}`)
         .gte("date", startDate)
         .lte("date", endDate);
 
       const sessions = (data ?? []) as Array<{
-        page_title: string;
+        domain: string;
         duration_seconds: number;
         visits: number;
         end_time: string;
         start_time: string;
       }>;
 
-      // Page breakdown
+      // Aggregate by subdomain
       const pageMap = new Map<
         string,
         { duration: number; visits: number; lastVisited: string }
       >();
       for (const s of sessions) {
-        const title = s.page_title || domain;
-        const cur = pageMap.get(title) ?? {
-          duration: 0,
-          visits: 0,
-          lastVisited: "",
-        };
-        pageMap.set(title, {
+        const key = s.domain;
+        const cur = pageMap.get(key) ?? { duration: 0, visits: 0, lastVisited: "" };
+        pageMap.set(key, {
           duration: cur.duration + s.duration_seconds,
           visits: cur.visits + (s.visits ?? 1),
-          lastVisited:
-            s.end_time > cur.lastVisited ? s.end_time : cur.lastVisited,
+          lastVisited: s.end_time > cur.lastVisited ? s.end_time : cur.lastVisited,
         });
       }
       setPages(
         Array.from(pageMap.entries())
-          .map(([page_title, { duration, visits, lastVisited }]) => ({
-            page_title,
+          .map(([subdomain, { duration, visits, lastVisited }]) => ({
+            domain: subdomain,
             duration_seconds: duration,
             visits,
             last_visited: lastVisited,
@@ -294,7 +286,7 @@ export function DomainDrilldownModal({
                       <thead>
                         <tr className="border-b border-white/[0.08] bg-white/[0.03]">
                           <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-white/25">
-                            Page
+                            Domain
                           </th>
                           <th className="px-4 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-white/25">
                             Time
@@ -310,15 +302,15 @@ export function DomainDrilldownModal({
                       <tbody className="divide-y divide-white/[0.05]">
                         {pages.map((p) => (
                           <tr
-                            key={p.page_title}
+                            key={p.domain}
                             className="hover:bg-white/[0.03]"
                           >
                             <td className="max-w-[14rem] px-4 py-3">
                               <span
                                 className="block truncate text-white/80"
-                                title={p.page_title}
+                                title={p.domain}
                               >
-                                {truncate(p.page_title, 60)}
+                                {p.domain}
                               </span>
                             </td>
                             <td className="px-4 py-3 text-right font-medium tabular-nums text-white/90">
