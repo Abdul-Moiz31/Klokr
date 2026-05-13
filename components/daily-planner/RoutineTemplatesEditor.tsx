@@ -189,6 +189,7 @@ export function RoutineTemplatesEditor({ state, setRoutineTemplate, newIdFn }: P
         data={data}
         onChange={(d) => setRoutineTemplate(selectedKind, d)}
         newIdFn={newIdFn}
+        isTemplate
       />
     </div>
   );

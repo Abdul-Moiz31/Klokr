@@ -9,6 +9,8 @@ type Props = {
   data: DayData;
   onChange: (d: DayData) => void;
   newIdFn: () => string;
+  /** When true, checkboxes are non-interactive and tasks are never marked done. */
+  isTemplate?: boolean;
 };
 
 type Draft = {
@@ -36,7 +38,7 @@ function orderedTasksForGroup(tasks: PlannerTask[], groupId: string) {
   ];
 }
 
-export function DayDataEditor({ data, onChange, newIdFn }: Props) {
+export function DayDataEditor({ data, onChange, newIdFn, isTemplate = false }: Props) {
   const [addingGroupId, setAddingGroupId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -219,21 +221,24 @@ export function DayDataEditor({ data, onChange, newIdFn }: Props) {
                         /* ── View mode ── */
                         <div
                           className={`group flex items-start gap-2.5 rounded-xl px-3 py-2.5 transition-colors hover:bg-white/[0.04] ${
-                            t.done ? "opacity-55" : ""
+                            !isTemplate && t.done ? "opacity-55" : ""
                           }`}
                         >
-                          {/* Checkbox */}
+                          {/* Checkbox — disabled in template mode, tasks only get checked in Today */}
                           <button
                             type="button"
                             aria-label={t.done ? "Mark pending" : "Mark done"}
-                            onClick={(e) => handleCheckboxClick(e, t.id, t.done)}
+                            onClick={(e) => { if (!isTemplate) handleCheckboxClick(e, t.id, t.done); }}
+                            disabled={isTemplate}
                             className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
-                              t.done
+                              isTemplate
+                                ? "border-white/15 cursor-default opacity-40"
+                                : t.done
                                 ? "border-violet-500/50 bg-violet-500/20"
                                 : "border-white/25 hover:border-violet-400/60"
                             }`}
                           >
-                            {t.done && (
+                            {!isTemplate && t.done && (
                               <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
                                 <path d="M1.5 4L3 5.5L6.5 2" stroke="#a78bfa" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                               </svg>
@@ -242,7 +247,7 @@ export function DayDataEditor({ data, onChange, newIdFn }: Props) {
 
                           {/* Title + chips */}
                           <div className="flex-1 min-w-0">
-                            <p className={`text-sm leading-snug ${t.done ? "line-through text-white/40" : "text-white/85"}`}>
+                            <p className={`text-sm leading-snug ${!isTemplate && t.done ? "line-through text-white/40" : "text-white/85"}`}>
                               {t.title || "—"}
                             </p>
                             {(t.urgent || t.estimateMinutes != null || t.domainTags.length > 0) && (
