@@ -17,6 +17,32 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { User } from "@supabase/supabase-js";
 
+/* ─── Diagnostics types ──────────────────────────────────── */
+
+interface DiagnosticsData {
+  connected: boolean;
+  lastDbWrite: string | null;
+  sessionsToday: number;
+  pendingWrites: number;
+  lastSyncTs: number | null;
+  lastSyncStatus: "ok" | "fail" | null;
+  extensionVersion: string | null;
+  browser: string;
+  accountId: string;
+  accountCreatedAt: string | null;
+  idleTimeoutMinutes: number;
+  minSessionSeconds: number;
+  workHours: string;
+}
+
+interface DiagnosticsApiResponse {
+  connected: boolean;
+  user_id: string;
+  account_created_at: string | null;
+  last_db_write: string | null;
+  sessions_today: number;
+}
+
 /* ─── Primitives ─────────────────────────────────────────── */
 
 function SectionTitle({ children, tooltip }: { children: ReactNode; tooltip?: string }) {
@@ -358,6 +384,15 @@ const TABS = [
       </svg>
     ),
   },
+  {
+    id: "diagnostics",
+    label: "Diagnostics",
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+      </svg>
+    ),
+  },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -385,6 +420,13 @@ export default function SettingsPage() {
   const [preview, setPreview] = useState<ExportPreview | null>(null);
   const [previewing, setPreviewing] = useState(false);
   const [exporting, setExporting] = useState(false);
+
+  // Diagnostics tab state
+  const [diagData, setDiagData] = useState<DiagnosticsData | null>(null);
+  const [diagLoading, setDiagLoading] = useState(false);
+  const [diagForceSyncing, setDiagForceSyncing] = useState(false);
+  const [diagClearConfirm, setDiagClearConfirm] = useState(false);
+  const [copiedId, setCopiedId] = useState(false);
 
   const router = useRouter();
 
@@ -549,6 +591,107 @@ export default function SettingsPage() {
       { days: new Set(summary.map((r) => r.date)).size, totalSeconds },
     );
     toast.success(`Exported ${summary.length} rows.`);
+  };
+
+  const loadDiagnostics = async () => {
+    if (!user) return;
+    setDiagLoading(true);
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) { toast.error("Not authenticated."); setDiagLoading(false); return; }
+
+      const res = await fetch("/api/diagnostics", {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (!res.ok) { toast.error("Failed to load diagnostics."); setDiagLoading(false); return; }
+      const api = await res.json() as DiagnosticsApiResponse;
+
+      // Extension client-side data arrives via window.postMessage; we read
+      // from localStorage as a fallback since the extension may not be present.
+      const storedPrefs = loadPrefs();
+      const workHours = `${String(storedPrefs.workStartHour).padStart(2, "0")}:00–${String(storedPrefs.workEndHour).padStart(2, "0")}:00`;
+
+      setDiagData({
+        connected: api.connected,
+        lastDbWrite: api.last_db_write,
+        sessionsToday: api.sessions_today,
+        pendingWrites: 0,       // populated below if extension responds
+        lastSyncTs: null,       // populated below if extension responds
+        lastSyncStatus: null,   // populated below if extension responds
+        extensionVersion: null, // populated below if extension responds
+        browser: navigator.userAgent.match(/Chrome\/([\d.]+)/)?.[1]
+          ? `Chrome ${navigator.userAgent.match(/Chrome\/([\d.]+)/)![1]}`
+          : navigator.userAgent,
+        accountId: api.user_id,
+        accountCreatedAt: api.account_created_at,
+        idleTimeoutMinutes: storedPrefs.idleTimeoutMinutes,
+        minSessionSeconds: storedPrefs.minSessionSeconds,
+        workHours,
+      });
+    } catch {
+      toast.error("Failed to load diagnostics.");
+    }
+    setDiagLoading(false);
+  };
+
+  const handleForceSyncMessage = () => {
+    setDiagForceSyncing(true);
+    window.postMessage({ type: "Klokrs_FORCE_SYNC" }, window.location.origin);
+    setTimeout(() => {
+      setDiagForceSyncing(false);
+      toast.success("Force sync triggered.");
+      void loadDiagnostics();
+    }, 2500);
+  };
+
+  const handleClearCache = () => {
+    if (!diagClearConfirm) { setDiagClearConfirm(true); return; }
+    window.postMessage({ type: "Klokrs_CLEAR_CACHE" }, window.location.origin);
+    setDiagClearConfirm(false);
+    toast.success("Cache clear requested. Extension will reload tracking state.");
+  };
+
+  const handleExportDiagnosticsJson = () => {
+    if (!diagData) return;
+    const manifest = { manifest_version: 3, permissions: ["tabs","idle","storage","alarms","activeTab"] };
+    const report = {
+      exported_at: new Date().toISOString(),
+      user: {
+        account_id: diagData.accountId,
+        created_at: diagData.accountCreatedAt,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      },
+      extension: {
+        version: diagData.extensionVersion ?? "unknown",
+        manifest_version: manifest.manifest_version,
+        permissions: manifest.permissions,
+      },
+      browser: { name: "Chrome", version: diagData.browser },
+      sync: {
+        last_success: diagData.lastSyncStatus === "ok" && diagData.lastSyncTs
+          ? new Date(diagData.lastSyncTs).toISOString()
+          : null,
+        last_attempt: diagData.lastSyncTs ? new Date(diagData.lastSyncTs).toISOString() : null,
+        pending_writes: diagData.pendingWrites,
+        total_sessions_today: diagData.sessionsToday,
+        last_db_write: diagData.lastDbWrite,
+        connected: diagData.connected,
+      },
+      settings: {
+        idle_timeout_minutes: diagData.idleTimeoutMinutes,
+        min_session_seconds: diagData.minSessionSeconds,
+        work_hours: diagData.workHours,
+      },
+    };
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `klokrs-diagnostics-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Diagnostics report downloaded.");
   };
 
   if (loading) {
@@ -927,6 +1070,160 @@ export default function SettingsPage() {
                   </div>
                 </Card>
               </div>
+            </>
+          )}
+
+          {/* ── Diagnostics ── */}
+          {activeTab === "diagnostics" && (
+            <>
+              {/* Connection & sync status */}
+              <div>
+                <SectionTitle tooltip="Live connection and sync health pulled from the server and your local extension state.">Connection Status</SectionTitle>
+                <Card>
+                  {diagLoading && (
+                    <div className="py-6 flex justify-center"><Loader /></div>
+                  )}
+                  {!diagLoading && !diagData && (
+                    <div className="py-5 text-center">
+                      <p className="text-sm text-white/40 mb-4">Load diagnostics to see current status.</p>
+                      <button
+                        type="button"
+                        onClick={() => void loadDiagnostics()}
+                        className="rounded-xl border border-violet-500/30 bg-violet-600/20 px-4 py-2.5 text-sm font-medium text-violet-200 hover:bg-violet-600/35 transition-all"
+                      >
+                        Load Diagnostics
+                      </button>
+                    </div>
+                  )}
+                  {!diagLoading && diagData && (
+                    <>
+                      <PrefRow label="Status">
+                        <span className={`flex items-center gap-2 text-sm font-medium ${diagData.connected ? "text-emerald-400" : "text-red-400"}`}>
+                          <span className={`h-2 w-2 rounded-full ${diagData.connected ? "bg-emerald-400" : "bg-red-400"}`} />
+                          {diagData.connected ? "Connected" : "Disconnected"}
+                        </span>
+                      </PrefRow>
+                      <PrefRow label="Last successful sync" hint="Most recent write recorded in the database">
+                        <span className="text-sm text-white/55 tabular-nums">
+                          {diagData.lastDbWrite
+                            ? new Date(diagData.lastDbWrite).toLocaleString()
+                            : "No writes yet"}
+                        </span>
+                      </PrefRow>
+                      <PrefRow label="Sessions today" hint="Total sessions recorded today in the database">
+                        <span className="text-sm text-white/70 tabular-nums">{diagData.sessionsToday}</span>
+                      </PrefRow>
+                      <PrefRow label="Extension version">
+                        <span className="text-sm text-white/55">{diagData.extensionVersion ?? "Not detected"}</span>
+                      </PrefRow>
+                      <PrefRow label="Browser">
+                        <span className="text-sm text-white/55 break-all">{diagData.browser}</span>
+                      </PrefRow>
+                      <PrefRow label="Account ID" hint="Share this with support if you need help">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-xs text-white/35 break-all">{diagData.accountId}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              void navigator.clipboard.writeText(diagData.accountId);
+                              setCopiedId(true);
+                              setTimeout(() => setCopiedId(false), 2000);
+                            }}
+                            className="shrink-0 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-white/50 hover:bg-white/10 hover:text-white/80 transition-colors"
+                          >
+                            {copiedId ? "Copied!" : "Copy"}
+                          </button>
+                        </div>
+                      </PrefRow>
+                    </>
+                  )}
+                </Card>
+              </div>
+
+              {/* Actions */}
+              {diagData && (
+                <div>
+                  <SectionTitle tooltip="Maintenance actions for your local extension state.">Actions</SectionTitle>
+                  <Card>
+                    <div className="py-3 flex flex-col gap-3">
+                      {/* Force sync */}
+                      <div className="flex items-center justify-between gap-4 py-1">
+                        <div>
+                          <p className="text-sm text-white/80">Force sync now</p>
+                          <p className="mt-0.5 text-xs text-white/35">Triggers an immediate heartbeat from the extension</p>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={diagForceSyncing}
+                          onClick={handleForceSyncMessage}
+                          className="shrink-0 flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-medium text-white/60 hover:border-white/20 hover:text-white/90 transition-all disabled:opacity-40"
+                        >
+                          {diagForceSyncing ? (
+                            <svg className="animate-spin" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" strokeOpacity="0.25"/><path d="M21 12a9 9 0 00-9-9" strokeLinecap="round"/>
+                            </svg>
+                          ) : (
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                            </svg>
+                          )}
+                          {diagForceSyncing ? "Syncing…" : "Sync now"}
+                        </button>
+                      </div>
+
+                      {/* Clear cache */}
+                      <div className="flex items-center justify-between gap-4 py-1 border-t border-white/[0.05] pt-3">
+                        <div>
+                          <p className="text-sm text-white/80">Clear local cache</p>
+                          <p className="mt-0.5 text-xs text-white/35">Wipes session state and retry queue. Auth tokens are preserved.</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleClearCache}
+                          className={`shrink-0 rounded-xl px-4 py-2 text-sm font-medium transition-all ${
+                            diagClearConfirm
+                              ? "border border-red-500/40 bg-red-500/20 text-red-300 hover:bg-red-500/30"
+                              : "border border-white/10 bg-white/[0.04] text-white/60 hover:border-white/20 hover:text-white/90"
+                          }`}
+                        >
+                          {diagClearConfirm ? "Confirm clear" : "Clear cache"}
+                        </button>
+                      </div>
+
+                      {/* Export JSON */}
+                      <div className="flex items-center justify-between gap-4 py-1 border-t border-white/[0.05] pt-3">
+                        <div>
+                          <p className="text-sm text-white/80">Export diagnostics report</p>
+                          <p className="mt-0.5 text-xs text-white/35">Downloads a JSON file you can paste in a support email</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleExportDiagnosticsJson}
+                          className="shrink-0 flex items-center gap-2 rounded-xl border border-violet-500/30 bg-violet-600/20 px-4 py-2 text-sm font-medium text-violet-200 hover:bg-violet-600/35 hover:border-violet-500/50 transition-all"
+                        >
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                          </svg>
+                          Export JSON
+                        </button>
+                      </div>
+                    </div>
+                  </Card>
+                </div>
+              )}
+
+              {/* Refresh button when data is loaded */}
+              {diagData && !diagLoading && (
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => void loadDiagnostics()}
+                    className="text-xs text-white/30 hover:text-white/60 transition-colors"
+                  >
+                    ↻ Refresh diagnostics
+                  </button>
+                </div>
+              )}
             </>
           )}
 
