@@ -14,8 +14,8 @@ export function RestrictedNotice() {
     const supabase = createClient();
 
     const check = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user?.app_metadata?.restricted === true) {
+      const { data, error } = await supabase.auth.getUser();
+      if (!error && data.user?.app_metadata?.restricted === true) {
         setRestricted(true);
       }
     };
