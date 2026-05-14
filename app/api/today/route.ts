@@ -30,17 +30,11 @@ export async function GET(request: NextRequest) {
     const today = localNow.toISOString().split("T")[0]!;
     const min_seconds = parseInt(new URL(request.url).searchParams.get("min_seconds") ?? "0", 10) || 0;
 
-    let query = supabase
+    const { data, error } = await supabase
       .from("tab_sessions")
       .select("domain, duration_seconds, page_title, visits")
       .eq("user_id", user.id)
       .eq("date", today);
-
-    if (min_seconds > 0) {
-      query = query.gte("duration_seconds", min_seconds);
-    }
-
-    const { data, error } = await query;
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
@@ -52,6 +46,10 @@ export async function GET(request: NextRequest) {
       page_title: string;
       visits: number | null;
     };
+
+    // Aggregate all rows first, then apply min_seconds to the total.
+    // Filtering individual rows before summing would incorrectly drop domains
+    // whose total time is large but was built from many short heartbeat saves.
     const aggregated = Object.values(
       (data as Session[]).reduce(
         (acc, session) => {
@@ -71,7 +69,9 @@ export async function GET(request: NextRequest) {
           { domain: string; total_seconds: number; visits: number }
         >
       )
-    ).sort((a, b) => b.total_seconds - a.total_seconds);
+    )
+      .filter((d) => min_seconds === 0 || d.total_seconds >= min_seconds)
+      .sort((a, b) => b.total_seconds - a.total_seconds);
 
     return NextResponse.json({ data: aggregated, date: today });
   } catch {

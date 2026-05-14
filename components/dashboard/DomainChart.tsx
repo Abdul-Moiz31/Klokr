@@ -16,7 +16,6 @@ import {
 
 interface DomainData {
   domain: string;
-  pageTitle: string;
   totalSeconds: number;
 }
 
@@ -63,10 +62,10 @@ export function DomainChart({
 
   const adapted = data.map((d) => ({ ...d, visits: 0 }));
   const grouped = groupByRootDomain(adapted);
-  const chartData = grouped.slice(0, 8).map((g) => {
-    const best = g.subdomains.reduce((a, b) => a.totalSeconds >= b.totalSeconds ? a : b);
-    return { domain: getSiteName(g.rootDomain, (best as DomainData).pageTitle), seconds: g.totalSeconds };
-  });
+  const chartData = grouped.slice(0, 8).map((g) => ({
+    domain: getSiteName(g.rootDomain),
+    seconds: g.totalSeconds,
+  }));
 
   const maxSeconds = Math.max(...chartData.map((d) => d.seconds), 1);
   const useMinutes = maxSeconds < 3600;

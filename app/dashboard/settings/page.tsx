@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
@@ -12,7 +12,36 @@ import { Button } from "@/components/ui/Button";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { Loader } from "@/components/ui/Loader";
 import { DEFAULT_PREFS, loadPrefs, savePrefs, type KlokrsPrefs } from "@/lib/prefs";
+import { getSiteName } from "@/lib/domain";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 import type { User } from "@supabase/supabase-js";
+
+/* ─── Diagnostics types ──────────────────────────────────── */
+
+interface DiagnosticsData {
+  connected: boolean;
+  lastDbWrite: string | null;
+  sessionsToday: number;
+  pendingWrites: number;
+  lastSyncTs: number | null;
+  lastSyncStatus: "ok" | "fail" | null;
+  extensionVersion: string | null;
+  browser: string;
+  accountId: string;
+  accountCreatedAt: string | null;
+  idleTimeoutMinutes: number;
+  minSessionSeconds: number;
+  workHours: string;
+}
+
+interface DiagnosticsApiResponse {
+  connected: boolean;
+  user_id: string;
+  account_created_at: string | null;
+  last_db_write: string | null;
+  sessions_today: number;
+}
 
 /* ─── Primitives ─────────────────────────────────────────── */
 
@@ -98,22 +127,223 @@ function ChipSelect<T extends number | string>({
 
 /* ─── Export ─────────────────────────────────────────────── */
 
-// function toCSV(rows: Record<string, unknown>[]): string { // coming soon
-//   if (!rows.length) return "";
-//   const headers = Object.keys(rows[0]!);
-//   const escape = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-//   return [headers.join(","), ...rows.map((r) => headers.map((h) => escape(r[h])).join(","))].join("\n");
-// }
+function formatDuration(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
 
-// function downloadCSV(content: string, filename: string) { // coming soon
-//   const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
-//   const url = URL.createObjectURL(blob);
-//   const a = document.createElement("a");
-//   a.href = url;
-//   a.download = filename;
-//   a.click();
-//   URL.revokeObjectURL(url);
-// }
+type C = [number, number, number];
+const PALETTE = {
+  bg:     [10,  10,  15]  as C,
+  violet: [124, 58,  237] as C,
+  cyan:   [6,   182, 212] as C,
+  card:   [17,  17,  24]  as C,
+  border: [31,  31,  46]  as C,
+  body:   [226, 232, 240] as C,
+  muted:  [100, 116, 139] as C,
+  white:  [255, 255, 255] as C,
+};
+
+interface SummaryRow {
+  date: string;
+  domain: string;
+  totalSeconds: number;
+  visits: number;
+}
+
+function generateExportPdf(
+  rows: SummaryRow[],
+  fromDate: string,
+  toDate: string,
+  userEmail: string,
+  preview: { days: number; totalSeconds: number },
+) {
+  const P = PALETTE;
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const M = 12;
+
+  const fillBg = () => { doc.setFillColor(...P.bg); doc.rect(0, 0, pageW, pageH, "F"); };
+  fillBg();
+
+  const _addPage = doc.addPage.bind(doc);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (doc as any).addPage = (...args: unknown[]) => { const r = (_addPage as any)(...args); fillBg(); return r; };
+
+  const generatedDate = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  const periodLabel = `${new Date(fromDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} – ${new Date(toDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
+  const topSite = rows.length > 0 ? getSiteName(rows[0]!.domain) : "—";
+
+  // ── Header bar ───────────────────────────────────────────
+  const hdrH = 20;
+  doc.setFillColor(...P.violet);
+  doc.rect(0, 0, pageW, hdrH, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.setTextColor(...P.white);
+  doc.text("Klokrs", M, 13);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.text(`Data Export  |  ${periodLabel}`, pageW - M, 13, { align: "right" });
+
+  // ── Divider ──────────────────────────────────────────────
+  doc.setDrawColor(56, 29, 104);
+  doc.setLineWidth(0.4);
+  doc.line(M, hdrH + 1, pageW - M, hdrH + 1);
+
+  // ── Overview label ───────────────────────────────────────
+  let y = hdrH + 10;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  doc.setTextColor(...P.cyan);
+  doc.text("OVERVIEW", M, y);
+  y += 5;
+
+  // ── 3 stat cards ─────────────────────────────────────────
+  const stats = [
+    { title: "Days tracked", value: String(preview.days) },
+    { title: "Total time", value: formatDuration(preview.totalSeconds) },
+    { title: "Top site", value: topSite },
+  ];
+  const gap = 3;
+  const boxW = (pageW - M * 2 - gap * 2) / 3;
+  const boxH = 26;
+  for (let i = 0; i < 3; i++) {
+    const bx = M + i * (boxW + gap);
+    doc.setFillColor(...P.card);
+    doc.roundedRect(bx, y, boxW, boxH, 1.5, 1.5, "F");
+    doc.setDrawColor(...P.border);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(bx, y, boxW, boxH, 1.5, 1.5, "D");
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+    doc.setTextColor(...P.muted);
+    doc.text(stats[i]!.title.toUpperCase(), bx + 5, y + 8);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(i === 2 ? 13 : 17);
+    doc.setTextColor(...P.body);
+    doc.text(stats[i]!.value, bx + 5, y + 19);
+    doc.setFillColor(...P.violet);
+    doc.rect(bx + 5, y + 22, 9, 0.7, "F");
+  }
+  y += boxH + 8;
+
+  // ── Section label ────────────────────────────────────────
+  doc.setFillColor(...P.violet);
+  doc.rect(M, y - 3.5, 1.2, 4.5, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  doc.setTextColor(...P.cyan);
+  doc.text("BROWSING SUMMARY", M + 3.5, y);
+  y += 4;
+
+  // ── Total seconds for % calculation ──────────────────────
+  const grandTotal = rows.reduce((s, r) => s + r.totalSeconds, 0) || 1;
+
+  // ── Table ────────────────────────────────────────────────
+  autoTable(doc, {
+    startY: y,
+    margin: { left: M, right: M, bottom: 16 },
+    head: [["Date", "Site", "Time Spent", "Visits", "% of Total"]],
+    body: rows.map((r) => [
+      new Date(r.date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+      r.domain,
+      formatDuration(r.totalSeconds),
+      String(r.visits),
+      `${Math.round((r.totalSeconds / grandTotal) * 100)}%`,
+    ]),
+    columnStyles: {
+      0: { cellWidth: 32 },
+      1: { cellWidth: "auto" as const },
+      2: { cellWidth: 26, halign: "right" as const },
+      3: { cellWidth: 18, halign: "right" as const },
+      4: { cellWidth: 34 },
+    },
+    headStyles: {
+      fillColor: P.violet,
+      textColor: P.white,
+      fontStyle: "bold",
+      fontSize: 9,
+      cellPadding: { top: 3, bottom: 3, left: 3, right: 3 },
+    },
+    bodyStyles: {
+      fillColor: P.bg,
+      textColor: P.body,
+      fontSize: 8.5,
+      lineColor: P.border,
+      lineWidth: 0.2,
+      cellPadding: { top: 2.5, bottom: 2.5, left: 3, right: 3 },
+    },
+    alternateRowStyles: { fillColor: P.card },
+    showHead: "everyPage",
+
+    didDrawPage: () => {
+      doc.setFillColor(...P.card);
+      doc.rect(0, pageH - 12, pageW, 12, "F");
+      doc.setDrawColor(...P.border);
+      doc.setLineWidth(0.3);
+      doc.line(0, pageH - 12, pageW, pageH - 12);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.setTextColor(...P.muted);
+      doc.text("Generated by Klokrs", M, pageH - 5);
+      doc.text(userEmail, pageW / 2, pageH - 5, { align: "center" });
+      doc.text(generatedDate, pageW - M, pageH - 5, { align: "right" });
+    },
+
+    didDrawCell: (data) => {
+      if (data.section !== "body" || data.column.index !== 4) return;
+      const pct = parseFloat(String(data.cell.raw));
+      if (isNaN(pct)) return;
+      const isAlt = data.row.index % 2 === 1;
+      doc.setFillColor(...(isAlt ? P.card : P.bg));
+      doc.rect(data.cell.x, data.cell.y, data.cell.width, data.cell.height, "F");
+      const barColor: C = isAlt ? [51, 31, 92] : [44, 24, 82];
+      const maxBarW = data.cell.width - 6;
+      const barW = Math.max(0.5, (pct / 100) * maxBarW);
+      doc.setFillColor(...barColor);
+      doc.rect(data.cell.x + 3, data.cell.y + 1.8, barW, data.cell.height - 3.6, "F");
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8.5);
+      doc.setTextColor(...P.body);
+      doc.text(`${pct}%`, data.cell.x + 3, data.cell.y + data.cell.height / 2, { baseline: "middle" as const });
+    },
+  });
+
+  doc.save(`Klokrs-export-${fromDate}-to-${toDate}.pdf`);
+}
+
+type ExportRange = "today" | "week" | "month" | "custom";
+
+interface ExportPreview {
+  days: number;
+  totalSessions: number;
+  totalSeconds: number;
+}
+
+interface RawSession {
+  date: string;
+  domain: string;
+  duration_seconds: number;
+  visits: number;
+}
+
+function dateRangeForPreset(preset: Exclude<ExportRange, "custom">): { from: string; to: string } {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const fmt = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const today = new Date();
+  const to = fmt(today);
+  if (preset === "today") return { from: to, to };
+  if (preset === "week") {
+    const d = new Date(today); d.setDate(d.getDate() - 6);
+    return { from: fmt(d), to };
+  }
+  const d = new Date(today); d.setDate(d.getDate() - 29);
+  return { from: fmt(d), to };
+}
 
 /* ─── Tab definitions ────────────────────────────────────── */
 
@@ -145,16 +375,24 @@ const TABS = [
       </svg>
     ),
   },
-  // {
-  //   id: "notifications",
-  //   label: "Notifications",
-  //   icon: (
-  //     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-  //       <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 01-3.46 0" />
-  //     </svg>
-  //   ),
-  // },
-  // { id: "data", label: "Data" }, // coming soon
+  {
+    id: "data",
+    label: "Data",
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
+      </svg>
+    ),
+  },
+  {
+    id: "diagnostics",
+    label: "Diagnostics",
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+      </svg>
+    ),
+  },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -173,12 +411,22 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
 
   const [prefs, setPrefs] = useState<KlokrsPrefs>(DEFAULT_PREFS);
+  const prefsSyncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prefsToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // const [notifPermission, setNotifPermission] = useState<NotificationPermission | "unsupported">("default"); // coming soon
+  const [exportRange, setExportRange] = useState<ExportRange>("week");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
+  const [preview, setPreview] = useState<ExportPreview | null>(null);
+  const [previewing, setPreviewing] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
-  // const [exportRange, setExportRange] = useState<"today" | "week" | "month">("week"); // coming soon
-  // const [exporting, setExporting] = useState(false); // coming soon
-  // const [exportMsg, setExportMsg] = useState<string | null>(null); // coming soon
+  // Diagnostics tab state
+  const [diagData, setDiagData] = useState<DiagnosticsData | null>(null);
+  const [diagLoading, setDiagLoading] = useState(false);
+  const [diagForceSyncing, setDiagForceSyncing] = useState(false);
+  const [diagClearConfirm, setDiagClearConfirm] = useState(false);
+  const [copiedId, setCopiedId] = useState(false);
 
   const router = useRouter();
 
@@ -194,14 +442,27 @@ export default function SettingsPage() {
   }, [router]);
 
   useEffect(() => {
-    const loaded = loadPrefs();
-    setPrefs(loaded);
-    // if (typeof Notification !== "undefined") setNotifPermission(Notification.permission); // coming soon
-    // else setNotifPermission("unsupported"); // coming soon
-    // Re-sync prefs to extension on page open (covers reinstall/first-login scenarios).
-    try {
-      window.postMessage({ type: "Klokrs_PREFS", prefs: loaded }, window.location.origin);
-    } catch { /* no extension */ }
+    const supabase = createClient();
+    void (async () => {
+      // Try loading from Supabase first; fall back to localStorage.
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.access_token) {
+          const res = await fetch("/api/prefs", {
+            headers: { Authorization: `Bearer ${session.access_token}` },
+          });
+          if (res.ok) {
+            const json = await res.json() as { prefs: KlokrsPrefs };
+            setPrefs(json.prefs);
+            try { window.postMessage({ type: "Klokrs_PREFS", prefs: json.prefs }, window.location.origin); } catch { /* no ext */ }
+            return;
+          }
+        }
+      } catch { /* fall through */ }
+      const loaded = loadPrefs();
+      setPrefs(loaded);
+      try { window.postMessage({ type: "Klokrs_PREFS", prefs: loaded }, window.location.origin); } catch { /* no extension */ }
+    })();
   }, []);
 
   const handleSaveName = async (e: { preventDefault(): void }) => {
@@ -221,11 +482,27 @@ export default function SettingsPage() {
     setPrefs((p) => {
       const next = { ...p, ...patch };
       savePrefs(next);
-      toast.success("Preferences saved.");
-      // Push to extension so idle threshold and min session apply immediately.
-      try {
-        window.postMessage({ type: "Klokrs_PREFS", prefs: next }, window.location.origin);
-      } catch { /* no extension installed — silent */ }
+      // Push to extension immediately.
+      try { window.postMessage({ type: "Klokrs_PREFS", prefs: next }, window.location.origin); } catch { /* no ext */ }
+      // Debounce Supabase POST — fires 800ms after the last change.
+      if (prefsSyncTimer.current) clearTimeout(prefsSyncTimer.current);
+      prefsSyncTimer.current = setTimeout(() => {
+        void (async () => {
+          try {
+            const supabase = createClient();
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.access_token) {
+              await fetch("/api/prefs", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+                body: JSON.stringify({ prefs: next }),
+              });
+            }
+          } catch { /* silent — localStorage already saved */ }
+        })();
+      }, 800);
+      if (prefsToastTimer.current) clearTimeout(prefsToastTimer.current);
+      prefsToastTimer.current = setTimeout(() => toast.success("Preferences saved."), 800);
       return next;
     });
   };
@@ -243,42 +520,179 @@ export default function SettingsPage() {
     toast.success("Password updated.");
   };
 
-  // const requestNotifications = async () => { // coming soon
-  //   if (typeof Notification === "undefined") return;
-  //   const result = await Notification.requestPermission();
-  //   setNotifPermission(result);
-  // };
+  const getDateRange = (): { from: string; to: string } | null => {
+    if (exportRange === "custom") {
+      if (!customFrom || !customTo || customFrom > customTo) return null;
+      return { from: customFrom, to: customTo };
+    }
+    return dateRangeForPreset(exportRange);
+  };
 
-  // const handleExport = async () => { // coming soon
-  //   if (!user) return;
-  //   setExporting(true);
-  //   setExportMsg(null);
-  //   const today = new Date();
-  //   const pad = (n: number) => String(n).padStart(2, "0");
-  //   const todayStr = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
-  //   let fromDate = todayStr;
-  //   if (exportRange === "week") {
-  //     const d = new Date(today); d.setDate(d.getDate() - 6);
-  //     fromDate = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-  //   } else if (exportRange === "month") {
-  //     const d = new Date(today); d.setDate(d.getDate() - 29);
-  //     fromDate = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-  //   }
-  //   const supabase = createClient();
-  //   const { data, error } = await supabase
-  //     .from("tab_sessions")
-  //     .select("date, domain, page_title, duration_seconds, visits, start_time, end_time")
-  //     .eq("user_id", user.id)
-  //     .gte("date", fromDate)
-  //     .lte("date", todayStr)
-  //     .order("date", { ascending: false })
-  //     .order("duration_seconds", { ascending: false });
-  //   setExporting(false);
-  //   if (error || !data) { setExportMsg("Export failed: " + (error?.message ?? "no data")); return; }
-  //   if (data.length === 0) { setExportMsg("No data in this range."); return; }
-  //   downloadCSV(toCSV(data as Record<string, unknown>[]), `Klokrs-export-${exportRange}-${todayStr}.csv`);
-  //   setExportMsg(`Exported ${data.length} rows.`);
-  // };
+  const handlePreview = async () => {
+    if (!user) return;
+    const range = getDateRange();
+    if (!range) { toast.error("Please set a valid date range."); return; }
+    setPreviewing(true);
+    setPreview(null);
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("tab_sessions")
+      .select("date, domain, duration_seconds, visits")
+      .eq("user_id", user.id)
+      .gte("date", range.from)
+      .lte("date", range.to);
+    setPreviewing(false);
+    if (error || !data) { toast.error("Failed to fetch preview."); return; }
+    const rows = data as RawSession[];
+    const days = new Set(rows.map((r) => r.date)).size;
+    const totalSessions = rows.length;
+    const totalSeconds = rows.reduce((s, r) => s + r.duration_seconds, 0);
+    setPreview({ days, totalSessions, totalSeconds });
+  };
+
+  const handleExport = async () => {
+    if (!user) return;
+    const range = getDateRange();
+    if (!range) { toast.error("Please set a valid date range."); return; }
+    setExporting(true);
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("tab_sessions")
+      .select("date, domain, duration_seconds, visits")
+      .eq("user_id", user.id)
+      .gte("date", range.from)
+      .lte("date", range.to)
+      .order("date", { ascending: false })
+      .order("duration_seconds", { ascending: false });
+    setExporting(false);
+    if (error || !data) { toast.error("Export failed: " + (error?.message ?? "no data")); return; }
+    const rows = data as RawSession[];
+    if (rows.length === 0) { toast.error("No data in this range."); return; }
+
+    // Aggregate by date + root domain → one summary row per domain per day
+    const map = new Map<string, { date: string; domain: string; totalSeconds: number; visits: number }>();
+    for (const r of rows) {
+      const key = `${r.date}__${r.domain}`;
+      const cur = map.get(key) ?? { date: r.date, domain: r.domain, totalSeconds: 0, visits: 0 };
+      cur.totalSeconds += r.duration_seconds;
+      cur.visits += r.visits ?? 1;
+      map.set(key, cur);
+    }
+    const summary = Array.from(map.values()).sort((a, b) =>
+      a.date < b.date ? 1 : a.date > b.date ? -1 : b.totalSeconds - a.totalSeconds
+    );
+
+    const totalSeconds = summary.reduce((s, r) => s + r.totalSeconds, 0);
+    generateExportPdf(
+      summary,
+      range.from,
+      range.to,
+      user.email ?? "",
+      { days: new Set(summary.map((r) => r.date)).size, totalSeconds },
+    );
+    toast.success(`Exported ${summary.length} rows.`);
+  };
+
+  const loadDiagnostics = async () => {
+    if (!user) return;
+    setDiagLoading(true);
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) { toast.error("Not authenticated."); setDiagLoading(false); return; }
+
+      const res = await fetch("/api/diagnostics", {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (!res.ok) { toast.error("Failed to load diagnostics."); setDiagLoading(false); return; }
+      const api = await res.json() as DiagnosticsApiResponse;
+
+      // Extension client-side data arrives via window.postMessage; we read
+      // from localStorage as a fallback since the extension may not be present.
+      const storedPrefs = loadPrefs();
+      const workHours = `${String(storedPrefs.workStartHour).padStart(2, "0")}:00–${String(storedPrefs.workEndHour).padStart(2, "0")}:00`;
+
+      setDiagData({
+        connected: api.connected,
+        lastDbWrite: api.last_db_write,
+        sessionsToday: api.sessions_today,
+        pendingWrites: 0,       // populated below if extension responds
+        lastSyncTs: null,       // populated below if extension responds
+        lastSyncStatus: null,   // populated below if extension responds
+        extensionVersion: null, // populated below if extension responds
+        browser: navigator.userAgent.match(/Chrome\/([\d.]+)/)?.[1]
+          ? `Chrome ${navigator.userAgent.match(/Chrome\/([\d.]+)/)![1]}`
+          : navigator.userAgent,
+        accountId: api.user_id,
+        accountCreatedAt: api.account_created_at,
+        idleTimeoutMinutes: storedPrefs.idleTimeoutMinutes,
+        minSessionSeconds: storedPrefs.minSessionSeconds,
+        workHours,
+      });
+    } catch {
+      toast.error("Failed to load diagnostics.");
+    }
+    setDiagLoading(false);
+  };
+
+  const handleForceSyncMessage = () => {
+    setDiagForceSyncing(true);
+    window.postMessage({ type: "Klokrs_FORCE_SYNC" }, window.location.origin);
+    setTimeout(() => {
+      setDiagForceSyncing(false);
+      toast.success("Force sync triggered.");
+      void loadDiagnostics();
+    }, 2500);
+  };
+
+  const handleClearCache = () => {
+    if (!diagClearConfirm) { setDiagClearConfirm(true); return; }
+    window.postMessage({ type: "Klokrs_CLEAR_CACHE" }, window.location.origin);
+    setDiagClearConfirm(false);
+    toast.success("Cache clear requested. Extension will reload tracking state.");
+  };
+
+  const handleExportDiagnosticsJson = () => {
+    if (!diagData) return;
+    const manifest = { manifest_version: 3, permissions: ["tabs","idle","storage","alarms","activeTab"] };
+    const report = {
+      exported_at: new Date().toISOString(),
+      user: {
+        account_id: diagData.accountId,
+        created_at: diagData.accountCreatedAt,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      },
+      extension: {
+        version: diagData.extensionVersion ?? "unknown",
+        manifest_version: manifest.manifest_version,
+        permissions: manifest.permissions,
+      },
+      browser: { name: "Chrome", version: diagData.browser },
+      sync: {
+        last_success: diagData.lastSyncStatus === "ok" && diagData.lastSyncTs
+          ? new Date(diagData.lastSyncTs).toISOString()
+          : null,
+        last_attempt: diagData.lastSyncTs ? new Date(diagData.lastSyncTs).toISOString() : null,
+        pending_writes: diagData.pendingWrites,
+        total_sessions_today: diagData.sessionsToday,
+        last_db_write: diagData.lastDbWrite,
+        connected: diagData.connected,
+      },
+      settings: {
+        idle_timeout_minutes: diagData.idleTimeoutMinutes,
+        min_session_seconds: diagData.minSessionSeconds,
+        work_hours: diagData.workHours,
+      },
+    };
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `klokrs-diagnostics-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Diagnostics report downloaded.");
+  };
 
   if (loading) {
     return (
@@ -288,7 +702,10 @@ export default function SettingsPage() {
     );
   }
 
-  const formatHour = (h: number) => h === 12 ? "12 PM" : h > 12 ? `${h - 12} PM` : `${h} AM`;
+  // Convert integer hour (0-23) to HH:MM string for <input type="time">.
+  const hourToTimeStr = (h: number) => `${String(h).padStart(2, "0")}:00`;
+  // Parse HH:MM back to integer hour.
+  const timeStrToHour = (s: string) => parseInt(s.split(":")[0] ?? "0", 10);
 
   return (
     <AppShell title="Settings" contentMaxClassName="max-w-2xl">
@@ -441,7 +858,7 @@ export default function SettingsPage() {
                     hint="Days where you track at least this many hours are marked productive on the Activity heatmap"
                   >
                     <ChipSelect
-                      options={[2, 3, 4, 5, 6, 8] as number[]}
+                      options={[2, 3, 4, 5, 6, 7, 8, 10, 12] as number[]}
                       value={prefs.productiveHoursThreshold}
                       format={(v) => `${v as number}h`}
                       onChange={(v) => updatePrefs({ productiveHoursThreshold: v as number })}
@@ -459,24 +876,24 @@ export default function SettingsPage() {
                 <SectionTitle tooltip="Your typical workday window — used to calculate what percentage of working time was actively tracked.">Working hours</SectionTitle>
                 <Card>
                   <PrefRow label="Day starts at">
-                    <ChipSelect
-                      options={[6, 7, 8, 9, 10] as number[]}
-                      value={prefs.workStartHour}
-                      format={formatHour}
-                      onChange={(v) => updatePrefs({ workStartHour: v as number })}
+                    <input
+                      type="time"
+                      value={hourToTimeStr(prefs.workStartHour)}
+                      onChange={(e) => updatePrefs({ workStartHour: timeStrToHour(e.target.value) })}
+                      className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-white/80 focus:outline-none focus:border-violet-500/50 [color-scheme:dark]"
                     />
                   </PrefRow>
                   <PrefRow label="Day ends at">
-                    <ChipSelect
-                      options={[16, 17, 18, 19, 20, 21] as number[]}
-                      value={prefs.workEndHour}
-                      format={formatHour}
-                      onChange={(v) => updatePrefs({ workEndHour: v as number })}
+                    <input
+                      type="time"
+                      value={hourToTimeStr(prefs.workEndHour)}
+                      onChange={(e) => updatePrefs({ workEndHour: timeStrToHour(e.target.value) })}
+                      className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-white/80 focus:outline-none focus:border-violet-500/50 [color-scheme:dark]"
                     />
                   </PrefRow>
                   <PrefRow label="Effective window">
                     <span className="text-sm text-white/40 tabular-nums">
-                      {prefs.workEndHour - prefs.workStartHour}h per day
+                      {((prefs.workEndHour - prefs.workStartHour + 24) % 24) || 24}h per day
                     </span>
                   </PrefRow>
                 </Card>
@@ -487,7 +904,7 @@ export default function SettingsPage() {
                 <Card>
                   <PrefRow label="Minimum session duration" hint="Sessions shorter than this are ignored">
                     <ChipSelect
-                      options={[5, 10, 15, 30] as number[]}
+                      options={[1, 3, 5, 10, 15, 30, 60] as number[]}
                       value={prefs.minSessionSeconds}
                       format={(v) => `${v as number}s`}
                       onChange={(v) => updatePrefs({ minSessionSeconds: v as number })}
@@ -495,7 +912,7 @@ export default function SettingsPage() {
                   </PrefRow>
                   <PrefRow label="Idle timeout" hint="Mark session idle after this long without activity">
                     <ChipSelect
-                      options={[1, 2, 5, 10] as number[]}
+                      options={[1, 2, 5, 10, 15, 30] as number[]}
                       value={prefs.idleTimeoutMinutes}
                       format={(v) => `${v as number}m`}
                       onChange={(v) => updatePrefs({ idleTimeoutMinutes: v as number })}
@@ -506,100 +923,309 @@ export default function SettingsPage() {
             </>
           )}
 
-          {/* ── Notifications — coming soon ── */}
-          {/* {activeTab === "notifications" && (
-            <div>
-              <SectionTitle tooltip="Browser notifications let Klokrs alert you when a focus session ends or your workday summary is ready.">Browser notifications</SectionTitle>
-              <Card>
-                <PrefRow
-                  label="Permission"
-                  hint={
-                    notifPermission === "granted"
-                      ? "Klokrs can send you browser alerts."
-                      : notifPermission === "denied"
-                        ? "Permission denied — reset in your browser settings."
-                        : notifPermission === "unsupported"
-                          ? "Not supported in this browser."
-                          : "Grant permission to receive focus and summary alerts."
-                  }
-                >
-                  {notifPermission === "granted" ? (
-                    <span className="rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-400">
-                      Granted
-                    </span>
-                  ) : notifPermission === "denied" ? (
-                    <span className="rounded-full border border-red-500/25 bg-red-500/10 px-2.5 py-1 text-xs font-medium text-red-400">
-                      Denied
-                    </span>
-                  ) : notifPermission === "unsupported" ? (
-                    <span className="text-xs text-white/30">Not available</span>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={requestNotifications}
-                      className="rounded-lg border border-violet-500/30 bg-violet-600/20 px-3 py-1.5 text-xs font-medium text-violet-300 hover:bg-violet-600/35 transition-colors"
-                    >
-                      Request permission
-                    </button>
-                  )}
-                </PrefRow>
-                <PrefRow label="Daily summary" hint="Notification with your total tracked time at end of working day">
-                  <Toggle
-                    checked={prefs.dailySummaryEnabled}
-                    onChange={(v) => updatePrefs({ dailySummaryEnabled: v })}
-                  />
-                </PrefRow>
-              </Card>
-            </div>
-          )} */}
-
-          {/* ── Data — coming soon ── */}
-          {/* {activeTab === "data" && (
+          {/* ── Data ── */}
+          {activeTab === "data" && (
             <>
               <div>
-                <SectionTitle tooltip="Download your raw session data as CSV — domain, page title, start/end time, duration, and visit count.">Export</SectionTitle>
+                <SectionTitle tooltip="Download your browsing data as a branded PDF — one row per domain per day with time spent and visit count.">Export data</SectionTitle>
                 <Card>
-                  <PrefRow label="Date range" hint="Time window to include in the CSV export">
+                  {/* Range presets */}
+                  <PrefRow label="Date range" hint="Choose a preset or set a custom window">
                     <ChipSelect
-                      options={["today", "week", "month"] as const}
+                      options={["today", "week", "month", "custom"] as ExportRange[]}
                       value={exportRange}
-                      format={(v) => v === "today" ? "Today" : v === "week" ? "Last 7 days" : "Last 30 days"}
-                      onChange={(v) => setExportRange(v as typeof exportRange)}
+                      format={(v) => v === "today" ? "Today" : v === "week" ? "Last 7 days" : v === "month" ? "Last 30 days" : "Custom"}
+                      onChange={(v) => { setExportRange(v); setPreview(null); }}
                     />
                   </PrefRow>
-                  <div className="py-3 flex flex-col items-start gap-2.5">
-                    <button
-                      type="button"
-                      onClick={handleExport}
-                      disabled={exporting}
-                      className="flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-medium text-white/80 hover:border-violet-500/30 hover:bg-violet-500/10 hover:text-white transition-all disabled:opacity-50"
-                    >
-                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M7 1v8M4 6l3 3 3-3M2 10v1a1 1 0 001 1h8a1 1 0 001-1v-1" />
-                      </svg>
-                      {exporting ? "Exporting…" : "Download CSV"}
-                    </button>
-                    {exportMsg && (
-                      <p className={`text-xs ${exportMsg.startsWith("Export failed") ? "text-red-400/80" : "text-emerald-400/80"}`}>
-                        {exportMsg}
-                      </p>
+
+                  {/* Custom date pickers */}
+                  {exportRange === "custom" && (() => {
+                    const joinedAt = user?.created_at ? user.created_at.slice(0, 10) : "2020-01-01";
+                    const todayStr = new Date().toISOString().slice(0, 10);
+                    return (
+                      <div className="flex flex-wrap items-center gap-3 py-3.5 border-b border-white/[0.05]">
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs text-white/40 shrink-0">From</label>
+                          <input
+                            type="date"
+                            value={customFrom}
+                            min={joinedAt}
+                            max={customTo || todayStr}
+                            onChange={(e) => { setCustomFrom(e.target.value); setPreview(null); }}
+                            className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-white/80 focus:outline-none focus:border-violet-500/50 [color-scheme:dark]"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs text-white/40 shrink-0">To</label>
+                          <input
+                            type="date"
+                            value={customTo}
+                            min={customFrom || joinedAt}
+                            max={todayStr}
+                            onChange={(e) => { setCustomTo(e.target.value); setPreview(null); }}
+                            className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-white/80 focus:outline-none focus:border-violet-500/50 [color-scheme:dark]"
+                          />
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Preview + download row */}
+                  <div className="py-4 flex flex-col gap-4">
+
+                    {/* Preview banner */}
+                    {preview && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="rounded-xl border border-violet-500/20 bg-violet-500/[0.07] px-4 py-3"
+                      >
+                        <p className="text-[11px] font-semibold uppercase tracking-wider text-violet-300/60 mb-2">Export preview</p>
+                        <div className="flex flex-wrap gap-x-6 gap-y-1">
+                          <div>
+                            <p className="text-xl font-bold text-white tabular-nums">{preview.days}</p>
+                            <p className="text-xs text-white/40">{preview.days === 1 ? "day" : "days"}</p>
+                          </div>
+                          <div>
+                            <p className="text-xl font-bold text-white tabular-nums">{preview.totalSessions}</p>
+                            <p className="text-xs text-white/40">sessions</p>
+                          </div>
+                          <div>
+                            <p className="text-xl font-bold tabular-nums" style={{ color: "#7C3AED" }}>{formatDuration(preview.totalSeconds)}</p>
+                            <p className="text-xs text-white/40">total tracked</p>
+                          </div>
+                        </div>
+                        {preview.totalSessions === 0 && (
+                          <p className="mt-2 text-xs text-amber-400/70">No data in this range.</p>
+                        )}
+                      </motion.div>
                     )}
+
+                    <div className="flex flex-wrap items-center gap-3">
+                      {/* Preview button */}
+                      <button
+                        type="button"
+                        onClick={() => void handlePreview()}
+                        disabled={previewing}
+                        className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm font-medium text-white/60 hover:border-white/20 hover:text-white/90 transition-all disabled:opacity-40"
+                      >
+                        {previewing ? (
+                          <svg className="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" strokeOpacity="0.25"/><path d="M21 12a9 9 0 00-9-9" strokeLinecap="round"/>
+                          </svg>
+                        ) : (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35M11 8v6M8 11h6"/>
+                          </svg>
+                        )}
+                        {previewing ? "Checking…" : "Preview"}
+                      </button>
+
+                      {/* Download button */}
+                      <button
+                        type="button"
+                        onClick={() => void handleExport()}
+                        disabled={exporting || (preview?.totalSessions === 0)}
+                        className="flex items-center gap-2 rounded-xl border border-violet-500/30 bg-violet-600/20 px-4 py-2.5 text-sm font-medium text-violet-200 hover:bg-violet-600/35 hover:border-violet-500/50 transition-all disabled:opacity-40"
+                      >
+                        {exporting ? (
+                          <svg className="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" strokeOpacity="0.25"/><path d="M21 12a9 9 0 00-9-9" strokeLinecap="round"/>
+                          </svg>
+                        ) : (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                          </svg>
+                        )}
+                        {exporting ? "Exporting…" : "Download PDF"}
+                      </button>
+                    </div>
                   </div>
                 </Card>
               </div>
 
+              {/* What we store */}
               <div>
                 <SectionTitle tooltip="A summary of exactly what data Klokrs records — and what it never touches.">What we store</SectionTitle>
                 <Card>
-                  <div className="py-3 space-y-2.5 text-sm text-white/50 leading-relaxed">
-                    <p>One row per tab session: domain, page title, start/end time, duration, and visit count.</p>
-                    <p>No page content, keystrokes, or personal information is ever collected.</p>
-                    <p>Full account deletion is available by contacting support.</p>
+                  <div className="py-3 space-y-0 divide-y divide-white/[0.05]">
+                    {[
+                      { label: "Domain name", detail: "e.g. youtube.com — never the full URL or path" },
+                      { label: "Time spent", detail: "Duration in seconds, aggregated per session" },
+                      { label: "Visit count", detail: "Number of times you navigated to that domain" },
+                      { label: "Date", detail: "Local date of the session (not UTC)" },
+                    ].map(({ label, detail }) => (
+                      <div key={label} className="flex items-start justify-between gap-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <span className="h-1.5 w-1.5 rounded-full bg-violet-400/60 shrink-0 mt-1.5" />
+                          <span className="text-sm text-white/75">{label}</span>
+                        </div>
+                        <span className="text-xs text-white/35 text-right">{detail}</span>
+                      </div>
+                    ))}
+                    <div className="pt-3 text-xs text-white/30 leading-relaxed">
+                      No page content, keystrokes, URLs, or personal information is ever collected or stored.
+                    </div>
                   </div>
                 </Card>
               </div>
             </>
-          )} */}
+          )}
+
+          {/* ── Diagnostics ── */}
+          {activeTab === "diagnostics" && (
+            <>
+              {/* Connection & sync status */}
+              <div>
+                <SectionTitle tooltip="Live connection and sync health pulled from the server and your local extension state.">Connection Status</SectionTitle>
+                <Card>
+                  {diagLoading && (
+                    <div className="py-6 flex justify-center"><Loader /></div>
+                  )}
+                  {!diagLoading && !diagData && (
+                    <div className="py-5 text-center">
+                      <p className="text-sm text-white/40 mb-4">Load diagnostics to see current status.</p>
+                      <button
+                        type="button"
+                        onClick={() => void loadDiagnostics()}
+                        className="rounded-xl border border-violet-500/30 bg-violet-600/20 px-4 py-2.5 text-sm font-medium text-violet-200 hover:bg-violet-600/35 transition-all"
+                      >
+                        Load Diagnostics
+                      </button>
+                    </div>
+                  )}
+                  {!diagLoading && diagData && (
+                    <>
+                      <PrefRow label="Status">
+                        <span className={`flex items-center gap-2 text-sm font-medium ${diagData.connected ? "text-emerald-400" : "text-red-400"}`}>
+                          <span className={`h-2 w-2 rounded-full ${diagData.connected ? "bg-emerald-400" : "bg-red-400"}`} />
+                          {diagData.connected ? "Connected" : "Disconnected"}
+                        </span>
+                      </PrefRow>
+                      <PrefRow label="Last successful sync" hint="Most recent write recorded in the database">
+                        <span className="text-sm text-white/55 tabular-nums">
+                          {diagData.lastDbWrite
+                            ? new Date(diagData.lastDbWrite).toLocaleString()
+                            : "No writes yet"}
+                        </span>
+                      </PrefRow>
+                      <PrefRow label="Sessions today" hint="Total sessions recorded today in the database">
+                        <span className="text-sm text-white/70 tabular-nums">{diagData.sessionsToday}</span>
+                      </PrefRow>
+                      <PrefRow label="Extension version">
+                        <span className="text-sm text-white/55">{diagData.extensionVersion ?? "Not detected"}</span>
+                      </PrefRow>
+                      <PrefRow label="Browser">
+                        <span className="text-sm text-white/55 break-all">{diagData.browser}</span>
+                      </PrefRow>
+                      <PrefRow label="Account ID" hint="Share this with support if you need help">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-xs text-white/35 break-all">{diagData.accountId}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              void navigator.clipboard.writeText(diagData.accountId);
+                              setCopiedId(true);
+                              setTimeout(() => setCopiedId(false), 2000);
+                            }}
+                            className="shrink-0 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-white/50 hover:bg-white/10 hover:text-white/80 transition-colors"
+                          >
+                            {copiedId ? "Copied!" : "Copy"}
+                          </button>
+                        </div>
+                      </PrefRow>
+                    </>
+                  )}
+                </Card>
+              </div>
+
+              {/* Actions */}
+              {diagData && (
+                <div>
+                  <SectionTitle tooltip="Maintenance actions for your local extension state.">Actions</SectionTitle>
+                  <Card>
+                    <div className="py-3 flex flex-col gap-3">
+                      {/* Force sync */}
+                      <div className="flex items-center justify-between gap-4 py-1">
+                        <div>
+                          <p className="text-sm text-white/80">Force sync now</p>
+                          <p className="mt-0.5 text-xs text-white/35">Triggers an immediate heartbeat from the extension</p>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={diagForceSyncing}
+                          onClick={handleForceSyncMessage}
+                          className="shrink-0 flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-medium text-white/60 hover:border-white/20 hover:text-white/90 transition-all disabled:opacity-40"
+                        >
+                          {diagForceSyncing ? (
+                            <svg className="animate-spin" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" strokeOpacity="0.25"/><path d="M21 12a9 9 0 00-9-9" strokeLinecap="round"/>
+                            </svg>
+                          ) : (
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                            </svg>
+                          )}
+                          {diagForceSyncing ? "Syncing…" : "Sync now"}
+                        </button>
+                      </div>
+
+                      {/* Clear cache */}
+                      <div className="flex items-center justify-between gap-4 py-1 border-t border-white/[0.05] pt-3">
+                        <div>
+                          <p className="text-sm text-white/80">Clear local cache</p>
+                          <p className="mt-0.5 text-xs text-white/35">Wipes session state and retry queue. Auth tokens are preserved.</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleClearCache}
+                          className={`shrink-0 rounded-xl px-4 py-2 text-sm font-medium transition-all ${
+                            diagClearConfirm
+                              ? "border border-red-500/40 bg-red-500/20 text-red-300 hover:bg-red-500/30"
+                              : "border border-white/10 bg-white/[0.04] text-white/60 hover:border-white/20 hover:text-white/90"
+                          }`}
+                        >
+                          {diagClearConfirm ? "Confirm clear" : "Clear cache"}
+                        </button>
+                      </div>
+
+                      {/* Export JSON */}
+                      <div className="flex items-center justify-between gap-4 py-1 border-t border-white/[0.05] pt-3">
+                        <div>
+                          <p className="text-sm text-white/80">Export diagnostics report</p>
+                          <p className="mt-0.5 text-xs text-white/35">Downloads a JSON file you can paste in a support email</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleExportDiagnosticsJson}
+                          className="shrink-0 flex items-center gap-2 rounded-xl border border-violet-500/30 bg-violet-600/20 px-4 py-2 text-sm font-medium text-violet-200 hover:bg-violet-600/35 hover:border-violet-500/50 transition-all"
+                        >
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                          </svg>
+                          Export JSON
+                        </button>
+                      </div>
+                    </div>
+                  </Card>
+                </div>
+              )}
+
+              {/* Refresh button when data is loaded */}
+              {diagData && !diagLoading && (
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => void loadDiagnostics()}
+                    className="text-xs text-white/30 hover:text-white/60 transition-colors"
+                  >
+                    ↻ Refresh diagnostics
+                  </button>
+                </div>
+              )}
+            </>
+          )}
 
         </motion.div>
       </AnimatePresence>

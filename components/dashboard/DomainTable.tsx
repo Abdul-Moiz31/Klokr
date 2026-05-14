@@ -3,11 +3,10 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
-import { getSiteName, getRootDomain, groupByRootDomain } from "@/lib/domain";
+import { getSiteName, groupByRootDomain } from "@/lib/domain";
 
 interface DomainRow {
   domain: string;
-  pageTitle: string;
   totalSeconds: number;
   visits: number;
 }
@@ -39,7 +38,6 @@ type GroupedRow = {
   totalSeconds: number;
   visits: number;
   subdomains: DomainRow[];
-  pageTitle: string;
 };
 
 export function DomainTable({
@@ -50,15 +48,10 @@ export function DomainTable({
   onDomainClick?: (domain: string, totalSeconds: number) => void;
 }) {
   const [minorExpanded, setMinorExpanded] = useState(false);
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   if (data.length === 0) return null;
 
-  // Group by root domain, carry forward the best page title
-  const grouped: GroupedRow[] = groupByRootDomain(data).map((g) => {
-    const best = g.subdomains.reduce((a, b) => a.totalSeconds >= b.totalSeconds ? a : b);
-    return { ...g, pageTitle: best.pageTitle };
-  });
+  const grouped: GroupedRow[] = groupByRootDomain(data);
 
   const totalDay = grouped.reduce((s, d) => s + d.totalSeconds, 0) || 1;
   const maxSeconds = grouped[0]?.totalSeconds || 1;
@@ -67,137 +60,67 @@ export function DomainTable({
   const minor = grouped.filter((d) => d.totalSeconds < MINOR_THRESHOLD_S);
   const minorSeconds = minor.reduce((s, d) => s + d.totalSeconds, 0);
 
-  const toggleGroup = (root: string) => {
-    setExpandedGroups((prev) => {
-      const next = new Set(prev);
-      next.has(root) ? next.delete(root) : next.add(root);
-      return next;
-    });
-  };
-
   const renderGroup = (group: GroupedRow, i: number, rankIndex: number) => {
     const style = RANK_STYLES[rankIndex] ?? DEFAULT_STYLE;
     const share = (group.totalSeconds / totalDay) * 100;
     const barWidth = (group.totalSeconds / maxSeconds) * 100;
-    const siteName = getSiteName(group.rootDomain, group.pageTitle);
-    const hasSubdomains = group.subdomains.length > 1;
-    const isExpanded = expandedGroups.has(group.rootDomain);
-    // Favicon from root domain for consistency
-    const faviconDomain = group.rootDomain;
+    const siteName = getSiteName(group.rootDomain);
 
     return (
-      <div key={group.rootDomain}>
-        <motion.li
-          initial={{ opacity: 0, x: -8 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.22 + i * 0.04, duration: 0.35 }}
-          onClick={() => onDomainClick?.(group.rootDomain, group.totalSeconds)}
-          className={`group relative flex items-center gap-4 px-6 py-4 transition-colors duration-200 sm:gap-5 sm:px-8 ${style.row} ${onDomainClick ? "cursor-pointer" : "cursor-default"}`}
-        >
-          {/* Rank badge + favicon */}
-          <div className="flex shrink-0 items-center gap-3">
-            <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md border text-[11px] font-bold tabular-nums ${style.badge}`}>
-              {rankIndex + 1}
+      <motion.li
+        key={group.rootDomain}
+        initial={{ opacity: 0, x: -8 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: 0.22 + i * 0.04, duration: 0.35 }}
+        onClick={() => onDomainClick?.(group.rootDomain, group.totalSeconds)}
+        className={`group relative flex items-center gap-4 px-6 py-4 transition-colors duration-200 sm:gap-5 sm:px-8 ${style.row} ${onDomainClick ? "cursor-pointer" : "cursor-default"}`}
+      >
+        {/* Rank badge + favicon */}
+        <div className="flex shrink-0 items-center gap-3">
+          <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md border text-[11px] font-bold tabular-nums ${style.badge}`}>
+            {rankIndex + 1}
+          </span>
+          <div className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.06]">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={`https://www.google.com/s2/favicons?domain=${group.rootDomain}&sz=32`}
+              alt=""
+              width={18}
+              height={18}
+              className="rounded-sm"
+              onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0.25"; }}
+            />
+          </div>
+        </div>
+
+        {/* Site name + bar */}
+        <div className="min-w-0 flex-1">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <span className="block truncate text-sm font-semibold text-white/90" title={group.rootDomain}>
+              {siteName}
             </span>
-            <div className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.06]">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={`https://www.google.com/s2/favicons?domain=${faviconDomain}&sz=32`}
-                alt=""
-                width={18}
-                height={18}
-                className="rounded-sm"
-                onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0.25"; }}
-              />
-            </div>
-          </div>
-
-          {/* Site name + bar */}
-          <div className="min-w-0 flex-1">
-            <div className="mb-2 flex items-center justify-between gap-3">
-              <div className="min-w-0 flex items-center gap-1.5">
-                <span className="block truncate text-sm font-semibold text-white/90" title={group.rootDomain}>
-                  {siteName}
-                </span>
-                {hasSubdomains && (
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); toggleGroup(group.rootDomain); }}
-                    className="shrink-0 flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.05] px-1.5 py-0.5 text-[10px] text-white/35 hover:text-white/60 hover:bg-white/[0.08] transition-colors"
-                  >
-                    {group.subdomains.length}
-                    <svg
-                      width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-                      className={`transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}
-                    >
-                      <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </button>
-                )}
-              </div>
-              <span className="shrink-0 text-xs text-white/35 tabular-nums">
-                {share < 1 ? "<1" : Math.round(share)}%
-              </span>
-            </div>
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/[0.07]">
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{ width: `${Math.max(2, barWidth)}%` }}
-                transition={{ delay: 0.3 + i * 0.04, duration: 0.55, ease: "easeOut" }}
-                className={`h-full rounded-full bg-gradient-to-r ${style.bar}`}
-              />
-            </div>
-          </div>
-
-          {/* Time + visits */}
-          <div className="flex shrink-0 flex-col items-end gap-1">
-            <span className="text-sm font-bold tabular-nums text-white">{formatTime(group.totalSeconds)}</span>
-            <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-medium text-white/40 tabular-nums">
-              {group.visits} {group.visits === 1 ? "visit" : "visits"}
+            <span className="shrink-0 text-xs text-white/35 tabular-nums">
+              {share < 1 ? "<1" : Math.round(share)}%
             </span>
           </div>
-        </motion.li>
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/[0.07]">
+            <motion.div
+              initial={{ width: 0 }}
+              animate={{ width: `${Math.max(2, barWidth)}%` }}
+              transition={{ delay: 0.3 + i * 0.04, duration: 0.55, ease: "easeOut" }}
+              className={`h-full rounded-full bg-gradient-to-r ${style.bar}`}
+            />
+          </div>
+        </div>
 
-        {/* Subdomain breakdown */}
-        <AnimatePresence>
-          {hasSubdomains && isExpanded && (
-            <motion.ul
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.2, ease: "easeInOut" }}
-              className="overflow-hidden border-t border-white/[0.04] bg-white/[0.015] divide-y divide-white/[0.04]"
-            >
-              {group.subdomains
-                .sort((a, b) => b.totalSeconds - a.totalSeconds)
-                .map((sub) => (
-                  <li
-                    key={sub.domain}
-                    className="flex items-center gap-3 px-8 py-2.5 sm:px-10"
-                    onClick={() => onDomainClick?.(sub.domain, sub.totalSeconds)}
-                  >
-                    <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded border border-white/[0.08] bg-white/[0.04]">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={`https://www.google.com/s2/favicons?domain=${sub.domain}&sz=16`}
-                        alt=""
-                        width={12}
-                        height={12}
-                        className="rounded-sm opacity-70"
-                        onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0.15"; }}
-                      />
-                    </div>
-                    <span className="flex-1 truncate text-xs text-white/40" title={sub.domain}>
-                      {getRootDomain(sub.domain) !== sub.domain ? sub.domain.replace(`.${getRootDomain(sub.domain)}`, "") + "." + getRootDomain(sub.domain) : sub.domain}
-                    </span>
-                    <span className="shrink-0 text-xs tabular-nums text-white/50">{formatTime(sub.totalSeconds)}</span>
-                    <span className="shrink-0 text-[10px] tabular-nums text-white/25">{sub.visits}v</span>
-                  </li>
-                ))}
-            </motion.ul>
-          )}
-        </AnimatePresence>
-      </div>
+        {/* Time + visits */}
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <span className="text-sm font-bold tabular-nums text-white">{formatTime(group.totalSeconds)}</span>
+          <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-medium text-white/40 tabular-nums">
+            {group.visits} {group.visits === 1 ? "visit" : "visits"}
+          </span>
+        </div>
+      </motion.li>
     );
   };
 
@@ -213,7 +136,7 @@ export function DomainTable({
         <div>
           <div className="flex items-center gap-1.5">
             <h3 className="text-base font-semibold text-white/95">All domains today</h3>
-            <InfoTooltip text="Grouped by root domain. Click the subdomain count badge to expand and see individual subdomains." side="bottom" />
+            <InfoTooltip text="Grouped by root domain. Ranked by time spent." side="bottom" />
           </div>
           <p className="mt-0.5 text-sm text-white/40">Ranked by time spent</p>
         </div>

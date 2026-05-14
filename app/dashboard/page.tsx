@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase";
-import { loadPrefs } from "@/lib/prefs";
 import { AppShell } from "@/components/dashboard/AppShell";
 import { PageHeader } from "@/components/dashboard/PageHeader";
 import { StatsCard } from "@/components/dashboard/StatsCard";
@@ -19,7 +18,6 @@ import type { User } from "@supabase/supabase-js";
 
 interface DomainStat {
   domain: string;
-  pageTitle: string;
   totalSeconds: number;
   visits: number;
   hours: number;
@@ -58,13 +56,11 @@ export default function DashboardPage() {
 
   const fetchSessions = useCallback(async (userId: string) => {
     const supabase = createClient();
-    const { minSessionSeconds } = loadPrefs();
     const { data, error } = await supabase
       .from("tab_sessions")
       .select("*")
       .eq("user_id", userId)
       .eq("date", getTodayString())
-      .gte("duration_seconds", minSessionSeconds)
       .order("duration_seconds", { ascending: false });
 
     if (error) {
@@ -144,7 +140,6 @@ export default function DashboardPage() {
         if (!acc[domain]) {
           acc[domain] = {
             domain,
-            pageTitle: session.page_title ?? domain,
             totalSeconds: 0,
             visits: 0,
             hours: 0,
@@ -152,12 +147,7 @@ export default function DashboardPage() {
           };
         }
         acc[domain].totalSeconds += session.duration_seconds;
-        // Use stored visit count from the upserted row, not row count.
         acc[domain].visits += session.visits ?? 1;
-        // Keep page_title from the session with most duration.
-        if (session.duration_seconds > (acc[domain].totalSeconds - session.duration_seconds)) {
-          acc[domain].pageTitle = session.page_title ?? domain;
-        }
         return acc;
       },
       {} as Record<string, DomainStat>
@@ -172,7 +162,7 @@ export default function DashboardPage() {
 
   const totalSeconds = sessions.reduce((sum, s) => sum + s.duration_seconds, 0);
   const topDomain = domainStats[0]
-    ? getSiteName(domainStats[0].domain, domainStats[0].pageTitle)
+    ? getSiteName(domainStats[0].domain)
     : "—";
   const domainCount = domainStats.length;
   const displayName = user?.user_metadata?.full_name ?? user?.email?.split("@")[0] ?? "there";
