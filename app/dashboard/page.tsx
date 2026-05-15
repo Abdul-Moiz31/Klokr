@@ -12,6 +12,7 @@ import { DomainChart } from "@/components/dashboard/DomainChart";
 import { DomainTable } from "@/components/dashboard/DomainTable";
 import { DomainDrilldownModal } from "@/components/reports/DomainDrilldownModal";
 import { Loader } from "@/components/ui/Loader";
+import { WorkDayCompleteBanner } from "@/components/dashboard/WorkDayCompleteBanner";
 import { getSiteName } from "@/lib/domain";
 import type { TabSession } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
@@ -209,6 +210,8 @@ export default function DashboardPage() {
           </>
         }
       />
+
+            <WorkDayCompleteBanner totalSecondsToday={totalSeconds} />
 
             {/* Fetch error banner */}
             {fetchError && (
