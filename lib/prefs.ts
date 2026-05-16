@@ -11,7 +11,7 @@ export const DEFAULT_PREFS: KlokrsPrefs = {
   minSessionSeconds: 10,
   idleTimeoutMinutes: 2,
   workStartHour: 9,
-  workEndHour: 18,
+  workEndHour: 17,
   dailySummaryEnabled: false,
   productiveHoursThreshold: 4,
 };
