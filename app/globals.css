@@ -100,14 +100,6 @@ html {
   outline: 2px solid rgba(167, 139, 250, 0.6);
   outline-offset: 1px;
 }
-.klokrs-timeline .fc-event.klokrs-event--urgent {
-  border-color: rgba(251, 191, 36, 0.4);
-  background: linear-gradient(
-    135deg,
-    rgba(180, 83, 9, 0.32),
-    rgba(124, 58, 237, 0.32)
-  );
-}
 .klokrs-timeline .fc-event.klokrs-event--done {
   opacity: 0.5;
 }
@@ -175,17 +167,6 @@ html {
   display: flex;
   gap: 6px;
   align-items: center;
-}
-.klokrs-timeline .klokrs-event-urgent {
-  background: rgba(251, 191, 36, 0.18);
-  color: rgb(252, 211, 77);
-  border: 1px solid rgba(251, 191, 36, 0.3);
-  border-radius: 999px;
-  padding: 0 6px;
-  font-size: 9px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
 }
 .klokrs-timeline .fc-highlight {
   background: rgba(167, 139, 250, 0.12);

@@ -40,8 +40,7 @@ type Props = {
 function emptyForm(): Omit<RecurringRule, "id" | "order"> {
   return {
     title: "",
-    urgent: false,
-    estimateMinutes: null,
+    description: "",
     domainTags: [],
     frequency: "daily",
     weekdays: [1, 2, 3, 4, 5],
@@ -267,7 +266,7 @@ function RecurringRuleModal({
     if (initial)
       return {
         ...initial,
-        // Backfill for rules created before default-time fields existed.
+        description: initial.description ?? "",
         defaultStartMinutes: initial.defaultStartMinutes ?? null,
         defaultDurationMinutes: initial.defaultDurationMinutes ?? null,
       };
@@ -324,13 +323,22 @@ function RecurringRuleModal({
           {initial ? "Update routine" : "New routine"}
         </h3>
 
-        <label className="block text-sm text-white/50">Enter the routine task</label>
+        <label className="block text-sm text-white/50">Title</label>
         <input
           value={form.title}
           onChange={(e) => set({ title: e.target.value })}
           className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white"
           placeholder="e.g. Job application"
           autoFocus
+        />
+
+        <label className="block text-sm text-white/50">Description (optional)</label>
+        <textarea
+          value={form.description}
+          onChange={(e) => set({ description: e.target.value })}
+          rows={2}
+          className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white/85 placeholder:text-white/30 resize-none focus:outline-none focus:border-violet-500/40"
+          placeholder="Notes about this routine"
         />
 
         <p className="text-sm text-white/50">Select the routine frequency</p>
@@ -399,45 +407,20 @@ function RecurringRuleModal({
           </>
         )}
 
-        <label className="flex items-center gap-2 text-sm text-white/70">
+        <div>
+          <span className="text-xs text-white/45">Domains (tab time)</span>
           <input
-            type="checkbox"
-            checked={form.urgent}
-            onChange={(e) => set({ urgent: e.target.checked })}
-            className="rounded border-white/30 accent-amber-500"
+            value={form.domainTags.join(", ")}
+            onChange={(e) => {
+              const parts = e.target.value
+                .split(/[,;]+/)
+                .map((d) => d.trim())
+                .filter(Boolean);
+              set({ domainTags: parts });
+            }}
+            className="w-full mt-1 bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-sm text-white/90"
+            placeholder="github.com, notion.so"
           />
-          Urgent (priority for tab time)
-        </label>
-
-        <div className="grid sm:grid-cols-2 gap-3">
-          <div>
-            <span className="text-xs text-white/45">Est. (min)</span>
-            <input
-              type="number"
-              min={0}
-              value={form.estimateMinutes ?? ""}
-              onChange={(e) => {
-                const v = e.target.value;
-                set({ estimateMinutes: v === "" ? null : Number(v) });
-              }}
-              className="w-full mt-1 bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-white"
-            />
-          </div>
-          <div className="sm:col-span-2">
-            <span className="text-xs text-white/45">Domains (tab time)</span>
-            <input
-              value={form.domainTags.join(", ")}
-              onChange={(e) => {
-                const parts = e.target.value
-                  .split(/[,;]+/)
-                  .map((d) => d.trim())
-                  .filter(Boolean);
-                set({ domainTags: parts });
-              }}
-              className="w-full mt-1 bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-sm text-white/90"
-              placeholder="github.com, notion.so"
-            />
-          </div>
         </div>
 
         {form.frequency === "biweekly" && (

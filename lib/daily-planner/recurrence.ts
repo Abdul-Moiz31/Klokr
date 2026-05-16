@@ -56,11 +56,8 @@ export function isRecurringDone(
   return state.recurringCompletions[completionKey(ruleId, d)] === true;
 }
 
-/** Rules that fire on `d`, in display order (urgent first, then `order`). */
+/** Rules that fire on `d`, in display order (by `order`). */
 export function rulesForDate(rules: RecurringRule[], d: Date) {
   const active = rules.filter((r) => ruleAppliesOnDate(r, d));
-  return [...active].sort((a, b) => {
-    if (a.urgent !== b.urgent) return a.urgent ? -1 : 1;
-    return a.order - b.order;
-  });
+  return [...active].sort((a, b) => a.order - b.order);
 }

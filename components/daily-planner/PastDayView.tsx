@@ -1,11 +1,11 @@
 "use client";
 
-import type { DailyPlannerV3, DayData, PlannerTask } from "@/lib/daily-planner/types";
+import type { DailyPlannerV4, DayData, PlannerTask } from "@/lib/daily-planner/types";
 import { dayKey } from "@/lib/daily-planner/date";
 import { TimelineView } from "./TimelineView";
 
 function ReadOnlyTask({ task }: { task: PlannerTask }) {
-  const { title, done, urgent, estimateMinutes, domainTags } = task;
+  const { title, description, done, domainTags } = task;
   return (
     <div className={`flex items-start gap-2.5 rounded-xl px-3 py-2.5 ${done ? "opacity-50" : ""}`}>
       <div
@@ -23,18 +23,13 @@ function ReadOnlyTask({ task }: { task: PlannerTask }) {
         <p className={`text-sm leading-snug ${done ? "line-through text-white/40" : "text-white/85"}`}>
           {title || "—"}
         </p>
-        {(urgent || estimateMinutes != null || domainTags.length > 0) && (
+        {description && (
+          <p className="mt-0.5 text-xs text-white/45 leading-snug whitespace-pre-wrap">
+            {description}
+          </p>
+        )}
+        {domainTags.length > 0 && (
           <div className="mt-1 flex flex-wrap gap-1">
-            {urgent && (
-              <span className="rounded-full border border-amber-500/25 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-300/90">
-                Urgent
-              </span>
-            )}
-            {estimateMinutes != null && (
-              <span className="rounded-full border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] text-white/40 tabular-nums">
-                {estimateMinutes}m
-              </span>
-            )}
             {domainTags.map((d) => (
               <span key={d} className="rounded-md border border-cyan-500/15 bg-cyan-950/30 px-1.5 py-0.5 text-[10px] text-cyan-400/70">
                 {d}
@@ -48,7 +43,7 @@ function ReadOnlyTask({ task }: { task: PlannerTask }) {
 }
 
 type Props = {
-  state: DailyPlannerV3;
+  state: DailyPlannerV4;
   forDate: Date;
 };
 
