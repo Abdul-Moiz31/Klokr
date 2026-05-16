@@ -12,9 +12,8 @@ import {
 
 export type TimelineTaskDraft = {
   title: string;
-  urgent: boolean;
+  description: string;
   done: boolean;
-  estimateMinutes: number | null;
   domainTags: string[];
   startMinutes: number | null;
   endMinutes: number | null;
@@ -55,11 +54,8 @@ function timeStringToMinutes(s: string): number | null {
 
 export function TimelineTaskModal({ initial, initialRange, onSave, onDelete, onClose }: Props) {
   const [title, setTitle] = useState(initial?.title ?? "");
-  const [urgent, setUrgent] = useState(initial?.urgent ?? false);
+  const [description, setDescription] = useState(initial?.description ?? "");
   const [done, setDone] = useState(initial?.done ?? false);
-  const [estimate, setEstimate] = useState<string>(
-    initial?.estimateMinutes != null ? String(initial.estimateMinutes) : ""
-  );
   const [domains, setDomains] = useState<string>(initial?.domainTags.join(", ") ?? "");
   const [scheduled, setScheduled] = useState<boolean>(
     initial ? initial.startMinutes != null : Boolean(initialRange)
@@ -96,9 +92,8 @@ export function TimelineTaskModal({ initial, initialRange, onSave, onDelete, onC
 
     onSave({
       title: t,
-      urgent,
+      description: description.trim(),
       done,
-      estimateMinutes: estimate === "" ? null : Math.max(0, Number(estimate) || 0),
       domainTags: splitDomains(domains),
       startMinutes,
       endMinutes,
@@ -135,6 +130,17 @@ export function TimelineTaskModal({ initial, initialRange, onSave, onDelete, onC
               autoFocus
               placeholder="e.g. Deep work — onboarding flow"
               className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/90 placeholder:text-white/30 focus:border-violet-500/40 focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs text-white/45">Description</label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={3}
+              placeholder="Optional notes about this task"
+              className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/85 placeholder:text-white/30 focus:border-violet-500/40 focus:outline-none resize-none"
             />
           </div>
 
@@ -199,50 +205,26 @@ export function TimelineTaskModal({ initial, initialRange, onSave, onDelete, onC
             )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-4">
+          {initial && (
             <label className="flex items-center gap-2 text-sm text-white/70">
               <input
                 type="checkbox"
-                checked={urgent}
-                onChange={(e) => setUrgent(e.target.checked)}
-                className="accent-amber-500"
+                checked={done}
+                onChange={(e) => setDone(e.target.checked)}
+                className="accent-violet-500"
               />
-              Urgent
+              Mark done
             </label>
-            {initial && (
-              <label className="flex items-center gap-2 text-sm text-white/70">
-                <input
-                  type="checkbox"
-                  checked={done}
-                  onChange={(e) => setDone(e.target.checked)}
-                  className="accent-violet-500"
-                />
-                Mark done
-              </label>
-            )}
-          </div>
+          )}
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <span className="text-xs text-white/45">Estimate (min)</span>
-              <input
-                type="number"
-                min={0}
-                value={estimate}
-                onChange={(e) => setEstimate(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white/90 focus:border-violet-500/40 focus:outline-none"
-                placeholder="60"
-              />
-            </div>
-            <div>
-              <span className="text-xs text-white/45">Domains (tab time)</span>
-              <input
-                value={domains}
-                onChange={(e) => setDomains(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white/90 focus:border-violet-500/40 focus:outline-none"
-                placeholder="github.com, notion.so"
-              />
-            </div>
+          <div>
+            <label className="block text-xs text-white/45">Domains (tab time)</label>
+            <input
+              value={domains}
+              onChange={(e) => setDomains(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white/90 focus:border-violet-500/40 focus:outline-none"
+              placeholder="github.com, notion.so"
+            />
           </div>
         </div>
 

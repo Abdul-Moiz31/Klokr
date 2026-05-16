@@ -22,7 +22,6 @@ export const UnscheduledRail = forwardRef<HTMLDivElement, Props>(function Unsche
 
   const visible = [...tasks].sort((a, b) => {
     if (a.done !== b.done) return a.done ? 1 : -1;
-    if (a.urgent !== b.urgent) return a.urgent ? -1 : 1;
     return a.order - b.order;
   });
 
@@ -53,14 +52,12 @@ export const UnscheduledRail = forwardRef<HTMLDivElement, Props>(function Unsche
         )}
 
         {visible.map((t) => {
-          const estimate = t.estimateMinutes ?? 60;
           return (
             <div
               key={t.id}
               data-unscheduled-task={readOnly ? undefined : true}
               data-task-id={t.id}
               data-task-title={t.title || "(untitled)"}
-              data-task-duration={estimate}
               className={`group flex items-start gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 transition ${
                 readOnly ? "" : "cursor-grab hover:border-violet-500/30 hover:bg-violet-500/5 active:cursor-grabbing"
               } ${t.done ? "opacity-50" : ""}`}
@@ -95,18 +92,13 @@ export const UnscheduledRail = forwardRef<HTMLDivElement, Props>(function Unsche
                 <p className={`text-sm leading-snug ${t.done ? "line-through text-white/40" : "text-white/85"}`}>
                   {t.title || "(untitled)"}
                 </p>
-                {(t.urgent || t.estimateMinutes != null || t.domainTags.length > 0) && (
+                {t.description && (
+                  <p className="mt-0.5 text-xs text-white/45 leading-snug line-clamp-2">
+                    {t.description}
+                  </p>
+                )}
+                {t.domainTags.length > 0 && (
                   <div className="mt-1 flex flex-wrap gap-1">
-                    {t.urgent && (
-                      <span className="rounded-full border border-amber-500/25 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-300/90">
-                        Urgent
-                      </span>
-                    )}
-                    {t.estimateMinutes != null && (
-                      <span className="rounded-full border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] text-white/40 tabular-nums">
-                        {t.estimateMinutes}m
-                      </span>
-                    )}
                     {t.domainTags.slice(0, 3).map((d) => (
                       <span
                         key={d}

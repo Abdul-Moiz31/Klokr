@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { DayData, PlannerGroup, PlannerTask } from "@/lib/daily-planner/types";
 import { useSparkle } from "@/components/ui/SparkleEffect";
+import { MIN_DURATION_MINUTES, normalizeRange } from "@/lib/daily-planner/timeline";
 
 type Props = {
   data: DayData;
@@ -15,19 +16,31 @@ type Props = {
 
 type Draft = {
   title: string;
-  urgent: boolean;
-  estimate: string;
+  description: string;
   domains: string;
+  /** "HH:MM" or "" */
+  start: string;
+  /** "HH:MM" or "" */
+  end: string;
 };
 
-const emptyDraft = (): Draft => ({ title: "", urgent: false, estimate: "", domains: "" });
+const emptyDraft = (): Draft => ({
+  title: "",
+  description: "",
+  domains: "",
+  start: "",
+  end: "",
+});
 
 function sortG(groups: PlannerGroup[]) {
   return [...groups].sort((a, b) => a.order - b.order);
 }
 
 function splitDomains(s: string) {
-  return s.split(/[,;]+/).map((d) => d.trim()).filter(Boolean);
+  return s
+    .split(/[,;]+/)
+    .map((d) => d.trim().toLowerCase().replace(/^www\./, ""))
+    .filter(Boolean);
 }
 
 function orderedTasksForGroup(tasks: PlannerTask[], groupId: string) {
@@ -38,17 +51,63 @@ function orderedTasksForGroup(tasks: PlannerTask[], groupId: string) {
   ];
 }
 
+function minutesToTimeString(m: number | null): string {
+  if (m == null) return "";
+  const h = Math.floor(m / 60);
+  const min = m % 60;
+  return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
+}
+
+function timeStringToMinutes(s: string): number | null {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(s.trim());
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (h < 0 || h > 23 || min < 0 || min > 59) return null;
+  return h * 60 + min;
+}
+
+/**
+ * From a draft's optional start/end strings, derive a valid range pair
+ * (both null = unscheduled) or an error message. "" + "" = unscheduled (ok).
+ * Anything else with one missing/invalid = error.
+ */
+function deriveRange(start: string, end: string):
+  | { ok: true; startMinutes: number | null; endMinutes: number | null }
+  | { ok: false; error: string } {
+  const s = start.trim();
+  const e = end.trim();
+  if (!s && !e) return { ok: true, startMinutes: null, endMinutes: null };
+  const sm = timeStringToMinutes(s);
+  const em = timeStringToMinutes(e);
+  if (sm == null || em == null) {
+    return { ok: false, error: "Enter both start and end times (HH:MM)." };
+  }
+  if (em <= sm) {
+    return { ok: false, error: `End must be at least ${MIN_DURATION_MINUTES} min after start.` };
+  }
+  const range = normalizeRange(sm, em);
+  return { ok: true, startMinutes: range.start, endMinutes: range.end };
+}
+
+function formatDuration(start: number | null, end: number | null): string | null {
+  if (start == null || end == null) return null;
+  return `${end - start} min`;
+}
+
 export function DayDataEditor({ data, onChange, newIdFn, isTemplate = false }: Props) {
   const [addingGroupId, setAddingGroupId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const { fire: fireSparkle } = useSparkle();
 
-  // Warn before tab close when a new-task form or title edit is open
   const hasUnsaved = addingGroupId !== null || editingId !== null;
   useEffect(() => {
     if (!hasUnsaved) return;
-    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); };
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [hasUnsaved]);
@@ -58,7 +117,10 @@ export function DayDataEditor({ data, onChange, newIdFn, isTemplate = false }: P
       const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
       fireSparkle({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
     }
-    onChange({ ...data, tasks: data.tasks.map((t) => (t.id === id ? { ...t, done: !currentDone } as PlannerTask : t)) });
+    onChange({
+      ...data,
+      tasks: data.tasks.map((t) => (t.id === id ? { ...t, done: !currentDone } : t)),
+    });
   };
 
   const setGroups = (groups: PlannerGroup[]) => onChange({ ...data, groups });
@@ -66,12 +128,23 @@ export function DayDataEditor({ data, onChange, newIdFn, isTemplate = false }: P
 
   const addGroup = () => {
     const max = data.groups.reduce((m, g) => Math.max(m, g.order), -1);
-    setGroups([...data.groups, { id: newIdFn(), title: "New group", order: max + 1 }]);
+    setGroups([
+      ...data.groups,
+      { id: newIdFn(), title: "New group", order: max + 1 },
+    ]);
   };
 
   const saveNewTask = (groupId: string) => {
     const title = draft.title.trim();
-    if (!title) return;
+    if (!title) {
+      setError("Title is required.");
+      return;
+    }
+    const range = deriveRange(draft.start, draft.end);
+    if (!range.ok) {
+      setError(range.error);
+      return;
+    }
     const inG = data.tasks.filter((t) => t.groupId === groupId);
     const maxO = inG.reduce((m, t) => Math.max(m, t.order), -1);
     setTasks([
@@ -80,21 +153,21 @@ export function DayDataEditor({ data, onChange, newIdFn, isTemplate = false }: P
         id: newIdFn(),
         groupId,
         title,
-        urgent: draft.urgent,
+        description: draft.description.trim(),
         done: false,
-        estimateMinutes: draft.estimate === "" ? null : Math.max(0, Number(draft.estimate) || 0),
         domainTags: splitDomains(draft.domains),
         order: maxO + 1,
-        startMinutes: null,
-        endMinutes: null,
+        startMinutes: range.startMinutes,
+        endMinutes: range.endMinutes,
       },
     ]);
     setDraft(emptyDraft());
     setAddingGroupId(null);
+    setError(null);
   };
 
   const updateTask = (id: string, patch: Partial<PlannerTask>) =>
-    setTasks(data.tasks.map((t) => (t.id === id ? { ...t, ...patch } as PlannerTask : t)));
+    setTasks(data.tasks.map((t) => (t.id === id ? { ...t, ...patch } : t)));
 
   const removeTask = (id: string) => {
     setTasks(data.tasks.filter((t) => t.id !== id));
@@ -108,11 +181,13 @@ export function DayDataEditor({ data, onChange, newIdFn, isTemplate = false }: P
     if (i < 0 || j < 0 || j >= list.length) return;
     const a = list[i]!;
     const b = list[j]!;
-    setTasks(data.tasks.map((t) => {
-      if (t.id === a.id) return { ...b, order: a.order };
-      if (t.id === b.id) return { ...a, order: b.order };
-      return t;
-    }));
+    setTasks(
+      data.tasks.map((t) => {
+        if (t.id === a.id) return { ...b, order: a.order };
+        if (t.id === b.id) return { ...a, order: b.order };
+        return t;
+      })
+    );
   };
 
   return (
@@ -131,7 +206,11 @@ export function DayDataEditor({ data, onChange, newIdFn, isTemplate = false }: P
               <input
                 value={g.title}
                 onChange={(e) =>
-                  setGroups(data.groups.map((x) => x.id === g.id ? { ...x, title: e.target.value } : x))
+                  setGroups(
+                    data.groups.map((x) =>
+                      x.id === g.id ? { ...x, title: e.target.value } : x
+                    )
+                  )
                 }
                 className="flex-1 min-w-[8rem] bg-transparent text-sm font-semibold text-white/90 placeholder:text-white/30 focus:outline-none"
                 placeholder="Group title"
@@ -145,7 +224,11 @@ export function DayDataEditor({ data, onChange, newIdFn, isTemplate = false }: P
                 type="button"
                 onClick={() => {
                   setTasks(data.tasks.filter((t) => t.groupId !== g.id));
-                  setGroups(data.groups.filter((x) => x.id !== g.id).map((x, i) => ({ ...x, order: i })));
+                  setGroups(
+                    data.groups
+                      .filter((x) => x.id !== g.id)
+                      .map((x, i) => ({ ...x, order: i }))
+                  );
                 }}
                 className="text-xs text-white/25 hover:text-red-400/80 transition-colors"
               >
@@ -158,6 +241,7 @@ export function DayDataEditor({ data, onChange, newIdFn, isTemplate = false }: P
               <AnimatePresence initial={false}>
                 {tasks.map((t, i) => {
                   const isEditing = editingId === t.id;
+                  const dur = formatDuration(t.startMinutes, t.endMinutes);
                   return (
                     <motion.div
                       key={t.id}
@@ -167,70 +251,26 @@ export function DayDataEditor({ data, onChange, newIdFn, isTemplate = false }: P
                       transition={{ duration: 0.18 }}
                     >
                       {isEditing ? (
-                        /* ── Edit mode ── */
-                        <div className="rounded-xl border border-violet-500/25 bg-violet-950/20 p-3 space-y-2.5">
-                          <input
-                            value={t.title}
-                            onChange={(e) => updateTask(t.id, { title: e.target.value })}
-                            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-violet-500/40"
-                            placeholder="Task title"
-                            autoFocus
-                          />
-                          <div className="flex flex-wrap gap-3 items-center">
-                            <label className="flex items-center gap-1.5 text-xs text-white/55 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={t.urgent}
-                                onChange={(e) => updateTask(t.id, { urgent: e.target.checked })}
-                                className="rounded border-white/30 accent-amber-500 w-3.5 h-3.5"
-                              />
-                              Urgent
-                            </label>
-                            <label className="flex items-center gap-1.5 text-xs text-white/55">
-                              Est.
-                              <input
-                                type="number"
-                                min={0}
-                                value={t.estimateMinutes ?? ""}
-                                onChange={(e) => {
-                                  const v = e.target.value;
-                                  updateTask(t.id, { estimateMinutes: v === "" ? null : Number(v) });
-                                }}
-                                className="w-16 bg-white/5 border border-white/10 rounded px-2 py-1 text-white focus:outline-none"
-                                placeholder="min"
-                              />
-                            </label>
-                            <div className="flex-1 min-w-[12rem]">
-                              <input
-                                value={t.domainTags.join(", ")}
-                                onChange={(e) => updateTask(t.id, { domainTags: splitDomains(e.target.value) })}
-                                className="w-full bg-white/5 border border-white/10 rounded px-2 py-1 text-xs text-white/90 focus:outline-none"
-                                placeholder="Domains: github.com, notion.so"
-                              />
-                            </div>
-                          </div>
-                          <div className="flex gap-2">
-                            <button
-                              type="button"
-                              onClick={() => setEditingId(null)}
-                              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-violet-600/80 text-white hover:bg-violet-500"
-                            >
-                              Done
-                            </button>
-                          </div>
-                        </div>
+                        <EditTaskForm
+                          task={t}
+                          onSave={(patch) => {
+                            updateTask(t.id, patch);
+                            setEditingId(null);
+                          }}
+                          onCancel={() => setEditingId(null)}
+                        />
                       ) : (
-                        /* ── View mode ── */
                         <div
                           className={`group flex items-start gap-2.5 rounded-xl px-3 py-2.5 transition-colors hover:bg-white/[0.04] ${
                             !isTemplate && t.done ? "opacity-55" : ""
                           }`}
                         >
-                          {/* Checkbox — disabled in template mode, tasks only get checked in Today */}
                           <button
                             type="button"
                             aria-label={t.done ? "Mark pending" : "Mark done"}
-                            onClick={(e) => { if (!isTemplate) handleCheckboxClick(e, t.id, t.done); }}
+                            onClick={(e) => {
+                              if (!isTemplate) handleCheckboxClick(e, t.id, t.done);
+                            }}
                             disabled={isTemplate}
                             className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
                               isTemplate
@@ -242,30 +282,50 @@ export function DayDataEditor({ data, onChange, newIdFn, isTemplate = false }: P
                           >
                             {!isTemplate && t.done && (
                               <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
-                                <path d="M1.5 4L3 5.5L6.5 2" stroke="#a78bfa" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                <path
+                                  d="M1.5 4L3 5.5L6.5 2"
+                                  stroke="#a78bfa"
+                                  strokeWidth="1.5"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
                               </svg>
                             )}
                           </button>
 
-                          {/* Title + chips */}
                           <div className="flex-1 min-w-0">
-                            <p className={`text-sm leading-snug ${!isTemplate && t.done ? "line-through text-white/40" : "text-white/85"}`}>
+                            <p
+                              className={`text-sm leading-snug ${
+                                !isTemplate && t.done
+                                  ? "line-through text-white/40"
+                                  : "text-white/85"
+                              }`}
+                            >
                               {t.title || "—"}
                             </p>
-                            {(t.urgent || t.estimateMinutes != null || t.domainTags.length > 0) && (
+                            {t.description && (
+                              <p className="mt-0.5 text-xs text-white/45 leading-snug whitespace-pre-wrap">
+                                {t.description}
+                              </p>
+                            )}
+                            {(t.startMinutes != null || dur || t.domainTags.length > 0) && (
                               <div className="mt-1 flex flex-wrap gap-1">
-                                {t.urgent && (
-                                  <span className="rounded-full border border-amber-500/25 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-300/90">
-                                    Urgent
+                                {t.startMinutes != null && t.endMinutes != null && (
+                                  <span className="rounded-full border border-violet-500/25 bg-violet-500/10 px-1.5 py-0.5 text-[10px] text-violet-300/80 tabular-nums">
+                                    {minutesToTimeString(t.startMinutes)} →{" "}
+                                    {minutesToTimeString(t.endMinutes)}
                                   </span>
                                 )}
-                                {t.estimateMinutes != null && (
+                                {dur && (
                                   <span className="rounded-full border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] text-white/40 tabular-nums">
-                                    {t.estimateMinutes}m
+                                    {dur}
                                   </span>
                                 )}
                                 {t.domainTags.map((d) => (
-                                  <span key={d} className="rounded-md border border-cyan-500/15 bg-cyan-950/30 px-1.5 py-0.5 text-[10px] text-cyan-400/70">
+                                  <span
+                                    key={d}
+                                    className="rounded-md border border-cyan-500/15 bg-cyan-950/30 px-1.5 py-0.5 text-[10px] text-cyan-400/70"
+                                  >
                                     {d}
                                   </span>
                                 ))}
@@ -273,7 +333,6 @@ export function DayDataEditor({ data, onChange, newIdFn, isTemplate = false }: P
                             )}
                           </div>
 
-                          {/* Actions — visible on hover */}
                           <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                             <button
                               type="button"
@@ -289,7 +348,9 @@ export function DayDataEditor({ data, onChange, newIdFn, isTemplate = false }: P
                             <button
                               type="button"
                               onClick={() => moveTask(g.id, t.id, 1)}
-                              disabled={i === tasks.filter(x => !x.done).length - 1 && !t.done}
+                              disabled={
+                                i === tasks.filter((x) => !x.done).length - 1 && !t.done
+                              }
                               className="flex h-6 w-6 items-center justify-center rounded text-white/30 hover:text-white/70 disabled:opacity-20 transition-colors"
                               aria-label="Move down"
                             >
@@ -303,7 +364,15 @@ export function DayDataEditor({ data, onChange, newIdFn, isTemplate = false }: P
                               className="flex h-6 w-6 items-center justify-center rounded text-white/30 hover:text-violet-400 transition-colors"
                               aria-label="Edit"
                             >
-                              <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round">
+                              <svg
+                                width="11"
+                                height="11"
+                                viewBox="0 0 11 11"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="1.3"
+                                strokeLinecap="round"
+                              >
                                 <path d="M1.5 9.5h2L8 4l-2-2-4.5 4.5v2ZM7 3l1-1 1 1-1 1L7 3Z" />
                               </svg>
                             </button>
@@ -313,7 +382,15 @@ export function DayDataEditor({ data, onChange, newIdFn, isTemplate = false }: P
                               className="flex h-6 w-6 items-center justify-center rounded text-white/30 hover:text-red-400 transition-colors"
                               aria-label="Delete"
                             >
-                              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round">
+                              <svg
+                                width="10"
+                                height="10"
+                                viewBox="0 0 10 10"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="1.3"
+                                strokeLinecap="round"
+                              >
                                 <path d="M2 2L8 8M8 2L2 8" />
                               </svg>
                             </button>
@@ -343,40 +420,79 @@ export function DayDataEditor({ data, onChange, newIdFn, isTemplate = false }: P
                   >
                     <input
                       value={draft.title}
-                      onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))  }
-                      onKeyDown={(e) => { if (e.key === "Enter") saveNewTask(g.id); if (e.key === "Escape") { setAddingGroupId(null); setDraft(emptyDraft()); } }}
+                      onChange={(e) =>
+                        setDraft((d) => ({ ...d, title: e.target.value }))
+                      }
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) saveNewTask(g.id);
+                        if (e.key === "Escape") {
+                          setAddingGroupId(null);
+                          setDraft(emptyDraft());
+                          setError(null);
+                        }
+                      }}
                       className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-violet-500/40"
                       placeholder="Task title"
                       autoFocus
                     />
-                    <div className="flex flex-wrap gap-3 items-center">
-                      <label className="flex items-center gap-1.5 text-xs text-white/50 cursor-pointer">
+                    <textarea
+                      value={draft.description}
+                      onChange={(e) =>
+                        setDraft((d) => ({ ...d, description: e.target.value }))
+                      }
+                      rows={2}
+                      className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white/85 placeholder:text-white/30 focus:outline-none focus:border-violet-500/40 resize-none"
+                      placeholder="Description (optional)"
+                    />
+                    <input
+                      value={draft.domains}
+                      onChange={(e) =>
+                        setDraft((d) => ({ ...d, domains: e.target.value }))
+                      }
+                      className="w-full bg-white/5 border border-white/10 rounded px-2 py-1.5 text-xs text-white/90 focus:outline-none"
+                      placeholder="Domains: github.com, notion.so (optional)"
+                    />
+                    <div className="flex flex-wrap items-center gap-3">
+                      <label className="flex items-center gap-1.5 text-xs text-white/50">
+                        Start
                         <input
-                          type="checkbox"
-                          checked={draft.urgent}
-                          onChange={(e) => setDraft((d) => ({ ...d, urgent: e.target.checked }))}
-                          className="rounded border-white/30 accent-amber-500 w-3.5 h-3.5"
+                          type="time"
+                          step={900}
+                          value={draft.start}
+                          onChange={(e) =>
+                            setDraft((d) => ({ ...d, start: e.target.value }))
+                          }
+                          className="bg-white/5 border border-white/10 rounded px-2 py-1 text-white focus:outline-none"
                         />
-                        Urgent
                       </label>
                       <label className="flex items-center gap-1.5 text-xs text-white/50">
-                        Est.
+                        End
                         <input
-                          type="number"
-                          min={0}
-                          value={draft.estimate}
-                          onChange={(e) => setDraft((d) => ({ ...d, estimate: e.target.value }))}
-                          className="w-16 bg-white/5 border border-white/10 rounded px-2 py-1 text-white focus:outline-none"
-                          placeholder="min"
+                          type="time"
+                          step={900}
+                          value={draft.end}
+                          onChange={(e) =>
+                            setDraft((d) => ({ ...d, end: e.target.value }))
+                          }
+                          className="bg-white/5 border border-white/10 rounded px-2 py-1 text-white focus:outline-none"
                         />
                       </label>
-                      <input
-                        value={draft.domains}
-                        onChange={(e) => setDraft((d) => ({ ...d, domains: e.target.value }))}
-                        className="flex-1 min-w-[12rem] bg-white/5 border border-white/10 rounded px-2 py-1 text-xs text-white/90 focus:outline-none"
-                        placeholder="Domains: github.com, notion.so"
-                      />
+                      {(() => {
+                        const s = timeStringToMinutes(draft.start);
+                        const e = timeStringToMinutes(draft.end);
+                        if (s != null && e != null && e > s) {
+                          return (
+                            <span className="text-[11px] text-white/40 tabular-nums">
+                              {e - s} min
+                            </span>
+                          );
+                        }
+                        return null;
+                      })()}
                     </div>
+                    {error && (
+                      <p className="text-xs text-amber-400/85">{error}</p>
+                    )}
                     <div className="flex gap-2">
                       <button
                         type="button"
@@ -387,7 +503,11 @@ export function DayDataEditor({ data, onChange, newIdFn, isTemplate = false }: P
                       </button>
                       <button
                         type="button"
-                        onClick={() => { setAddingGroupId(null); setDraft(emptyDraft()); }}
+                        onClick={() => {
+                          setAddingGroupId(null);
+                          setDraft(emptyDraft());
+                          setError(null);
+                        }}
                         className="px-3 py-1.5 rounded-lg text-xs text-white/50 hover:text-white/80 transition-colors border border-white/10 hover:bg-white/5"
                       >
                         Cancel
@@ -397,10 +517,22 @@ export function DayDataEditor({ data, onChange, newIdFn, isTemplate = false }: P
                 ) : (
                   <button
                     type="button"
-                    onClick={() => { setAddingGroupId(g.id); setDraft(emptyDraft()); }}
+                    onClick={() => {
+                      setAddingGroupId(g.id);
+                      setDraft(emptyDraft());
+                      setError(null);
+                    }}
                     className="flex items-center gap-1.5 text-xs text-white/35 hover:text-violet-400 transition-colors py-1"
                   >
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 12 12"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                    >
                       <path d="M6 1v10M1 6h10" />
                     </svg>
                     Add task
@@ -417,12 +549,127 @@ export function DayDataEditor({ data, onChange, newIdFn, isTemplate = false }: P
         onClick={addGroup}
         className="flex items-center gap-2 rounded-xl border border-dashed border-white/15 px-4 py-2.5 text-sm text-white/40 hover:border-violet-500/30 hover:text-violet-400 transition-colors"
       >
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 14 14"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        >
           <path d="M7 1v12M1 7h12" />
         </svg>
         Add group
       </button>
+    </div>
+  );
+}
 
+function EditTaskForm({
+  task,
+  onSave,
+  onCancel,
+}: {
+  task: PlannerTask;
+  onSave: (patch: Partial<PlannerTask>) => void;
+  onCancel: () => void;
+}) {
+  const [title, setTitle] = useState(task.title);
+  const [description, setDescription] = useState(task.description);
+  const [domains, setDomains] = useState(task.domainTags.join(", "));
+  const [start, setStart] = useState(minutesToTimeString(task.startMinutes));
+  const [end, setEnd] = useState(minutesToTimeString(task.endMinutes));
+  const [err, setErr] = useState<string | null>(null);
+
+  const handleSave = () => {
+    const t = title.trim();
+    if (!t) {
+      setErr("Title is required.");
+      return;
+    }
+    const range = deriveRange(start, end);
+    if (!range.ok) {
+      setErr(range.error);
+      return;
+    }
+    onSave({
+      title: t,
+      description: description.trim(),
+      domainTags: splitDomains(domains),
+      startMinutes: range.startMinutes,
+      endMinutes: range.endMinutes,
+    });
+  };
+
+  const s = timeStringToMinutes(start);
+  const e = timeStringToMinutes(end);
+  const liveDuration = s != null && e != null && e > s ? `${e - s} min` : null;
+
+  return (
+    <div className="rounded-xl border border-violet-500/25 bg-violet-950/20 p-3 space-y-2.5">
+      <input
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-violet-500/40"
+        placeholder="Task title"
+        autoFocus
+      />
+      <textarea
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        rows={2}
+        className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white/85 placeholder:text-white/30 focus:outline-none focus:border-violet-500/40 resize-none"
+        placeholder="Description (optional)"
+      />
+      <input
+        value={domains}
+        onChange={(e) => setDomains(e.target.value)}
+        className="w-full bg-white/5 border border-white/10 rounded px-2 py-1.5 text-xs text-white/90 focus:outline-none"
+        placeholder="Domains: github.com, notion.so (optional)"
+      />
+      <div className="flex flex-wrap items-center gap-3">
+        <label className="flex items-center gap-1.5 text-xs text-white/55">
+          Start
+          <input
+            type="time"
+            step={900}
+            value={start}
+            onChange={(e) => setStart(e.target.value)}
+            className="bg-white/5 border border-white/10 rounded px-2 py-1 text-white focus:outline-none"
+          />
+        </label>
+        <label className="flex items-center gap-1.5 text-xs text-white/55">
+          End
+          <input
+            type="time"
+            step={900}
+            value={end}
+            onChange={(e) => setEnd(e.target.value)}
+            className="bg-white/5 border border-white/10 rounded px-2 py-1 text-white focus:outline-none"
+          />
+        </label>
+        {liveDuration && (
+          <span className="text-[11px] text-white/40 tabular-nums">{liveDuration}</span>
+        )}
+      </div>
+      {err && <p className="text-xs text-amber-400/85">{err}</p>}
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={handleSave}
+          className="px-3 py-1.5 rounded-lg text-xs font-medium bg-violet-600/80 text-white hover:bg-violet-500"
+        >
+          Save
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-3 py-1.5 rounded-lg text-xs text-white/50 hover:text-white/80 transition-colors border border-white/10 hover:bg-white/5"
+        >
+          Cancel
+        </button>
+      </div>
     </div>
   );
 }

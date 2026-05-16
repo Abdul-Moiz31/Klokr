@@ -13,7 +13,6 @@ import type {
 import type { EventResizeDoneArg } from "@fullcalendar/interaction";
 import type { PlannerTask } from "@/lib/daily-planner/types";
 import {
-  MIN_DURATION_MINUTES,
   SNAP_MINUTES,
   dateToMinutes,
   formatRange,
@@ -67,8 +66,8 @@ export function TimelineView({
       eventData: (taskEl) => {
         const id = taskEl.getAttribute("data-task-id") ?? "";
         const title = taskEl.getAttribute("data-task-title") ?? "(untitled)";
-        const durationAttr = taskEl.getAttribute("data-task-duration");
-        const duration = durationAttr ? Math.max(MIN_DURATION_MINUTES, Number(durationAttr)) : 60;
+        // Unscheduled tasks have no inherent duration — default to 60 min on drop.
+        const duration = 60;
         return {
           id,
           title,
@@ -109,7 +108,6 @@ export function TimelineView({
           classNames: [
             "klokrs-event",
             t.done ? "klokrs-event--done" : "",
-            t.urgent ? "klokrs-event--urgent" : "",
           ].filter(Boolean),
           extendedProps: { task: t },
         } satisfies EventInput;
@@ -228,10 +226,7 @@ export function TimelineView({
                   {arg.event.title}
                 </div>
               </div>
-              <div className="klokrs-event-meta">
-                {formatRange(start, end)}
-                {task?.urgent && <span className="klokrs-event-urgent">Urgent</span>}
-              </div>
+              <div className="klokrs-event-meta">{formatRange(start, end)}</div>
             </div>
           );
         }}
