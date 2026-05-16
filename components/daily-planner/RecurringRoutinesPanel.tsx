@@ -47,7 +47,26 @@ function emptyForm(): Omit<RecurringRule, "id" | "order"> {
     weekdays: [1, 2, 3, 4, 5],
     monthDays: [1],
     biweeklyAnchor: dayKey(new Date()),
+    defaultStartMinutes: null,
+    defaultDurationMinutes: null,
   };
+}
+
+/** "09:00" <-> 540. Returns "" for null to clear inputs. */
+function minutesToTimeString(m: number | null): string {
+  if (m == null) return "";
+  const h = Math.floor(m / 60);
+  const min = m % 60;
+  return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
+}
+
+function timeStringToMinutes(s: string): number | null {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(s.trim());
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (h < 0 || h > 23 || min < 0 || min > 59) return null;
+  return h * 60 + min;
 }
 
 function freqLabel(r: RecurringRule) {
@@ -245,7 +264,13 @@ function RecurringRuleModal({
   onClose: () => void;
 }) {
   const [form, setForm] = useState<RecurringRule>(() => {
-    if (initial) return { ...initial };
+    if (initial)
+      return {
+        ...initial,
+        // Backfill for rules created before default-time fields existed.
+        defaultStartMinutes: initial.defaultStartMinutes ?? null,
+        defaultDurationMinutes: initial.defaultDurationMinutes ?? null,
+      };
     return {
       ...emptyForm(),
       id: newId(),
@@ -423,6 +448,66 @@ function RecurringRuleModal({
             week.
           </p>
         )}
+
+        <div className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-white/60">Default time (optional)</span>
+            {(form.defaultStartMinutes != null || form.defaultDurationMinutes != null) && (
+              <button
+                type="button"
+                onClick={() =>
+                  set({ defaultStartMinutes: null, defaultDurationMinutes: null })
+                }
+                className="text-xs text-white/40 hover:text-white/70"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+          <p className="text-xs text-white/35">
+            When set, this routine drops onto your timeline at this time. Leave
+            empty to keep it unscheduled.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <span className="text-xs text-white/45">Start</span>
+              <input
+                type="time"
+                step={900}
+                value={minutesToTimeString(form.defaultStartMinutes)}
+                onChange={(e) => {
+                  const m = timeStringToMinutes(e.target.value);
+                  set({
+                    defaultStartMinutes: m,
+                    defaultDurationMinutes:
+                      m != null && form.defaultDurationMinutes == null
+                        ? 60
+                        : form.defaultDurationMinutes,
+                  });
+                }}
+                className="w-full mt-1 bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-sm text-white/90"
+              />
+            </div>
+            <div>
+              <span className="text-xs text-white/45">Duration (min)</span>
+              <input
+                type="number"
+                min={15}
+                step={15}
+                value={form.defaultDurationMinutes ?? ""}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  set({
+                    defaultDurationMinutes:
+                      v === "" ? null : Math.max(15, Number(v) || 15),
+                  });
+                }}
+                className="w-full mt-1 bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-sm text-white/90"
+                placeholder="60"
+              />
+            </div>
+          </div>
+        </div>
 
         <div className="flex gap-2 pt-2">
           <button

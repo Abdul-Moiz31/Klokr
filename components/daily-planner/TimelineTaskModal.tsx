@@ -1,0 +1,283 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
+import type { PlannerTask } from "@/lib/daily-planner/types";
+import {
+  MIN_DURATION_MINUTES,
+  SNAP_MINUTES,
+  formatMinutes,
+  normalizeRange,
+} from "@/lib/daily-planner/timeline";
+
+export type TimelineTaskDraft = {
+  title: string;
+  urgent: boolean;
+  done: boolean;
+  estimateMinutes: number | null;
+  domainTags: string[];
+  startMinutes: number | null;
+  endMinutes: number | null;
+};
+
+type Props = {
+  /** When editing: the existing task. When creating: null. */
+  initial: PlannerTask | null;
+  /** Pre-fill the time range on create (from drag-to-select). */
+  initialRange?: { start: number; end: number };
+  onSave: (draft: TimelineTaskDraft) => void;
+  onDelete?: () => void;
+  onClose: () => void;
+};
+
+function splitDomains(s: string) {
+  return s
+    .split(/[,;]+/)
+    .map((d) => d.trim().toLowerCase().replace(/^www\./, ""))
+    .filter(Boolean);
+}
+
+function minutesToTimeString(m: number | null): string {
+  if (m == null) return "";
+  const h = Math.floor(m / 60);
+  const min = m % 60;
+  return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
+}
+
+function timeStringToMinutes(s: string): number | null {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(s.trim());
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (h < 0 || h > 23 || min < 0 || min > 59) return null;
+  return h * 60 + min;
+}
+
+export function TimelineTaskModal({ initial, initialRange, onSave, onDelete, onClose }: Props) {
+  const [title, setTitle] = useState(initial?.title ?? "");
+  const [urgent, setUrgent] = useState(initial?.urgent ?? false);
+  const [done, setDone] = useState(initial?.done ?? false);
+  const [estimate, setEstimate] = useState<string>(
+    initial?.estimateMinutes != null ? String(initial.estimateMinutes) : ""
+  );
+  const [domains, setDomains] = useState<string>(initial?.domainTags.join(", ") ?? "");
+  const [scheduled, setScheduled] = useState<boolean>(
+    initial ? initial.startMinutes != null : Boolean(initialRange)
+  );
+  const [startStr, setStartStr] = useState<string>(
+    minutesToTimeString(initial?.startMinutes ?? initialRange?.start ?? null)
+  );
+  const [endStr, setEndStr] = useState<string>(
+    minutesToTimeString(initial?.endMinutes ?? initialRange?.end ?? null)
+  );
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  const handleSave = () => {
+    const t = title.trim();
+    if (!t) return;
+
+    let startMinutes: number | null = null;
+    let endMinutes: number | null = null;
+    if (scheduled) {
+      const s = timeStringToMinutes(startStr);
+      const e = timeStringToMinutes(endStr);
+      if (s == null || e == null) return;
+      const range = normalizeRange(s, e);
+      startMinutes = range.start;
+      endMinutes = range.end;
+    }
+
+    onSave({
+      title: t,
+      urgent,
+      done,
+      estimateMinutes: estimate === "" ? null : Math.max(0, Number(estimate) || 0),
+      domainTags: splitDomains(domains),
+      startMinutes,
+      endMinutes,
+    });
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="w-full max-w-md rounded-2xl border border-white/10 bg-[#0f0f16] p-6 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 className="mb-4 text-base font-semibold text-white">
+          {initial ? "Edit task" : "New task"}
+        </h3>
+
+        <div className="space-y-3.5">
+          <div>
+            <label className="block text-xs text-white/45">Title</label>
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                  e.preventDefault();
+                  handleSave();
+                }
+              }}
+              autoFocus
+              placeholder="e.g. Deep work — onboarding flow"
+              className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/90 placeholder:text-white/30 focus:border-violet-500/40 focus:outline-none"
+            />
+          </div>
+
+          <div className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-3">
+            <label className="flex items-center gap-2 text-sm text-white/70">
+              <input
+                type="checkbox"
+                checked={scheduled}
+                onChange={(e) => setScheduled(e.target.checked)}
+                className="accent-violet-500"
+              />
+              Schedule on timeline
+            </label>
+            {scheduled && (
+              <>
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <div>
+                    <span className="text-xs text-white/45">Start</span>
+                    <input
+                      type="time"
+                      step={SNAP_MINUTES * 60}
+                      value={startStr}
+                      onChange={(e) => setStartStr(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white/90 focus:border-violet-500/40 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-xs text-white/45">End</span>
+                    <input
+                      type="time"
+                      step={SNAP_MINUTES * 60}
+                      value={endStr}
+                      onChange={(e) => setEndStr(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white/90 focus:border-violet-500/40 focus:outline-none"
+                    />
+                  </div>
+                </div>
+                {(() => {
+                  const s = timeStringToMinutes(startStr);
+                  const e = timeStringToMinutes(endStr);
+                  if (s == null || e == null) {
+                    return (
+                      <p className="mt-2 text-xs text-amber-400/70">
+                        Enter times like 09:00 and 10:30.
+                      </p>
+                    );
+                  }
+                  if (e <= s) {
+                    return (
+                      <p className="mt-2 text-xs text-amber-400/70">
+                        End must be at least {MIN_DURATION_MINUTES} min after start.
+                      </p>
+                    );
+                  }
+                  return (
+                    <p className="mt-2 text-xs text-white/40 tabular-nums">
+                      {formatMinutes(s)} → {formatMinutes(e)} · {e - s} min
+                    </p>
+                  );
+                })()}
+              </>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-4">
+            <label className="flex items-center gap-2 text-sm text-white/70">
+              <input
+                type="checkbox"
+                checked={urgent}
+                onChange={(e) => setUrgent(e.target.checked)}
+                className="accent-amber-500"
+              />
+              Urgent
+            </label>
+            {initial && (
+              <label className="flex items-center gap-2 text-sm text-white/70">
+                <input
+                  type="checkbox"
+                  checked={done}
+                  onChange={(e) => setDone(e.target.checked)}
+                  className="accent-violet-500"
+                />
+                Mark done
+              </label>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <span className="text-xs text-white/45">Estimate (min)</span>
+              <input
+                type="number"
+                min={0}
+                value={estimate}
+                onChange={(e) => setEstimate(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white/90 focus:border-violet-500/40 focus:outline-none"
+                placeholder="60"
+              />
+            </div>
+            <div>
+              <span className="text-xs text-white/45">Domains (tab time)</span>
+              <input
+                value={domains}
+                onChange={(e) => setDomains(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white/90 focus:border-violet-500/40 focus:outline-none"
+                placeholder="github.com, notion.so"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-6 flex items-center gap-2">
+          {onDelete && (
+            <button
+              type="button"
+              onClick={() => {
+                onDelete();
+                onClose();
+              }}
+              className="rounded-xl border border-red-500/25 px-3 py-2.5 text-sm text-red-300/85 transition hover:bg-red-500/10"
+            >
+              Delete
+            </button>
+          )}
+          <div className="ml-auto flex gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-xl border border-white/10 px-4 py-2.5 text-sm text-white/60 transition hover:text-white/85"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={!title.trim()}
+              className="rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {initial ? "Save" : "Create"}
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
+}

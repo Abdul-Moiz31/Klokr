@@ -32,12 +32,10 @@ export default function DailyPlannerPage() {
     );
   }
 
-  void user;
-
   return (
     <AppShell title="Daily planner">
       <PageHeader eyebrow="Plan" title="Daily planner" />
-      <DailyPlannerApp />
+      <DailyPlannerApp accountCreatedAt={user?.created_at ?? null} />
     </AppShell>
   );
 }

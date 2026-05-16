@@ -85,6 +85,8 @@ export function DayDataEditor({ data, onChange, newIdFn, isTemplate = false }: P
         estimateMinutes: draft.estimate === "" ? null : Math.max(0, Number(draft.estimate) || 0),
         domainTags: splitDomains(draft.domains),
         order: maxO + 1,
+        startMinutes: null,
+        endMinutes: null,
       },
     ]);
     setDraft(emptyDraft());

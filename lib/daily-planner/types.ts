@@ -16,6 +16,16 @@ export type PlannerTask = {
   /** e.g. github.com — matched without www */
   domainTags: string[];
   order: number;
+  /**
+   * Minutes since local midnight [0, 1440). null = unscheduled (lives in the
+   * unscheduled rail, not on the timeline). Snapped to 15-min increments on write.
+   */
+  startMinutes: number | null;
+  /**
+   * Exclusive end in minutes since local midnight (1, 1440]. null = unscheduled.
+   * Always > startMinutes when both are set.
+   */
+  endMinutes: number | null;
 };
 
 export type DayData = {
@@ -50,6 +60,13 @@ export type RecurringRule = {
   /** First occurrence anchor (yyyy-mm-dd) for bi-weekly parity; defaults at create */
   biweeklyAnchor: string;
   order: number;
+  /**
+   * Optional default schedule. When BOTH are set, the rule materializes onto a
+   * day with those times; otherwise the task lands unscheduled.
+   * Minutes since local midnight, snapped to 15.
+   */
+  defaultStartMinutes: number | null;
+  defaultDurationMinutes: number | null;
 };
 
 /** Saved ad-hoc-style task groups used as “start from this” for a class of days */
@@ -74,7 +91,14 @@ export type DailyPlannerV2 = {
   routineTemplates: Record<RoutineTemplateKind, DayData>;
 };
 
-export type DailyPlannerState = DailyPlannerV2;
+/**
+ * v3: same shape as v2 but tasks carry optional startMinutes/endMinutes and
+ * recurring rules carry optional default schedule. Migration leaves all existing
+ * tasks unscheduled (startMinutes/endMinutes = null), so nothing visible breaks.
+ */
+export type DailyPlannerV3 = Omit<DailyPlannerV2, "v"> & { v: 3 };
+
+export type DailyPlannerState = DailyPlannerV3;
 
 export type PlannerTaskRule = {
   taskId: string;

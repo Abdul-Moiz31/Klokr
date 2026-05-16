@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
-  DailyPlannerV2,
+  DailyPlannerV3,
   DayData,
   RecurringRule,
   RoutineTemplateKind,
@@ -14,6 +14,7 @@ import {
   dayDataWithFreshIds,
   dayKey,
   loadDailyPlanner,
+  migrateAnyToV3,
   newId,
   saveDailyPlanner,
 } from "./storage";
@@ -30,7 +31,7 @@ function deepClone<T>(x: T): T {
 }
 
 export function useDailyPlannerState() {
-  const [state, setState] = useState<DailyPlannerV2 | null>(null);
+  const [state, setState] = useState<DailyPlannerV3 | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isInitialLoad = useRef(true);
@@ -51,10 +52,12 @@ export function useDailyPlannerState() {
       if (!remote) return;
 
       // If remote is newer than what we loaded from localStorage, adopt it.
+      // Remote rows may be older v1/v2 shapes — migrate before adopting.
       const localTs = localStorage.getItem("Klokrs_planner_synced_at") ?? "0";
       if (remote.updated_at > localTs) {
-        setState(remote.data);
-        saveDailyPlanner(remote.data);
+        const migrated = migrateAnyToV3(remote.data);
+        setState(migrated);
+        saveDailyPlanner(migrated);
         localStorage.setItem("Klokrs_planner_synced_at", remote.updated_at);
       }
     })();
@@ -86,7 +89,7 @@ export function useDailyPlannerState() {
     };
   }, [state]);
 
-  const update = useCallback((fn: (s: DailyPlannerV2) => DailyPlannerV2) => {
+  const update = useCallback((fn: (s: DailyPlannerV3) => DailyPlannerV3) => {
     setState((prev) => (prev ? fn(deepClone(prev)) : null));
   }, []);
 
