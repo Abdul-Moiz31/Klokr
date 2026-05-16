@@ -1,6 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+const AUTH_ONLY_ROUTES = new Set(["/login", "/signup"]);
+
 export async function middleware(request: NextRequest) {
   const response = NextResponse.next();
 
@@ -19,9 +21,13 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  const { data: { session } } = await supabase.auth.getSession();
+  // getUser() forces a token refresh when expired and triggers setAll() above,
+  // writing the refreshed cookies onto the response. Without this, the access
+  // token expires after 1h and the browser client's refreshed session never
+  // makes it back into the SSR cookie jar.
+  const { data: { user } } = await supabase.auth.getUser();
 
-  if (session) {
+  if (user && AUTH_ONLY_ROUTES.has(request.nextUrl.pathname)) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
@@ -29,5 +35,15 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/login", "/signup"],
+  matcher: [
+    "/login",
+    "/signup",
+    "/dashboard/:path*",
+    "/activity/:path*",
+    "/reports/:path*",
+    "/pomodoro/:path*",
+    "/daily-planner/:path*",
+    "/routine-templates/:path*",
+    "/admin/:path*",
+  ],
 };
