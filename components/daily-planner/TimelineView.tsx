@@ -156,9 +156,9 @@ export function TimelineView({
         allDaySlot={false}
         nowIndicator
         height="auto"
-        contentHeight={720}
+        contentHeight={960}
         expandRows
-        slotMinTime="06:00:00"
+        slotMinTime="00:00:00"
         slotMaxTime="24:00:00"
         slotDuration={SNAP_DURATION}
         slotLabelInterval="01:00"
