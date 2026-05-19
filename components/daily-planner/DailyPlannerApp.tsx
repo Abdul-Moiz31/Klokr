@@ -1,19 +1,27 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { Loader } from "@/components/ui/Loader";
-import { DayDataEditor } from "./DayDataEditor";
 import { RecurringRoutinesPanel } from "./RecurringRoutinesPanel";
 import { PastDayView } from "./PastDayView";
 import { RoutineTemplatesEditor } from "./RoutineTemplatesEditor";
+import { TimelineView } from "./TimelineView";
+import { UnscheduledRail } from "./UnscheduledRail";
+import { TimelineTaskModal, type TimelineTaskDraft } from "./TimelineTaskModal";
 import { ExtensionPlannerSync } from "@/components/ExtensionPlannerSync";
 import { useDailyPlannerState } from "@/lib/daily-planner/useDailyPlannerState";
 import { createEmptyDayData, dayKey } from "@/lib/daily-planner/storage";
 import { suggestedRoutineTemplateKind } from "@/lib/daily-planner/date";
-import type { DayData, RecurringRule, RoutineTemplateKind } from "@/lib/daily-planner/types";
+import { normalizeRange } from "@/lib/daily-planner/timeline";
+import type {
+  DayData,
+  PlannerTask,
+  RecurringRule,
+  RoutineTemplateKind,
+} from "@/lib/daily-planner/types";
 
 const TABS = [
   {
@@ -58,6 +66,21 @@ function addDays(date: Date, n: number): Date {
   return d;
 }
 
+function startOfLocalDay(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+function parseCreatedAtToLocalDay(iso: string | null | undefined): Date | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return startOfLocalDay(d);
+}
+
+function formatJoinedDate(d: Date): string {
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
 function formatNavDate(d: Date): string {
   return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 }
@@ -71,7 +94,12 @@ function SectionHeader({ label, tooltip }: { label: string; tooltip: string }) {
   );
 }
 
-export function DailyPlannerApp() {
+type DailyPlannerAppProps = {
+  /** ISO timestamp of when the user signed up; bounds how far back they can journal. */
+  accountCreatedAt?: string | null;
+};
+
+export function DailyPlannerApp({ accountCreatedAt = null }: DailyPlannerAppProps = {}) {
   const {
     state,
     hydrated,
@@ -95,19 +123,134 @@ export function DailyPlannerApp() {
   const [viewDate, setViewDate] = useState<Date>(() => new Date());
   const [confirmTemplate, setConfirmTemplate] = useState<RoutineTemplateKind | null>(null);
   const [confirmDuplicateRule, setConfirmDuplicateRule] = useState<RecurringRule | null>(null);
+  const [modal, setModal] = useState<
+    | { mode: "create"; initialRange?: { start: number; end: number } }
+    | { mode: "edit"; taskId: string }
+    | null
+  >(null);
+  const unscheduledRailRef = useRef<HTMLDivElement | null>(null);
 
   const todayK = getTodayKey();
   const viewK = dayKey(viewDate);
   const isViewingToday = viewK === todayK;
   const now = new Date();
 
+  const minViewableDay = useMemo(
+    () => parseCreatedAtToLocalDay(accountCreatedAt),
+    [accountCreatedAt]
+  );
+  const minViewableK = minViewableDay ? dayKey(minViewableDay) : null;
+  const atEarliestDay = minViewableK != null && viewK <= minViewableK;
+
   const todayAdHoc: DayData = useMemo(() => {
     if (!state) return createEmptyDayData();
     return state.adHocByDate[todayK] ?? createEmptyDayData();
   }, [state, todayK]);
 
+  const scheduledTasks = useMemo(
+    () => todayAdHoc.tasks.filter((t) => t.startMinutes != null && t.endMinutes != null),
+    [todayAdHoc]
+  );
+  const unscheduledTasks = useMemo(
+    () => todayAdHoc.tasks.filter((t) => t.startMinutes == null),
+    [todayAdHoc]
+  );
+
   const rules = getTrackingRules();
   const suggestedKind = suggestedRoutineTemplateKind(now);
+
+  const ensureFirstGroupId = (data: DayData): { data: DayData; groupId: string } => {
+    if (data.groups.length > 0) {
+      const sorted = [...data.groups].sort((a, b) => a.order - b.order);
+      return { data, groupId: sorted[0]!.id };
+    }
+    const fresh = createEmptyDayData();
+    return { data: fresh, groupId: fresh.groups[0]!.id };
+  };
+
+  const setTodayTasks = (mutate: (tasks: PlannerTask[]) => PlannerTask[]) => {
+    const next = mutate(todayAdHoc.tasks);
+    setTodayAdHoc({ ...todayAdHoc, tasks: next });
+  };
+
+  const upsertTaskTime = (taskId: string, startMinutes: number, endMinutes: number) => {
+    const range = normalizeRange(startMinutes, endMinutes);
+    setTodayTasks((tasks) =>
+      tasks.map((t) =>
+        t.id === taskId ? { ...t, startMinutes: range.start, endMinutes: range.end } : t
+      )
+    );
+  };
+
+  const createTaskFromModal = (draft: TimelineTaskDraft) => {
+    const { data, groupId } = ensureFirstGroupId(todayAdHoc);
+    const maxOrder = data.tasks
+      .filter((t) => t.groupId === groupId)
+      .reduce((m, t) => Math.max(m, t.order), -1);
+    const newTask: PlannerTask = {
+      id: newIdFn(),
+      groupId,
+      title: draft.title,
+      description: draft.description,
+      done: draft.done,
+      domainTags: draft.domainTags,
+      order: maxOrder + 1,
+      startMinutes: draft.startMinutes,
+      endMinutes: draft.endMinutes,
+    };
+    setTodayAdHoc({ ...data, tasks: [...data.tasks, newTask] });
+  };
+
+  const updateTaskFromModal = (taskId: string, draft: TimelineTaskDraft) => {
+    setTodayTasks((tasks) =>
+      tasks.map((t) =>
+        t.id === taskId
+          ? {
+              ...t,
+              title: draft.title,
+              description: draft.description,
+              done: draft.done,
+              domainTags: draft.domainTags,
+              startMinutes: draft.startMinutes,
+              endMinutes: draft.endMinutes,
+            }
+          : t
+      )
+    );
+  };
+
+  const deleteTask = (taskId: string) => {
+    setTodayTasks((tasks) => tasks.filter((t) => t.id !== taskId));
+  };
+
+  const toggleTaskDone = (taskId: string) => {
+    setTodayTasks((tasks) =>
+      tasks.map((t) => (t.id === taskId ? { ...t, done: !t.done } : t))
+    );
+  };
+
+  const quickCreateUnscheduled = (title: string) => {
+    const { data, groupId } = ensureFirstGroupId(todayAdHoc);
+    const maxOrder = data.tasks
+      .filter((t) => t.groupId === groupId)
+      .reduce((m, t) => Math.max(m, t.order), -1);
+    const newTask: PlannerTask = {
+      id: newIdFn(),
+      groupId,
+      title,
+      description: "",
+      done: false,
+      domainTags: [],
+      order: maxOrder + 1,
+      startMinutes: null,
+      endMinutes: null,
+    };
+    setTodayAdHoc({ ...data, tasks: [...data.tasks, newTask] });
+  };
+
+  const taskBeingEdited = modal?.mode === "edit"
+    ? todayAdHoc.tasks.find((t) => t.id === modal.taskId) ?? null
+    : null;
 
   const tryApplyTemplate = (kind: RoutineTemplateKind) => {
     if (!state) return;
@@ -177,7 +320,13 @@ export function DailyPlannerApp() {
                 <button
                   type="button"
                   onClick={() => setViewDate((d) => addDays(d, -1))}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 text-white/40 transition-colors hover:border-white/20 hover:text-white/70"
+                  disabled={atEarliestDay}
+                  title={
+                    atEarliestDay && minViewableDay
+                      ? `You joined Klokrs on ${formatJoinedDate(minViewableDay)} — no days before that.`
+                      : undefined
+                  }
+                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 text-white/40 transition-colors hover:border-white/20 hover:text-white/70 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:border-white/10 disabled:hover:text-white/40"
                   aria-label="Previous day"
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -192,6 +341,11 @@ export function DailyPlannerApp() {
                   {!isViewingToday && (
                     <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-300/70">
                       Journal
+                    </span>
+                  )}
+                  {atEarliestDay && minViewableDay && (
+                    <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] text-white/40">
+                      Joined {formatJoinedDate(minViewableDay)}
                     </span>
                   )}
                 </div>
@@ -278,11 +432,28 @@ export function DailyPlannerApp() {
                       </div>
                     </div>
 
-                    <DayDataEditor
-                      data={todayAdHoc}
-                      onChange={(d) => setTodayAdHoc(d)}
-                      newIdFn={newIdFn}
-                    />
+                    <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
+                      <TimelineView
+                        forDate={viewDate}
+                        tasks={scheduledTasks}
+                        onTaskTimeChange={upsertTaskTime}
+                        onCreateRange={(start, end) =>
+                          setModal({ mode: "create", initialRange: { start, end } })
+                        }
+                        onEditTask={(taskId) => setModal({ mode: "edit", taskId })}
+                        onToggleDone={toggleTaskDone}
+                        externalDropContainerRef={unscheduledRailRef}
+                        onExternalDrop={upsertTaskTime}
+                      />
+                      <UnscheduledRail
+                        ref={unscheduledRailRef}
+                        tasks={unscheduledTasks}
+                        onCreate={quickCreateUnscheduled}
+                        onEdit={(taskId) => setModal({ mode: "edit", taskId })}
+                        onDelete={deleteTask}
+                        onToggleDone={toggleTaskDone}
+                      />
+                    </div>
                 </>
               )}
             </div>
@@ -376,6 +547,28 @@ export function DailyPlannerApp() {
             </div>
           </motion.div>
         </div>
+      )}
+
+      {/* Timeline task modal (create / edit) */}
+      {modal && (modal.mode === "create" || taskBeingEdited) && (
+        <TimelineTaskModal
+          initial={modal.mode === "edit" ? taskBeingEdited : null}
+          initialRange={modal.mode === "create" ? modal.initialRange : undefined}
+          onClose={() => setModal(null)}
+          onSave={(draft) => {
+            if (modal.mode === "edit" && taskBeingEdited) {
+              updateTaskFromModal(taskBeingEdited.id, draft);
+            } else {
+              createTaskFromModal(draft);
+            }
+            setModal(null);
+          }}
+          onDelete={
+            modal.mode === "edit" && taskBeingEdited
+              ? () => deleteTask(taskBeingEdited.id)
+              : undefined
+          }
+        />
       )}
 
       {/* Confirm-template modal — replaces native window.confirm */}

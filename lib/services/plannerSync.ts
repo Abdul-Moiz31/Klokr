@@ -1,8 +1,14 @@
 import { createClient } from "@/lib/supabase";
-import type { DailyPlannerV2 } from "@/lib/daily-planner/types";
+import type {
+  DailyPlannerV1,
+  DailyPlannerV2,
+  DailyPlannerV3,
+  DailyPlannerV4,
+} from "@/lib/daily-planner/types";
 
 type RemoteRow = {
-  data: DailyPlannerV2;
+  // Remote storage may hold any historical version; the caller migrates.
+  data: DailyPlannerV1 | DailyPlannerV2 | DailyPlannerV3 | DailyPlannerV4;
   updated_at: string;
 };
 
@@ -22,7 +28,7 @@ export async function fetchRemotePlanner(
 
 export async function upsertRemotePlanner(
   userId: string,
-  plannerData: DailyPlannerV2
+  plannerData: DailyPlannerV4
 ): Promise<void> {
   const supabase = createClient();
   await supabase.from("user_planner_data").upsert(
