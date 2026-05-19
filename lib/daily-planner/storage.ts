@@ -1,6 +1,8 @@
 import type {
   DailyPlannerV1,
   DailyPlannerV2,
+  DailyPlannerV3,
+  DailyPlannerV4,
   DayData,
   PlannerTask,
   RecurringRule,
@@ -56,11 +58,18 @@ export function dayDataWithFreshIds(d: DayData): DayData {
  */
 export function appendRecurringRuleAsTaskToDayData(
   dayData: DayData,
-  rule: Pick<RecurringRule, "title" | "urgent" | "estimateMinutes" | "domainTags">,
+  rule: Pick<
+    RecurringRule,
+    | "title"
+    | "description"
+    | "domainTags"
+    | "defaultStartMinutes"
+    | "defaultDurationMinutes"
+  >,
   newIdFn: () => string
 ): DayData {
   let groups = dayData.groups;
-  let tasks = dayData.tasks;
+  const tasks = dayData.tasks;
   if (groups.length === 0) {
     const empty = createEmptyDayData();
     groups = empty.groups;
@@ -73,15 +82,27 @@ export function appendRecurringRuleAsTaskToDayData(
   const domainTags = (rule.domainTags ?? [])
     .map((d) => d.trim().toLowerCase().replace(/^www\./, ""))
     .filter(Boolean);
+  let startMinutes: number | null = null;
+  let endMinutes: number | null = null;
+  if (
+    isFiniteSchedule(rule.defaultStartMinutes) &&
+    isFiniteSchedule(rule.defaultDurationMinutes)
+  ) {
+    const s = clampMinutes(rule.defaultStartMinutes!);
+    const dur = Math.max(15, Math.round(rule.defaultDurationMinutes!));
+    startMinutes = s;
+    endMinutes = Math.min(1440, s + dur);
+  }
   const newTask: PlannerTask = {
     id: newIdFn(),
     groupId: target.id,
     title: rule.title,
-    urgent: rule.urgent,
+    description: rule.description ?? "",
     done: false,
-    estimateMinutes: rule.estimateMinutes,
     domainTags,
     order: maxOrder + 1,
+    startMinutes,
+    endMinutes,
   };
   return { groups, tasks: [...tasks, newTask] };
 }
@@ -117,21 +138,94 @@ const DEFAULT_DUMP: DayData = {
   tasks: [],
 };
 
-function migrateTask(t: PlannerTask): PlannerTask {
+/**
+ * Coerce an unknown-shape task (from any historical version) into the v4
+ * PlannerTask shape. Discards `urgent` and `estimateMinutes` if present;
+ * adds `description = ""` if missing.
+ */
+function migrateTask(raw: unknown): PlannerTask {
+  const t = (raw ?? {}) as Record<string, unknown>;
+  const rawStartNum = typeof t.startMinutes === "number" ? t.startMinutes : null;
+  const rawEndNum = typeof t.endMinutes === "number" ? t.endMinutes : null;
+  const rawStart = isFiniteSchedule(rawStartNum) ? clampMinutes(rawStartNum!) : null;
+  const rawEnd = isFiniteSchedule(rawEndNum) ? clampMinutes(rawEndNum!) : null;
+  let startMinutes: number | null = rawStart;
+  let endMinutes: number | null = rawEnd;
+  if (startMinutes == null || endMinutes == null) {
+    // If only one side is set, treat as unscheduled.
+    startMinutes = null;
+    endMinutes = null;
+  } else if (endMinutes <= startMinutes) {
+    // Enforce min 15-min duration on bad data.
+    endMinutes = Math.min(1440, startMinutes + 15);
+  }
   return {
-    ...t,
+    id: typeof t.id === "string" ? t.id : newId(),
+    groupId: typeof t.groupId === "string" ? t.groupId : "",
+    title: typeof t.title === "string" ? t.title : "",
+    description: typeof t.description === "string" ? t.description : "",
     done: t.done === true,
-    domainTags: Array.isArray(t.domainTags) ? t.domainTags : [],
+    domainTags: Array.isArray(t.domainTags)
+      ? (t.domainTags.filter((d) => typeof d === "string") as string[])
+      : [],
+    order: typeof t.order === "number" ? t.order : 0,
+    startMinutes,
+    endMinutes,
   };
 }
 
-function migrateDayData(d: DayData): DayData {
-  return { ...d, tasks: d.tasks.map(migrateTask) };
+function isFiniteSchedule(n: number | null | undefined): boolean {
+  return typeof n === "number" && Number.isFinite(n);
 }
 
-function defaultV2(): DailyPlannerV2 {
+function clampMinutes(n: number): number {
+  if (n < 0) return 0;
+  if (n > 1440) return 1440;
+  return Math.round(n);
+}
+
+function migrateDayData(d: DayData | undefined): DayData {
+  if (!d) return createEmptyDayData();
+  return { ...d, tasks: (d.tasks ?? []).map(migrateTask) };
+}
+
+/** Coerce an unknown-shape rule into the v4 RecurringRule shape. */
+function migrateRule(raw: unknown): RecurringRule {
+  const r = (raw ?? {}) as Record<string, unknown>;
+  const start = isFiniteSchedule(r.defaultStartMinutes as number | null | undefined)
+    ? clampMinutes(r.defaultStartMinutes as number)
+    : null;
+  const dur = isFiniteSchedule(r.defaultDurationMinutes as number | null | undefined)
+    ? Math.max(15, Math.round(r.defaultDurationMinutes as number))
+    : null;
+  const freq = (r.frequency as RecurringRule["frequency"]) || "daily";
   return {
-    v: 2,
+    id: typeof r.id === "string" ? r.id : newId(),
+    title: typeof r.title === "string" ? r.title : "",
+    description: typeof r.description === "string" ? r.description : "",
+    domainTags: Array.isArray(r.domainTags)
+      ? (r.domainTags.filter((d) => typeof d === "string") as string[])
+      : [],
+    frequency: freq,
+    weekdays: Array.isArray(r.weekdays)
+      ? (r.weekdays.filter((d) => typeof d === "number") as number[])
+      : [],
+    monthDays: Array.isArray(r.monthDays)
+      ? (r.monthDays.filter((d) => typeof d === "number") as number[])
+      : [],
+    biweeklyAnchor:
+      typeof r.biweeklyAnchor === "string" && r.biweeklyAnchor
+        ? r.biweeklyAnchor
+        : dayKey(new Date()),
+    order: typeof r.order === "number" ? r.order : 0,
+    defaultStartMinutes: start,
+    defaultDurationMinutes: dur,
+  };
+}
+
+function defaultV4(): DailyPlannerV4 {
+  return {
+    v: 4,
     recurringRules: [],
     adHocByDate: {},
     taskDump: JSON.parse(JSON.stringify(DEFAULT_DUMP)) as DayData,
@@ -140,78 +234,112 @@ function defaultV2(): DailyPlannerV2 {
   };
 }
 
-function migrateV1ToV2(v1: DailyPlannerV1): DailyPlannerV2 {
-  const d = (x: DayData) => migrateDayData(x);
+function migrateV1ToV4(v1: DailyPlannerV1): DailyPlannerV4 {
   const adHoc: Record<string, DayData | undefined> = {};
-  for (const [key, val] of Object.entries(v1.dayOverrides)) {
-    if (val) adHoc[key] = d(val);
+  for (const [key, val] of Object.entries(v1.dayOverrides ?? {})) {
+    if (val) adHoc[key] = migrateDayData(val);
   }
   return {
-    v: 2,
+    v: 4,
     recurringRules: [],
     adHocByDate: adHoc,
-    taskDump: d(v1.taskDump),
+    taskDump: migrateDayData(v1.taskDump),
     recurringCompletions: {},
     routineTemplates: defaultRoutineTemplates(v1),
   };
 }
 
-function normalizeV2(p: DailyPlannerV2): DailyPlannerV2 {
+/** v2 / v3 / v4 all share the same outer shape — normalize through the same path. */
+function normalizeV4(raw: unknown): DailyPlannerV4 {
   const defRt = defaultRoutineTemplates();
-  const rt = p.routineTemplates;
+  const p = (raw ?? {}) as Record<string, unknown>;
+  const rt = (p.routineTemplates ?? {}) as Record<string, unknown>;
+  const taskDumpRaw = (p.taskDump as DayData | undefined) ?? defaultV4().taskDump;
+  const adHocSrc = (p.adHocByDate ?? {}) as Record<string, DayData | undefined>;
+  const completions = (p.recurringCompletions ?? {}) as Record<string, boolean>;
+  const rules = Array.isArray(p.recurringRules)
+    ? (p.recurringRules as unknown[]).map(migrateRule)
+    : [];
+
   return {
-    v: 2,
-    recurringRules: (p.recurringRules ?? []).map((r) => ({
-      ...r,
-      weekdays: Array.isArray(r.weekdays) ? r.weekdays : [],
-      monthDays: Array.isArray(r.monthDays) ? r.monthDays : [],
-      biweeklyAnchor: r.biweeklyAnchor || dayKey(new Date()),
-      domainTags: Array.isArray(r.domainTags) ? r.domainTags : [],
-    })),
+    v: 4,
+    recurringRules: rules,
     adHocByDate: Object.fromEntries(
-      Object.entries(p.adHocByDate ?? {}).map(([k, v]) => [
-        k,
-        v ? migrateDayData(v) : v,
-      ])
+      Object.entries(adHocSrc).map(([k, v]) => [k, v ? migrateDayData(v) : v])
     ) as Record<string, DayData | undefined>,
-    taskDump: migrateDayData(p.taskDump ?? defaultV2().taskDump),
-    recurringCompletions: p.recurringCompletions ?? {},
+    taskDump: migrateDayData(taskDumpRaw),
+    recurringCompletions: completions,
     routineTemplates: {
-      fallback: migrateDayData(rt?.fallback ?? defRt.fallback),
-      weekdays: migrateDayData(rt?.weekdays ?? defRt.weekdays),
+      fallback: migrateDayData((rt.fallback as DayData | undefined) ?? defRt.fallback),
+      weekdays: migrateDayData((rt.weekdays as DayData | undefined) ?? defRt.weekdays),
       // Migrate old single "weekend" key to both saturday and sunday
-      saturday: migrateDayData(rt?.saturday ?? (rt as Record<string, DayData | undefined>)?.["weekend"] ?? defRt.saturday),
-      sunday: migrateDayData(rt?.sunday ?? (rt as Record<string, DayData | undefined>)?.["weekend"] ?? defRt.sunday),
+      saturday: migrateDayData(
+        (rt.saturday as DayData | undefined) ??
+          (rt.weekend as DayData | undefined) ??
+          defRt.saturday
+      ),
+      sunday: migrateDayData(
+        (rt.sunday as DayData | undefined) ??
+          (rt.weekend as DayData | undefined) ??
+          defRt.sunday
+      ),
     },
   };
 }
 
-export function loadDailyPlanner(): DailyPlannerV2 {
-  if (typeof window === "undefined") return defaultV2();
+export function loadDailyPlanner(): DailyPlannerV4 {
+  if (typeof window === "undefined") return defaultV4();
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return defaultV2();
-    const p = JSON.parse(raw) as DailyPlannerV1 | DailyPlannerV2;
-    if (p.v === 1) {
-      const v2 = migrateV1ToV2(p);
+    if (!raw) return defaultV4();
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const v = parsed.v;
+    let migrated: DailyPlannerV4;
+    if (v === 1) {
+      migrated = migrateV1ToV4(parsed as unknown as DailyPlannerV1);
+    } else if (v === 2 || v === 3 || v === 4) {
+      migrated = normalizeV4(parsed);
+    } else {
+      return defaultV4();
+    }
+    if (!migrated.taskDump.groups.length) {
+      migrated.taskDump = defaultV4().taskDump;
+    }
+    if (v !== 4) {
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(v2));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
       } catch {
         /* ignore */
       }
-      return v2;
     }
-    if (p.v === 2) {
-      if (!p.taskDump?.groups?.length) p.taskDump = defaultV2().taskDump;
-      return normalizeV2(p as DailyPlannerV2);
-    }
-    return defaultV2();
+    return migrated;
   } catch {
-    return defaultV2();
+    return defaultV4();
   }
 }
 
-export function saveDailyPlanner(state: DailyPlannerV2) {
+/**
+ * Coerce any historical planner shape into v4. Used by the hook when adopting
+ * remote data that may have been written by an older client.
+ */
+export function migrateAnyToV4(
+  raw:
+    | DailyPlannerV1
+    | DailyPlannerV2
+    | DailyPlannerV3
+    | DailyPlannerV4
+    | Record<string, unknown>
+    | undefined
+    | null
+): DailyPlannerV4 {
+  if (!raw) return defaultV4();
+  const v = (raw as Record<string, unknown>).v;
+  if (v === 1) return migrateV1ToV4(raw as unknown as DailyPlannerV1);
+  if (v === 2 || v === 3 || v === 4) return normalizeV4(raw);
+  return defaultV4();
+}
+
+export function saveDailyPlanner(state: DailyPlannerV4) {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -247,10 +375,7 @@ function pushGroupTasks(
   };
 
   for (const g of sortGroups(groups)) {
-    const ts = tasksInGroup(tasks, g.id);
-    const withU = ts.filter((t) => t.urgent);
-    const noU = ts.filter((t) => !t.urgent);
-    for (const t of [...withU, ...noU]) pushTask(t);
+    for (const t of tasksInGroup(tasks, g.id)) pushTask(t);
   }
 }
 
@@ -259,14 +384,33 @@ function pushGroupTasks(
  * Recurring-rule rows are a library only until added to a template or today.
  */
 export function buildTabTrackingRules(
-  state: DailyPlannerV2,
+  state: DailyPlannerV4,
   forDate: Date
 ): { taskId: string; domains: string[] }[] {
   const order: { taskId: string; domains: string[] }[] = [];
 
   const k = dayKey(forDate);
   const adHoc = state.adHocByDate[k] ?? { groups: [], tasks: [] };
-  pushGroupTasks(adHoc.groups, adHoc.tasks, order, (t) => !t.done);
+
+  // Scheduled tasks first, in time order — matches "the thing I'm doing now".
+  const scheduled = adHoc.tasks
+    .filter((t) => !t.done && t.startMinutes != null && t.domainTags.length > 0)
+    .sort((a, b) => (a.startMinutes ?? 0) - (b.startMinutes ?? 0));
+  for (const t of scheduled) {
+    const domains = t.domainTags
+      .map((d) => d.trim().toLowerCase().replace(/^www\./, ""))
+      .filter(Boolean);
+    if (domains.length > 0) order.push({ taskId: t.id, domains });
+  }
+
+  // Unscheduled tasks within the day's plan, by group/order.
+  const unscheduledDay: DayData = {
+    groups: adHoc.groups,
+    tasks: adHoc.tasks.filter((t) => t.startMinutes == null),
+  };
+  pushGroupTasks(unscheduledDay.groups, unscheduledDay.tasks, order, (t) => !t.done);
+
+  // Task dump as final fallback.
   pushGroupTasks(
     state.taskDump.groups,
     state.taskDump.tasks,

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
-  DailyPlannerV2,
+  DailyPlannerV4,
   DayData,
   RecurringRule,
   RoutineTemplateKind,
@@ -14,6 +14,7 @@ import {
   dayDataWithFreshIds,
   dayKey,
   loadDailyPlanner,
+  migrateAnyToV4,
   newId,
   saveDailyPlanner,
 } from "./storage";
@@ -30,7 +31,7 @@ function deepClone<T>(x: T): T {
 }
 
 export function useDailyPlannerState() {
-  const [state, setState] = useState<DailyPlannerV2 | null>(null);
+  const [state, setState] = useState<DailyPlannerV4 | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isInitialLoad = useRef(true);
@@ -51,11 +52,25 @@ export function useDailyPlannerState() {
       if (!remote) return;
 
       // If remote is newer than what we loaded from localStorage, adopt it.
+      // Remote rows may be older v1/v2/v3 shapes — migrate before adopting,
+      // and if migration changed the version, write v4 back so the DB row
+      // catches up without waiting for the next user edit.
       const localTs = localStorage.getItem("Klokrs_planner_synced_at") ?? "0";
+      const remoteVersion = (remote.data as { v?: number })?.v;
       if (remote.updated_at > localTs) {
-        setState(remote.data);
-        saveDailyPlanner(remote.data);
+        const migrated = migrateAnyToV4(remote.data);
+        setState(migrated);
+        saveDailyPlanner(migrated);
         localStorage.setItem("Klokrs_planner_synced_at", remote.updated_at);
+        if (remoteVersion !== 4) {
+          await upsertRemotePlanner(user.id, migrated);
+          localStorage.setItem("Klokrs_planner_synced_at", new Date().toISOString());
+        }
+      } else if (remoteVersion !== 4) {
+        // Remote is older but we already had newer local data — still upgrade
+        // the DB row to v4 with our local state so the schema converges.
+        await upsertRemotePlanner(user.id, local);
+        localStorage.setItem("Klokrs_planner_synced_at", new Date().toISOString());
       }
     })();
   }, []);
@@ -86,7 +101,7 @@ export function useDailyPlannerState() {
     };
   }, [state]);
 
-  const update = useCallback((fn: (s: DailyPlannerV2) => DailyPlannerV2) => {
+  const update = useCallback((fn: (s: DailyPlannerV4) => DailyPlannerV4) => {
     setState((prev) => (prev ? fn(deepClone(prev)) : null));
   }, []);
 

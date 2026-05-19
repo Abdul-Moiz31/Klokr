@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { DayDataEditor } from "./DayDataEditor";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
-import type { DailyPlannerV2, DayData, RoutineTemplateKind } from "@/lib/daily-planner/types";
+import type { DailyPlannerV4, DayData, RoutineTemplateKind } from "@/lib/daily-planner/types";
 import { createEmptyDayData } from "@/lib/daily-planner/storage";
 
 type MainRoutineTab = "weekdays" | "weekend" | "fallback";
@@ -91,7 +91,7 @@ const ROUTINE_TEMPLATE_KINDS: {
 ];
 
 type Props = {
-  state: DailyPlannerV2;
+  state: DailyPlannerV4;
   setRoutineTemplate: (kind: RoutineTemplateKind, data: DayData) => void;
   newIdFn: () => string;
 };

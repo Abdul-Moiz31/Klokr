@@ -8,14 +8,24 @@ export type PlannerTask = {
   id: string;
   groupId: string;
   title: string;
-  urgent: boolean;
+  /** Free-form notes shown under the title in lists / modals. Optional, defaults to "". */
+  description: string;
   /** Todo completion — saved with the rest of the plan */
   done: boolean;
-  /** minutes; null = no estimate */
-  estimateMinutes: number | null;
   /** e.g. github.com — matched without www */
   domainTags: string[];
   order: number;
+  /**
+   * Minutes since local midnight [0, 1440). null = unscheduled (lives in the
+   * unscheduled rail, not on the timeline). Snapped to 15-min increments on write.
+   * Duration is derived from end − start; no separate estimate is stored.
+   */
+  startMinutes: number | null;
+  /**
+   * Exclusive end in minutes since local midnight (1, 1440]. null = unscheduled.
+   * Always > startMinutes when both are set.
+   */
+  endMinutes: number | null;
 };
 
 export type DayData = {
@@ -39,8 +49,8 @@ export type RecurrenceFrequency = "daily" | "weekly" | "biweekly" | "monthly";
 export type RecurringRule = {
   id: string;
   title: string;
-  urgent: boolean;
-  estimateMinutes: number | null;
+  /** Free-form notes carried onto the materialized task. */
+  description: string;
   domainTags: string[];
   frequency: RecurrenceFrequency;
   /** 0=Sun .. 6=Sat — for weekly and biweekly */
@@ -50,6 +60,13 @@ export type RecurringRule = {
   /** First occurrence anchor (yyyy-mm-dd) for bi-weekly parity; defaults at create */
   biweeklyAnchor: string;
   order: number;
+  /**
+   * Optional default schedule. When BOTH are set, the rule materializes onto the
+   * timeline (start/end minutes); otherwise the task lands in the Unscheduled rail.
+   * Minutes since local midnight, snapped to 15.
+   */
+  defaultStartMinutes: number | null;
+  defaultDurationMinutes: number | null;
 };
 
 /** Saved ad-hoc-style task groups used as “start from this” for a class of days */
@@ -74,7 +91,29 @@ export type DailyPlannerV2 = {
   routineTemplates: Record<RoutineTemplateKind, DayData>;
 };
 
-export type DailyPlannerState = DailyPlannerV2;
+/**
+ * v3: same shape as v2 but tasks carry optional startMinutes/endMinutes and
+ * recurring rules carry optional default schedule. Pre-v4 shape — `urgent` and
+ * `estimateMinutes` still on tasks/rules.
+ */
+export type DailyPlannerV3 = Omit<DailyPlannerV2, "v"> & { v: 3 };
+
+/**
+ * v4: drops `urgent` and `estimateMinutes` from tasks and rules; adds
+ * `description: string` to tasks and rules. Duration is derived from
+ * end − start at the task level. Migration discards urgent/estimate values
+ * and seeds description = "".
+ */
+export type DailyPlannerV4 = {
+  v: 4;
+  recurringRules: RecurringRule[];
+  adHocByDate: Record<string, DayData | undefined>;
+  taskDump: DayData;
+  recurringCompletions: Record<string, boolean>;
+  routineTemplates: Record<RoutineTemplateKind, DayData>;
+};
+
+export type DailyPlannerState = DailyPlannerV4;
 
 export type PlannerTaskRule = {
   taskId: string;

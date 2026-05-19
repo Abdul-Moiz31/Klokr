@@ -31,3 +31,146 @@ body {
 html {
   scroll-behavior: smooth;
 }
+
+/* FullCalendar dark-theme overrides for the daily planner timeline. */
+.klokrs-timeline {
+  --fc-border-color: rgba(255, 255, 255, 0.06);
+  --fc-page-bg-color: transparent;
+  --fc-neutral-bg-color: transparent;
+  --fc-neutral-text-color: rgba(255, 255, 255, 0.45);
+  --fc-today-bg-color: rgba(124, 58, 237, 0.04);
+  --fc-now-indicator-color: rgb(167, 139, 250);
+  --fc-event-bg-color: rgba(124, 58, 237, 0.18);
+  --fc-event-border-color: rgba(167, 139, 250, 0.32);
+  --fc-event-text-color: rgb(237, 233, 254);
+  --fc-event-selected-overlay-color: rgba(255, 255, 255, 0.08);
+  color-scheme: dark;
+}
+.klokrs-timeline .fc {
+  color: rgba(255, 255, 255, 0.85);
+  font-family: inherit;
+}
+.klokrs-timeline .fc-col-header,
+.klokrs-timeline .fc-col-header-cell {
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.06);
+}
+.klokrs-timeline .fc-col-header-cell-cushion {
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.klokrs-timeline .fc-timegrid-slot {
+  height: 24px;
+  border-color: rgba(255, 255, 255, 0.04);
+}
+.klokrs-timeline .fc-timegrid-slot-label {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  border-color: rgba(255, 255, 255, 0.04);
+}
+.klokrs-timeline .fc-timegrid-slot-minor {
+  border-color: rgba(255, 255, 255, 0.02);
+}
+.klokrs-timeline .fc-timegrid-now-indicator-line {
+  border-color: rgba(167, 139, 250, 0.7);
+}
+.klokrs-timeline .fc-timegrid-now-indicator-arrow {
+  border-color: rgba(167, 139, 250, 0.7);
+  color: rgba(167, 139, 250, 0.7);
+}
+.klokrs-timeline .fc-event {
+  border-radius: 10px;
+  padding: 4px 6px;
+  background: linear-gradient(
+    135deg,
+    rgba(124, 58, 237, 0.32),
+    rgba(67, 56, 202, 0.32)
+  );
+  border: 1px solid rgba(167, 139, 250, 0.32);
+  color: rgb(237, 233, 254);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.05) inset;
+  cursor: grab;
+}
+.klokrs-timeline .fc-event:focus,
+.klokrs-timeline .fc-event:focus-visible {
+  outline: 2px solid rgba(167, 139, 250, 0.6);
+  outline-offset: 1px;
+}
+.klokrs-timeline .fc-event.klokrs-event--done {
+  opacity: 0.5;
+}
+.klokrs-timeline .klokrs-event-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+}
+.klokrs-timeline .klokrs-event-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.klokrs-timeline .klokrs-event-title {
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.klokrs-timeline .klokrs-event-title--done {
+  text-decoration: line-through;
+  text-decoration-color: rgba(237, 233, 254, 0.6);
+}
+.klokrs-timeline .klokrs-event-checkbox {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgb(167, 139, 250);
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+  padding: 0;
+}
+.klokrs-timeline .klokrs-event-checkbox:hover {
+  border-color: rgba(167, 139, 250, 0.85);
+  background: rgba(167, 139, 250, 0.15);
+}
+.klokrs-timeline .klokrs-event-checkbox--done {
+  border-color: rgba(167, 139, 250, 0.85);
+  background: rgba(167, 139, 250, 0.25);
+}
+.klokrs-timeline .klokrs-event-checkbox--readonly {
+  cursor: default;
+  opacity: 0.7;
+}
+.klokrs-timeline .klokrs-event-checkbox:focus-visible {
+  outline: 2px solid rgba(167, 139, 250, 0.6);
+  outline-offset: 1px;
+}
+.klokrs-timeline .klokrs-event-meta {
+  font-size: 11px;
+  color: rgba(237, 233, 254, 0.7);
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.klokrs-timeline .fc-highlight {
+  background: rgba(167, 139, 250, 0.12);
+}
+.klokrs-timeline .fc-timegrid-event-harness:hover .fc-event {
+  filter: brightness(1.06);
+}
