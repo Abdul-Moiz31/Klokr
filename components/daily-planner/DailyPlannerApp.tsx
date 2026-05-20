@@ -130,6 +130,20 @@ export function DailyPlannerApp({ accountCreatedAt = null }: DailyPlannerAppProp
   const [prefs, setPrefs] = useState<KlokrsPrefs>(DEFAULT_PREFS);
   useEffect(() => {
     setPrefs(loadPrefs());
+    // Re-read on focus/visibility so Settings changes (made in another tab or
+    // earlier in the session) take effect without a full reload.
+    const reload = () => setPrefs(loadPrefs());
+    const onVis = () => {
+      if (document.visibilityState === "visible") reload();
+    };
+    window.addEventListener("focus", reload);
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("storage", reload);
+    return () => {
+      window.removeEventListener("focus", reload);
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("storage", reload);
+    };
   }, []);
   // Fetch sessions for whatever day is being viewed (today → realtime + 30s poll;
   // past days → one-shot fetch). Used to render fill bars on each task block.
