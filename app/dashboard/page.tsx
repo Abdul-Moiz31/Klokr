@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase";
+import { useAuthSession } from "@/lib/useAuthSession";
+import { loadPrefs, resolveTimezone } from "@/lib/prefs";
 import { AppShell } from "@/components/dashboard/AppShell";
 import { PageHeader } from "@/components/dashboard/PageHeader";
 import { StatsCard } from "@/components/dashboard/StatsCard";
@@ -12,10 +12,10 @@ import { DomainChart } from "@/components/dashboard/DomainChart";
 import { DomainTable } from "@/components/dashboard/DomainTable";
 import { DomainDrilldownModal } from "@/components/reports/DomainDrilldownModal";
 import { Loader } from "@/components/ui/Loader";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { WorkDayCompleteBanner } from "@/components/dashboard/WorkDayCompleteBanner";
 import { getSiteName } from "@/lib/domain";
 import type { TabSession } from "@/lib/supabase";
-import type { User } from "@supabase/supabase-js";
 
 interface DomainStat {
   domain: string;
@@ -40,27 +40,37 @@ function formatTotalTime(seconds: number): string {
 }
 
 function getTodayString() {
-  const d = new Date();
-  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60_000);
-  return local.toISOString().split("T")[0]!;
+  const zone = resolveTimezone(loadPrefs());
+  try {
+    // en-CA gives ISO-shaped "YYYY-MM-DD" via Intl reliably.
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: zone,
+      year: "numeric", month: "2-digit", day: "2-digit",
+    }).format(new Date());
+  } catch {
+    const d = new Date();
+    const local = new Date(d.getTime() - d.getTimezoneOffset() * 60_000);
+    return local.toISOString().split("T")[0]!;
+  }
 }
 
 
 export default function DashboardPage() {
-  const [user, setUser] = useState<User | null>(null);
+  const { session } = useAuthSession();
+  const user = session?.user ?? null;
+  const userId = user?.id ?? null;
   const [sessions, setSessions] = useState<TabSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastSynced, setLastSynced] = useState<Date | null>(null);
   const [fetchError, setFetchError] = useState(false);
   const [drilldown, setDrilldown] = useState<{ domain: string; totalSeconds: number } | null>(null);
-  const router = useRouter();
 
-  const fetchSessions = useCallback(async (userId: string) => {
+  const fetchSessions = useCallback(async (uid: string) => {
     const supabase = createClient();
     const { data, error } = await supabase
       .from("tab_sessions")
       .select("*")
-      .eq("user_id", userId)
+      .eq("user_id", uid)
       .eq("date", getTodayString())
       .order("duration_seconds", { ascending: false });
 
@@ -74,22 +84,13 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
+    if (!userId) return;
     let cancelled = false;
     let pollingInterval: ReturnType<typeof setInterval> | undefined;
     const supabase = createClient();
 
     void (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { router.push("/login"); return; }
-      if (cancelled) return;
-
-      // Use getUser() for a live server fetch so admin-updated metadata is always fresh
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push("/login"); return; }
-      if (cancelled) return;
-
-      setUser(user);
-      await fetchSessions(user.id);
+      await fetchSessions(userId);
       if (cancelled) return;
       setLoading(false);
 
@@ -97,17 +98,17 @@ export default function DashboardPage() {
       // (heartbeat incrementing duration on an existing row) so the dashboard
       // refreshes in real-time throughout the session, not just on first visit.
       const channel = supabase
-        .channel(`tab_sessions:${user.id}:${crypto.randomUUID()}`)
+        .channel(`tab_sessions:${userId}:${crypto.randomUUID()}`)
         .on(
           "postgres_changes",
           {
             event: "*",
             schema: "public",
             table: "tab_sessions",
-            filter: `user_id=eq.${user.id}`,
+            filter: `user_id=eq.${userId}`,
           },
           () => {
-            void fetchSessions(user.id);
+            void fetchSessions(userId);
           }
         );
 
@@ -117,13 +118,8 @@ export default function DashboardPage() {
       }
       channel.subscribe();
 
-      if (cancelled) {
-        void supabase.removeChannel(channel);
-        return;
-      }
-
       pollingInterval = setInterval(() => {
-        void fetchSessions(user.id);
+        void fetchSessions(userId);
       }, 30_000);
     })();
 
@@ -132,7 +128,7 @@ export default function DashboardPage() {
       if (pollingInterval) clearInterval(pollingInterval);
       supabase.removeAllChannels();
     };
-  }, [router, fetchSessions]);
+  }, [userId, fetchSessions]);
 
   const domainStats: DomainStat[] = Object.values(
     sessions.reduce(
@@ -322,38 +318,27 @@ export default function DashboardPage() {
             </div>
 
             {sessions.length === 0 ? (
-              <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4 }}
-                className="overflow-hidden rounded-2xl border border-dashed border-white/15 bg-white/[0.03] p-10 text-center sm:p-14"
-              >
-                <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl border border-violet-500/20 bg-gradient-to-br from-violet-500/20 to-cyan-500/10 text-3xl">
-                  ⏱️
-                </div>
-                <h3 className="mb-2 text-xl font-semibold text-white sm:text-2xl">
-                  No data yet for today
-                </h3>
-                <p className="mx-auto mb-8 max-w-md text-sm leading-relaxed text-white/45">
-                  Keep the Klokrs extension enabled and use Chrome as usual. Time
-                  per domain will show up here as sessions sync—usually within a
-                  few seconds of browsing.
-                </p>
-                <div className="flex flex-col items-center justify-center gap-3 sm:flex-row sm:gap-4">
-                  <Link
-                    href="/daily-planner"
-                    className="inline-flex min-w-[10rem] items-center justify-center rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-500"
-                  >
-                    Open daily planner
-                  </Link>
-                  <Link
-                    href="/pomodoro"
-                    className="inline-flex min-w-[10rem] items-center justify-center rounded-xl border border-white/15 bg-white/5 px-5 py-2.5 text-sm font-medium text-white/85 transition hover:border-white/25 hover:bg-white/10"
-                  >
-                    Pomodoro
-                  </Link>
-                </div>
-              </motion.div>
+              <EmptyState
+                icon="⏱️"
+                title="No data yet for today"
+                description="Keep the Klokrs extension enabled and use Chrome as usual. Time per domain will show up here as sessions sync—usually within a few seconds of browsing."
+                action={
+                  <div className="flex flex-col items-center justify-center gap-3 sm:flex-row sm:gap-4">
+                    <Link
+                      href="/daily-planner"
+                      className="inline-flex min-w-[10rem] items-center justify-center rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-500"
+                    >
+                      Open daily planner
+                    </Link>
+                    <Link
+                      href="/pomodoro"
+                      className="inline-flex min-w-[10rem] items-center justify-center rounded-xl border border-white/15 bg-white/5 px-5 py-2.5 text-sm font-medium text-white/85 transition hover:border-white/25 hover:bg-white/10"
+                    >
+                      Pomodoro
+                    </Link>
+                  </div>
+                }
+              />
             ) : (
               <div className="space-y-6 lg:space-y-8">
                 <DomainChart data={domainStats} totalSeconds={totalSeconds} />
