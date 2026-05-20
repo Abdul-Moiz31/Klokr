@@ -11,9 +11,13 @@ import type {
   EventInput,
 } from "@fullcalendar/core";
 import type { EventResizeDoneArg } from "@fullcalendar/interaction";
-import type { PlannerTask } from "@/lib/daily-planner/types";
+import type { IdleRange, PlannerTask } from "@/lib/daily-planner/types";
 import type { TabSession } from "@/lib/supabase";
-import { computeOnTaskStats, type OnTaskStats } from "@/lib/daily-planner/onTask";
+import {
+  computeOnTaskStats,
+  type OnTaskStats,
+  type UnscheduledGap,
+} from "@/lib/daily-planner/onTask";
 import {
   SNAP_MINUTES,
   dateToMinutes,
@@ -44,10 +48,34 @@ type Props = {
   sessions?: TabSession[];
   /** Auto-completion threshold % — drives the fill-bar color and corner check. */
   autoCompleteThreshold?: number;
+  /** Unscheduled gaps with tracked activity — rendered as red coral blocks. */
+  unscheduledGaps?: UnscheduledGap[];
+  /** User-marked idle ranges — rendered as muted gray blocks. */
+  idleRanges?: IdleRange[];
+  /** Click handler for red unscheduled-gap blocks. */
+  onGapClick?: (gap: UnscheduledGap) => void;
 };
 
 const SNAP_DURATION = `00:${String(SNAP_MINUTES).padStart(2, "0")}:00`;
 const EMPTY_SESSIONS: TabSession[] = [];
+const EMPTY_GAPS: UnscheduledGap[] = [];
+const EMPTY_IDLE: IdleRange[] = [];
+
+/** Stable id for a gap so FullCalendar can diff it across renders. */
+function gapEventId(gap: UnscheduledGap): string {
+  return `gap-${gap.fromMinutes}-${gap.toMinutes}`;
+}
+function idleEventId(r: IdleRange): string {
+  return `idle-${r.fromMinutes}-${r.toMinutes}`;
+}
+function fmtMinutes(min: number): string {
+  const total = Math.round(min);
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  if (h === 0) return `${m} min`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
+}
 
 export function TimelineView({
   forDate,
@@ -61,6 +89,9 @@ export function TimelineView({
   readOnly = false,
   sessions = EMPTY_SESSIONS,
   autoCompleteThreshold = 80,
+  unscheduledGaps = EMPTY_GAPS,
+  idleRanges = EMPTY_IDLE,
+  onGapClick,
 }: Props) {
   const statsByTaskId = useMemo(() => {
     const map = new Map<string, OnTaskStats>();
@@ -112,7 +143,7 @@ export function TimelineView({
   }, [forDate]);
 
   const events: EventInput[] = useMemo(() => {
-    return tasks
+    const taskEvents: EventInput[] = tasks
       .filter((t) => t.startMinutes != null && t.endMinutes != null)
       .map((t) => {
         const start = minutesToDate(forDate, t.startMinutes!);
@@ -127,10 +158,32 @@ export function TimelineView({
             "klokrs-event",
             t.done ? "klokrs-event--done" : "",
           ].filter(Boolean),
-          extendedProps: { task: t },
+          extendedProps: { kind: "task", task: t },
         } satisfies EventInput;
       });
-  }, [tasks, forDate, readOnly]);
+
+    const gapEvents: EventInput[] = unscheduledGaps.map((gap) => ({
+      id: gapEventId(gap),
+      title: "Background activity",
+      start: minutesToDate(forDate, gap.fromMinutes),
+      end: minutesToDate(forDate, gap.toMinutes),
+      editable: false,
+      classNames: ["klokrs-event", "klokrs-event--gap"],
+      extendedProps: { kind: "gap", gap },
+    }));
+
+    const idleEvents: EventInput[] = idleRanges.map((r) => ({
+      id: idleEventId(r),
+      title: "Idle",
+      start: minutesToDate(forDate, r.fromMinutes),
+      end: minutesToDate(forDate, r.toMinutes),
+      editable: false,
+      classNames: ["klokrs-event", "klokrs-event--idle"],
+      extendedProps: { kind: "idle", idle: r },
+    }));
+
+    return [...taskEvents, ...gapEvents, ...idleEvents];
+  }, [tasks, forDate, readOnly, unscheduledGaps, idleRanges]);
 
   const handleDrop = (info: EventDropArg) => {
     const ev = info.event;
@@ -159,6 +212,13 @@ export function TimelineView({
   };
 
   const handleEventClick = (info: EventClickArg) => {
+    const kind = info.event.extendedProps?.kind as string | undefined;
+    if (kind === "gap") {
+      const gap = info.event.extendedProps?.gap as UnscheduledGap | undefined;
+      if (gap && onGapClick) onGapClick(gap);
+      return;
+    }
+    if (kind === "idle") return;
     if (readOnly) return;
     onEditTask(info.event.id);
   };
@@ -193,9 +253,34 @@ export function TimelineView({
         select={handleSelect}
         eventClick={handleEventClick}
         eventContent={(arg) => {
-          const task = arg.event.extendedProps?.task as PlannerTask | undefined;
+          const kind = (arg.event.extendedProps?.kind as string | undefined) ?? "task";
           const start = arg.event.start ? dateToMinutes(arg.event.start) : 0;
           const end = arg.event.end ? dateToMinutes(arg.event.end) : start;
+          if (kind === "gap") {
+            const gap = arg.event.extendedProps?.gap as UnscheduledGap | undefined;
+            const activity = gap?.activityMinutes ?? end - start;
+            return (
+              <div className="klokrs-event-body klokrs-event-body--gap">
+                <div className="klokrs-event-row">
+                  <div className="klokrs-event-title">Background activity</div>
+                </div>
+                <div className="klokrs-event-meta">
+                  {formatRange(start, end)} · {fmtMinutes(activity)}
+                </div>
+              </div>
+            );
+          }
+          if (kind === "idle") {
+            return (
+              <div className="klokrs-event-body klokrs-event-body--idle">
+                <div className="klokrs-event-row">
+                  <div className="klokrs-event-title">Idle</div>
+                </div>
+                <div className="klokrs-event-meta">{formatRange(start, end)}</div>
+              </div>
+            );
+          }
+          const task = arg.event.extendedProps?.task as PlannerTask | undefined;
           const done = task?.done === true;
           const canToggle = !readOnly && task != null && onToggleDone != null;
           const stats = task ? statsByTaskId.get(task.id) : undefined;

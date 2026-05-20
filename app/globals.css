@@ -201,6 +201,33 @@ html {
   color: rgb(237, 233, 254);
   margin-left: 4px;
 }
+/* Red coral "background activity" block — Phase 3 unscheduled gap. */
+.klokrs-timeline .fc-event.klokrs-event--gap {
+  background: rgba(248, 113, 113, 0.18);
+  border-color: rgba(248, 113, 113, 0.65);
+  color: rgba(254, 226, 226, 0.95);
+  cursor: pointer;
+}
+.klokrs-timeline .fc-event.klokrs-event--gap:hover {
+  background: rgba(248, 113, 113, 0.26);
+}
+.klokrs-timeline .klokrs-event-body--gap .klokrs-event-title {
+  color: rgba(254, 226, 226, 0.95);
+}
+.klokrs-timeline .klokrs-event-body--gap .klokrs-event-meta {
+  color: rgba(254, 226, 226, 0.7);
+}
+/* Idle block — muted gray, non-interactive. */
+.klokrs-timeline .fc-event.klokrs-event--idle {
+  background: rgba(148, 163, 184, 0.12);
+  border-color: rgba(148, 163, 184, 0.35);
+  color: rgba(226, 232, 240, 0.7);
+  cursor: default;
+}
+.klokrs-timeline .klokrs-event-body--idle .klokrs-event-title,
+.klokrs-timeline .klokrs-event-body--idle .klokrs-event-meta {
+  color: rgba(226, 232, 240, 0.6);
+}
 .klokrs-timeline .fc-highlight {
   background: rgba(167, 139, 250, 0.12);
 }
