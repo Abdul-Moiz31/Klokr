@@ -1,33 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { createClient } from "@/lib/supabase";
 import { AppShell } from "@/components/dashboard/AppShell";
 import { PomodoroApp } from "@/components/pomodoro/PomodoroApp";
 import { Loader } from "@/components/ui/Loader";
-import type { User } from "@supabase/supabase-js";
+import { useAuthSession } from "@/lib/useAuthSession";
 
 export default function PomodoroPage() {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const router = useRouter();
+  const { session, status } = useAuthSession();
+  const user = session?.user ?? null;
 
-  useEffect(() => {
-    const supabase = createClient();
-    void (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        router.push("/login");
-        return;
-      }
-      setUser(session.user);
-      setLoading(false);
-    })();
-  }, [router]);
-
-  if (loading) {
+  if (status === "loading" || !user) {
     return (
       <AppShell title="Pomodoro">
         <Loader />
