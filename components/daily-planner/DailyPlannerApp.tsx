@@ -15,6 +15,7 @@ import { ExtensionPlannerSync } from "@/components/ExtensionPlannerSync";
 import { useDailyPlannerState } from "@/lib/daily-planner/useDailyPlannerState";
 import { useTodaySessions } from "@/lib/daily-planner/useTodaySessions";
 import { findUnscheduledGaps, type UnscheduledGap } from "@/lib/daily-planner/onTask";
+import { localMinutesNow, pickAutoCompletions } from "@/lib/daily-planner/autoComplete";
 import { createEmptyDayData, dayKey } from "@/lib/daily-planner/storage";
 import { suggestedRoutineTemplateKind } from "@/lib/daily-planner/date";
 import { normalizeRange } from "@/lib/daily-planner/timeline";
@@ -141,6 +142,13 @@ export function DailyPlannerApp({ accountCreatedAt = null }: DailyPlannerAppProp
     | null
   >(null);
   const [gapModal, setGapModal] = useState<UnscheduledGap | null>(null);
+  // Task IDs the user manually un-completed this session — auto-complete skips
+  // them so they don't immediately flip back to done. Cleared on page reload.
+  const ignoredAutoCompleteRef = useRef<Set<string>>(new Set());
+  // Tick state to drive the 60s re-evaluation of end-of-window tasks. Bumping
+  // this number re-runs the auto-completion effect even when state/sessions
+  // didn't change (e.g. a task window just ended).
+  const [autoCompleteTick, setAutoCompleteTick] = useState(0);
   const unscheduledRailRef = useRef<HTMLDivElement | null>(null);
 
   const todayK = getTodayKey();
@@ -169,6 +177,58 @@ export function DailyPlannerApp({ accountCreatedAt = null }: DailyPlannerAppProp
     [todayAdHoc]
   );
   const todayIdleRanges = todayAdHoc.idleRanges ?? [];
+
+  // 60s ticker so end-of-window auto-completion fires for tasks whose window
+  // ends while the planner is open. Cheap — just a state bump.
+  useEffect(() => {
+    if (!isViewingToday) return;
+    const id = setInterval(() => setAutoCompleteTick((n) => n + 1), 60_000);
+    return () => clearInterval(id);
+  }, [isViewingToday]);
+
+  // Auto-completion check. Runs whenever scheduledTasks / sessions / prefs /
+  // tick change. Only writes when viewing today — past days shouldn't flip
+  // retroactively, and future days obviously have no past windows.
+  useEffect(() => {
+    if (!isViewingToday) return;
+    if (!prefs.autoCompleteEnabled) return;
+    if (scheduledTasks.length === 0) return;
+    const nowMin = localMinutesNow();
+    const picks = pickAutoCompletions(
+      scheduledTasks,
+      sessions,
+      viewDate,
+      prefs,
+      nowMin,
+      ignoredAutoCompleteRef.current
+    );
+    if (picks.length === 0) return;
+    const pickIds = new Set(picks.map((p) => p.taskId));
+    setTodayTasks((tasks) =>
+      tasks.map((t) => {
+        const p = picks.find((x) => x.taskId === t.id);
+        if (!p) return t;
+        return {
+          ...t,
+          done: true,
+          autoCompleted: true,
+          completedAt: p.completedAt,
+        };
+      })
+    );
+    // Use the local var so the closure doesn't reference the ref directly.
+    void pickIds;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    isViewingToday,
+    scheduledTasks,
+    sessions,
+    prefs.autoCompleteEnabled,
+    prefs.autoCompleteThreshold,
+    viewDate,
+    autoCompleteTick,
+  ]);
+
   const unscheduledGaps = useMemo(() => {
     const raw = findUnscheduledGaps(
       scheduledTasks,
@@ -268,7 +328,21 @@ export function DailyPlannerApp({ accountCreatedAt = null }: DailyPlannerAppProp
 
   const toggleTaskDone = (taskId: string) => {
     setTodayTasks((tasks) =>
-      tasks.map((t) => (t.id === taskId ? { ...t, done: !t.done } : t))
+      tasks.map((t) => {
+        if (t.id !== taskId) return t;
+        const nextDone = !t.done;
+        // Un-completing an auto-completed task: clear the auto flag and add
+        // the task to the ignore set so the next 60s tick doesn't re-flip it.
+        if (!nextDone && t.autoCompleted) {
+          ignoredAutoCompleteRef.current.add(t.id);
+          return { ...t, done: false, autoCompleted: false, completedAt: undefined };
+        }
+        // Manually completing: stamp completedAt for parity with auto path.
+        if (nextDone) {
+          return { ...t, done: true, completedAt: Date.now() };
+        }
+        return { ...t, done: false, completedAt: undefined };
+      })
     );
   };
 
