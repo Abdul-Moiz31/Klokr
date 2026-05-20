@@ -116,6 +116,7 @@ export function DailyPlannerApp({ accountCreatedAt = null }: DailyPlannerAppProp
     getTrackingRules,
     applyRoutineTemplateToToday,
     setRoutineTemplate,
+    setTemplateTaskDomains,
     newId: newIdFn,
   } = useDailyPlannerState();
 
@@ -202,21 +203,35 @@ export function DailyPlannerApp({ accountCreatedAt = null }: DailyPlannerAppProp
   };
 
   const updateTaskFromModal = (taskId: string, draft: TimelineTaskDraft) => {
+    let propagateTo: { kind: RoutineTemplateKind; templateTaskId: string } | null = null;
     setTodayTasks((tasks) =>
-      tasks.map((t) =>
-        t.id === taskId
-          ? {
-              ...t,
-              title: draft.title,
-              description: draft.description,
-              done: draft.done,
-              domainTags: draft.domainTags,
-              startMinutes: draft.startMinutes,
-              endMinutes: draft.endMinutes,
-            }
-          : t
-      )
+      tasks.map((t) => {
+        if (t.id !== taskId) return t;
+        if (
+          draft.applyDomainsToTemplate &&
+          t.sourceTemplateTaskId &&
+          t.sourceTemplateKind
+        ) {
+          propagateTo = { kind: t.sourceTemplateKind, templateTaskId: t.sourceTemplateTaskId };
+        }
+        return {
+          ...t,
+          title: draft.title,
+          description: draft.description,
+          done: draft.done,
+          domainTags: draft.domainTags,
+          startMinutes: draft.startMinutes,
+          endMinutes: draft.endMinutes,
+        };
+      })
     );
+    if (propagateTo) {
+      setTemplateTaskDomains(
+        (propagateTo as { kind: RoutineTemplateKind; templateTaskId: string }).kind,
+        (propagateTo as { kind: RoutineTemplateKind; templateTaskId: string }).templateTaskId,
+        draft.domainTags
+      );
+    }
   };
 
   const deleteTask = (taskId: string) => {

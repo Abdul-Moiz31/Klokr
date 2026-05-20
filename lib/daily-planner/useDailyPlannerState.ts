@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
-  DailyPlannerV4,
+  DailyPlannerV5,
   DayData,
   RecurringRule,
   RoutineTemplateKind,
@@ -14,7 +14,7 @@ import {
   dayDataWithFreshIds,
   dayKey,
   loadDailyPlanner,
-  migrateAnyToV4,
+  migrateAnyToV5,
   newId,
   saveDailyPlanner,
 } from "./storage";
@@ -31,7 +31,7 @@ function deepClone<T>(x: T): T {
 }
 
 export function useDailyPlannerState() {
-  const [state, setState] = useState<DailyPlannerV4 | null>(null);
+  const [state, setState] = useState<DailyPlannerV5 | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isInitialLoad = useRef(true);
@@ -52,23 +52,23 @@ export function useDailyPlannerState() {
       if (!remote) return;
 
       // If remote is newer than what we loaded from localStorage, adopt it.
-      // Remote rows may be older v1/v2/v3 shapes — migrate before adopting,
-      // and if migration changed the version, write v4 back so the DB row
+      // Remote rows may be older v1..v4 shapes — migrate before adopting,
+      // and if migration changed the version, write v5 back so the DB row
       // catches up without waiting for the next user edit.
       const localTs = localStorage.getItem("Klokrs_planner_synced_at") ?? "0";
       const remoteVersion = (remote.data as { v?: number })?.v;
       if (remote.updated_at > localTs) {
-        const migrated = migrateAnyToV4(remote.data);
+        const migrated = migrateAnyToV5(remote.data);
         setState(migrated);
         saveDailyPlanner(migrated);
         localStorage.setItem("Klokrs_planner_synced_at", remote.updated_at);
-        if (remoteVersion !== 4) {
+        if (remoteVersion !== 5) {
           await upsertRemotePlanner(user.id, migrated);
           localStorage.setItem("Klokrs_planner_synced_at", new Date().toISOString());
         }
-      } else if (remoteVersion !== 4) {
+      } else if (remoteVersion !== 5) {
         // Remote is older but we already had newer local data — still upgrade
-        // the DB row to v4 with our local state so the schema converges.
+        // the DB row to v5 with our local state so the schema converges.
         await upsertRemotePlanner(user.id, local);
         localStorage.setItem("Klokrs_planner_synced_at", new Date().toISOString());
       }
@@ -101,7 +101,7 @@ export function useDailyPlannerState() {
     };
   }, [state]);
 
-  const update = useCallback((fn: (s: DailyPlannerV4) => DailyPlannerV4) => {
+  const update = useCallback((fn: (s: DailyPlannerV5) => DailyPlannerV5) => {
     setState((prev) => (prev ? fn(deepClone(prev)) : null));
   }, []);
 
@@ -121,9 +121,10 @@ export function useDailyPlannerState() {
       if (s.adHocByDate[todayK] == null) {
         const kind = suggestedRoutineTemplateKind(today);
         const dayTemplate = s.routineTemplates[kind];
+        const usedKind = dayTemplate.tasks.length > 0 ? kind : "fallback";
         const src = dayTemplate.tasks.length > 0 ? dayTemplate : s.routineTemplates.fallback;
         if (src.tasks.length > 0) {
-          s.adHocByDate[todayK] = dayDataWithFreshIds(deepClone(src));
+          s.adHocByDate[todayK] = dayDataWithFreshIds(deepClone(src), usedKind);
         }
       }
 
@@ -365,12 +366,38 @@ export function useDailyPlannerState() {
     [update]
   );
 
+  /**
+   * Update `domainTags` on a specific template task — used by the A1 confirm
+   * dialog when the user edits today's instance and chooses "Apply to template".
+   * Returns true if the template task was found and updated, false otherwise.
+   */
+  const setTemplateTaskDomains = useCallback(
+    (kind: RoutineTemplateKind, templateTaskId: string, domains: string[]): boolean => {
+      let found = false;
+      update((s) => {
+        const tpl = s.routineTemplates[kind];
+        if (!tpl) return s;
+        const tasks = tpl.tasks.map((t) => {
+          if (t.id === templateTaskId) {
+            found = true;
+            return { ...t, domainTags: domains };
+          }
+          return t;
+        });
+        if (found) s.routineTemplates[kind] = { ...tpl, tasks };
+        return s;
+      });
+      return found;
+    },
+    [update]
+  );
+
   const applyRoutineTemplateToToday = useCallback(
     (kind: RoutineTemplateKind) => {
       update((s) => {
         const k = dayKey(new Date());
         const src = s.routineTemplates[kind];
-        s.adHocByDate[k] = dayDataWithFreshIds(deepClone(src));
+        s.adHocByDate[k] = dayDataWithFreshIds(deepClone(src), kind);
         return s;
       });
     },
@@ -402,6 +429,7 @@ export function useDailyPlannerState() {
     newId,
     getTrackingRules,
     setRoutineTemplate,
+    setTemplateTaskDomains,
     applyRoutineTemplateToToday,
   };
 }

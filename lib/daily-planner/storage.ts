@@ -3,7 +3,10 @@ import type {
   DailyPlannerV2,
   DailyPlannerV3,
   DailyPlannerV4,
+  DailyPlannerV5,
   DayData,
+  IdleRange,
+  ManualAttribution,
   PlannerTask,
   RecurringRule,
   RoutineTemplateKind,
@@ -34,8 +37,19 @@ export function createEmptyDayData(): DayData {
 /**
  * Copy a plan with new group/task ids so the same template can be applied
  * to several days (or combined) without id collisions in storage.
+ *
+ * When `templateKind` is provided, each cloned task records lineage back to its
+ * source template task via `sourceTemplateTaskId` + `sourceTemplateKind`. This
+ * enables the A1 confirm dialog ("Apply to today only / Apply to template").
+ *
+ * Auto-completion state (`autoCompleted`, `completedAt`, `manualAttributions`,
+ * `skipped`, `done`) is never copied from a template — instances always start
+ * fresh.
  */
-export function dayDataWithFreshIds(d: DayData): DayData {
+export function dayDataWithFreshIds(
+  d: DayData,
+  templateKind?: RoutineTemplateKind
+): DayData {
   const gMap = new Map<string, string>();
   for (const g of d.groups) {
     gMap.set(g.id, newId());
@@ -43,11 +57,22 @@ export function dayDataWithFreshIds(d: DayData): DayData {
   const groups = d.groups.map((g) => ({ ...g, id: gMap.get(g.id)! }));
   const tasks = d.tasks.map((t) => {
     const gid = gMap.get(t.groupId);
-    return {
+    const lineage = templateKind
+      ? { sourceTemplateTaskId: t.id, sourceTemplateKind: templateKind }
+      : {};
+    const fresh: PlannerTask = {
       ...t,
       id: newId(),
       groupId: gid ?? t.groupId,
+      done: false,
+      ...lineage,
     };
+    // Instances never inherit completion/attribution state from a template.
+    delete fresh.autoCompleted;
+    delete fresh.completedAt;
+    delete fresh.manualAttributions;
+    delete fresh.skipped;
+    return fresh;
   });
   return { groups, tasks };
 }
@@ -143,6 +168,29 @@ const DEFAULT_DUMP: DayData = {
  * PlannerTask shape. Discards `urgent` and `estimateMinutes` if present;
  * adds `description = ""` if missing.
  */
+const VALID_TEMPLATE_KINDS: RoutineTemplateKind[] = [
+  "fallback",
+  "weekdays",
+  "saturday",
+  "sunday",
+];
+
+function migrateManualAttributions(raw: unknown): ManualAttribution[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const out: ManualAttribution[] = [];
+  for (const r of raw) {
+    if (!r || typeof r !== "object") continue;
+    const rec = r as Record<string, unknown>;
+    const from = typeof rec.fromMinutes === "number" ? clampMinutes(rec.fromMinutes) : null;
+    const to = typeof rec.toMinutes === "number" ? clampMinutes(rec.toMinutes) : null;
+    const added = typeof rec.addedMinutes === "number" ? Math.max(0, Math.round(rec.addedMinutes)) : null;
+    const at = typeof rec.addedAt === "number" ? rec.addedAt : null;
+    if (from == null || to == null || added == null || at == null || to <= from) continue;
+    out.push({ fromMinutes: from, toMinutes: to, addedMinutes: added, addedAt: at });
+  }
+  return out.length ? out : undefined;
+}
+
 function migrateTask(raw: unknown): PlannerTask {
   const t = (raw ?? {}) as Record<string, unknown>;
   const rawStartNum = typeof t.startMinutes === "number" ? t.startMinutes : null;
@@ -159,7 +207,7 @@ function migrateTask(raw: unknown): PlannerTask {
     // Enforce min 15-min duration on bad data.
     endMinutes = Math.min(1440, startMinutes + 15);
   }
-  return {
+  const out: PlannerTask = {
     id: typeof t.id === "string" ? t.id : newId(),
     groupId: typeof t.groupId === "string" ? t.groupId : "",
     title: typeof t.title === "string" ? t.title : "",
@@ -172,6 +220,35 @@ function migrateTask(raw: unknown): PlannerTask {
     startMinutes,
     endMinutes,
   };
+  // v5 additions — only set when present so older blobs round-trip cleanly.
+  if (t.autoCompleted === true) out.autoCompleted = true;
+  if (typeof t.completedAt === "number") out.completedAt = t.completedAt;
+  const ma = migrateManualAttributions(t.manualAttributions);
+  if (ma) out.manualAttributions = ma;
+  if (typeof t.sourceTemplateTaskId === "string") out.sourceTemplateTaskId = t.sourceTemplateTaskId;
+  if (
+    typeof t.sourceTemplateKind === "string" &&
+    VALID_TEMPLATE_KINDS.includes(t.sourceTemplateKind as RoutineTemplateKind)
+  ) {
+    out.sourceTemplateKind = t.sourceTemplateKind as RoutineTemplateKind;
+  }
+  if (t.skipped === true) out.skipped = true;
+  return out;
+}
+
+function migrateIdleRanges(raw: unknown): IdleRange[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const out: IdleRange[] = [];
+  for (const r of raw) {
+    if (!r || typeof r !== "object") continue;
+    const rec = r as Record<string, unknown>;
+    const from = typeof rec.fromMinutes === "number" ? clampMinutes(rec.fromMinutes) : null;
+    const to = typeof rec.toMinutes === "number" ? clampMinutes(rec.toMinutes) : null;
+    const at = typeof rec.markedAt === "number" ? rec.markedAt : null;
+    if (from == null || to == null || at == null || to <= from) continue;
+    out.push({ fromMinutes: from, toMinutes: to, markedAt: at });
+  }
+  return out.length ? out : undefined;
 }
 
 function isFiniteSchedule(n: number | null | undefined): boolean {
@@ -186,7 +263,11 @@ function clampMinutes(n: number): number {
 
 function migrateDayData(d: DayData | undefined): DayData {
   if (!d) return createEmptyDayData();
-  return { ...d, tasks: (d.tasks ?? []).map(migrateTask) };
+  const out: DayData = { ...d, tasks: (d.tasks ?? []).map(migrateTask) };
+  const idle = migrateIdleRanges((d as { idleRanges?: unknown }).idleRanges);
+  if (idle) out.idleRanges = idle;
+  else delete (out as { idleRanges?: unknown }).idleRanges;
+  return out;
 }
 
 /** Coerce an unknown-shape rule into the v4 RecurringRule shape. */
@@ -223,9 +304,9 @@ function migrateRule(raw: unknown): RecurringRule {
   };
 }
 
-function defaultV4(): DailyPlannerV4 {
+function defaultV5(): DailyPlannerV5 {
   return {
-    v: 4,
+    v: 5,
     recurringRules: [],
     adHocByDate: {},
     taskDump: JSON.parse(JSON.stringify(DEFAULT_DUMP)) as DayData,
@@ -234,13 +315,13 @@ function defaultV4(): DailyPlannerV4 {
   };
 }
 
-function migrateV1ToV4(v1: DailyPlannerV1): DailyPlannerV4 {
+function migrateV1ToV5(v1: DailyPlannerV1): DailyPlannerV5 {
   const adHoc: Record<string, DayData | undefined> = {};
   for (const [key, val] of Object.entries(v1.dayOverrides ?? {})) {
     if (val) adHoc[key] = migrateDayData(val);
   }
   return {
-    v: 4,
+    v: 5,
     recurringRules: [],
     adHocByDate: adHoc,
     taskDump: migrateDayData(v1.taskDump),
@@ -249,12 +330,12 @@ function migrateV1ToV4(v1: DailyPlannerV1): DailyPlannerV4 {
   };
 }
 
-/** v2 / v3 / v4 all share the same outer shape — normalize through the same path. */
-function normalizeV4(raw: unknown): DailyPlannerV4 {
+/** v2 / v3 / v4 / v5 all share the same outer shape — normalize through one path. */
+function normalizeV5(raw: unknown): DailyPlannerV5 {
   const defRt = defaultRoutineTemplates();
   const p = (raw ?? {}) as Record<string, unknown>;
   const rt = (p.routineTemplates ?? {}) as Record<string, unknown>;
-  const taskDumpRaw = (p.taskDump as DayData | undefined) ?? defaultV4().taskDump;
+  const taskDumpRaw = (p.taskDump as DayData | undefined) ?? defaultV5().taskDump;
   const adHocSrc = (p.adHocByDate ?? {}) as Record<string, DayData | undefined>;
   const completions = (p.recurringCompletions ?? {}) as Record<string, boolean>;
   const rules = Array.isArray(p.recurringRules)
@@ -262,7 +343,7 @@ function normalizeV4(raw: unknown): DailyPlannerV4 {
     : [];
 
   return {
-    v: 4,
+    v: 5,
     recurringRules: rules,
     adHocByDate: Object.fromEntries(
       Object.entries(adHocSrc).map(([k, v]) => [k, v ? migrateDayData(v) : v])
@@ -287,25 +368,25 @@ function normalizeV4(raw: unknown): DailyPlannerV4 {
   };
 }
 
-export function loadDailyPlanner(): DailyPlannerV4 {
-  if (typeof window === "undefined") return defaultV4();
+export function loadDailyPlanner(): DailyPlannerV5 {
+  if (typeof window === "undefined") return defaultV5();
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return defaultV4();
+    if (!raw) return defaultV5();
     const parsed = JSON.parse(raw) as Record<string, unknown>;
     const v = parsed.v;
-    let migrated: DailyPlannerV4;
+    let migrated: DailyPlannerV5;
     if (v === 1) {
-      migrated = migrateV1ToV4(parsed as unknown as DailyPlannerV1);
-    } else if (v === 2 || v === 3 || v === 4) {
-      migrated = normalizeV4(parsed);
+      migrated = migrateV1ToV5(parsed as unknown as DailyPlannerV1);
+    } else if (v === 2 || v === 3 || v === 4 || v === 5) {
+      migrated = normalizeV5(parsed);
     } else {
-      return defaultV4();
+      return defaultV5();
     }
     if (!migrated.taskDump.groups.length) {
-      migrated.taskDump = defaultV4().taskDump;
+      migrated.taskDump = defaultV5().taskDump;
     }
-    if (v !== 4) {
+    if (v !== 5) {
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
       } catch {
@@ -314,32 +395,33 @@ export function loadDailyPlanner(): DailyPlannerV4 {
     }
     return migrated;
   } catch {
-    return defaultV4();
+    return defaultV5();
   }
 }
 
 /**
- * Coerce any historical planner shape into v4. Used by the hook when adopting
+ * Coerce any historical planner shape into v5. Used by the hook when adopting
  * remote data that may have been written by an older client.
  */
-export function migrateAnyToV4(
+export function migrateAnyToV5(
   raw:
     | DailyPlannerV1
     | DailyPlannerV2
     | DailyPlannerV3
     | DailyPlannerV4
+    | DailyPlannerV5
     | Record<string, unknown>
     | undefined
     | null
-): DailyPlannerV4 {
-  if (!raw) return defaultV4();
+): DailyPlannerV5 {
+  if (!raw) return defaultV5();
   const v = (raw as Record<string, unknown>).v;
-  if (v === 1) return migrateV1ToV4(raw as unknown as DailyPlannerV1);
-  if (v === 2 || v === 3 || v === 4) return normalizeV4(raw);
-  return defaultV4();
+  if (v === 1) return migrateV1ToV5(raw as unknown as DailyPlannerV1);
+  if (v === 2 || v === 3 || v === 4 || v === 5) return normalizeV5(raw);
+  return defaultV5();
 }
 
-export function saveDailyPlanner(state: DailyPlannerV4) {
+export function saveDailyPlanner(state: DailyPlannerV5) {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -384,7 +466,7 @@ function pushGroupTasks(
  * Recurring-rule rows are a library only until added to a template or today.
  */
 export function buildTabTrackingRules(
-  state: DailyPlannerV4,
+  state: DailyPlannerV5,
   forDate: Date
 ): { taskId: string; domains: string[] }[] {
   const order: { taskId: string; domains: string[] }[] = [];
