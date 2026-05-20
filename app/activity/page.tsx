@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useAuthSession } from "@/lib/useAuthSession";
 import { createClient } from "@/lib/supabase";
 import { AppShell } from "@/components/dashboard/AppShell";
 import { PageHeader } from "@/components/dashboard/PageHeader";
@@ -50,13 +50,13 @@ function calcStreak(dailyMap: Map<string, number>, todayStr: string): number {
 }
 
 export default function ActivityPage() {
-  const [user, setUser] = useState<User | null>(null);
+  const { session: authSession } = useAuthSession();
+  const user = authSession?.user ?? null;
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<DayStat[]>([]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedSeconds, setSelectedSeconds] = useState(0);
   const userIdRef = useRef<string | null>(null);
-  const router = useRouter();
 
   const prefs = useMemo(() => loadPrefs(), []);
   const thresholdS = prefs.productiveHoursThreshold * 3600;
@@ -94,16 +94,13 @@ export default function ActivityPage() {
   }, [today, todayStr]);
 
   useEffect(() => {
-    const supabase = createClient();
+    if (!user) return;
+    userIdRef.current = user.id;
     void (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { router.push("/login"); return; }
-      setUser(session.user);
-      userIdRef.current = session.user.id;
-      await fetchStats(session.user.id);
+      await fetchStats(user.id);
       setLoading(false);
     })();
-  }, [router, fetchStats]);
+  }, [user, fetchStats]);
 
   // Re-fetch when the user switches back to this tab after being away.
   useEffect(() => {

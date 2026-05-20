@@ -1,30 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase";
 import { AppShell } from "@/components/dashboard/AppShell";
 import { PageHeader } from "@/components/dashboard/PageHeader";
 import { DailyPlannerApp } from "@/components/daily-planner/DailyPlannerApp";
 import { Loader } from "@/components/ui/Loader";
-import type { User } from "@supabase/supabase-js";
+import { useAuthSession } from "@/lib/useAuthSession";
 
 export default function DailyPlannerPage() {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const router = useRouter();
+  const { session, status } = useAuthSession();
 
-  useEffect(() => {
-    const supabase = createClient();
-    void (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { router.push("/login"); return; }
-      setUser(session.user);
-      setLoading(false);
-    })();
-  }, [router]);
-
-  if (loading) {
+  if (status === "loading" || !session) {
     return (
       <AppShell title="Daily planner">
         <Loader />
@@ -35,7 +20,7 @@ export default function DailyPlannerPage() {
   return (
     <AppShell title="Daily planner">
       <PageHeader eyebrow="Plan" title="Daily planner" />
-      <DailyPlannerApp accountCreatedAt={user?.created_at ?? null} />
+      <DailyPlannerApp accountCreatedAt={session.user.created_at ?? null} />
     </AppShell>
   );
 }

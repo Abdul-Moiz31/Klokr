@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
+import { useAuthSession } from "@/lib/useAuthSession";
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/dashboard/PageHeader";
@@ -11,7 +11,7 @@ import { PasswordInput } from "@/components/ui/PasswordInput";
 import { Button } from "@/components/ui/Button";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { Loader } from "@/components/ui/Loader";
-import { DEFAULT_PREFS, loadPrefs, savePrefs, type KlokrsPrefs } from "@/lib/prefs";
+import { DEFAULT_PREFS, loadPrefs, savePrefs, resolveTimezone, type KlokrsPrefs } from "@/lib/prefs";
 import { getSiteName } from "@/lib/domain";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -74,25 +74,25 @@ function Card({ children }: { children: ReactNode }) {
   );
 }
 
-// function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) { // coming soon
-//   return (
-//     <button
-//       type="button"
-//       role="switch"
-//       aria-checked={checked}
-//       onClick={() => onChange(!checked)}
-//       className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border transition-colors duration-200 focus:outline-none ${
-//         checked ? "border-violet-500/50 bg-violet-600" : "border-white/15 bg-white/10"
-//       }`}
-//     >
-//       <span
-//         className={`inline-block h-3.5 w-3.5 self-center rounded-full bg-white shadow transition-transform duration-200 ${
-//           checked ? "translate-x-4" : "translate-x-0.5"
-//         }`}
-//       />
-//     </button>
-//   );
-// }
+function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border transition-colors duration-200 focus:outline-none ${
+        checked ? "border-violet-500/50 bg-violet-600" : "border-white/15 bg-white/10"
+      }`}
+    >
+      <span
+        className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform duration-200 ${
+          checked ? "translate-x-4" : "translate-x-0.5"
+        }`}
+      />
+    </button>
+  );
+}
 
 function ChipSelect<T extends number | string>({
   options,
@@ -428,18 +428,15 @@ export default function SettingsPage() {
   const [diagClearConfirm, setDiagClearConfirm] = useState(false);
   const [copiedId, setCopiedId] = useState(false);
 
-  const router = useRouter();
+  const { session: authSession } = useAuthSession();
 
+  // Sync auth session → local user state so handlers can update metadata after rename.
   useEffect(() => {
-    const supabase = createClient();
-    void (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { router.push("/login"); return; }
-      setUser(session.user);
-      setDisplayName(session.user.user_metadata?.full_name ?? "");
-      setLoading(false);
-    })();
-  }, [router]);
+    if (!authSession) return;
+    setUser(authSession.user);
+    setDisplayName(authSession.user.user_metadata?.full_name ?? "");
+    setLoading(false);
+  }, [authSession]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -797,6 +794,47 @@ export default function SettingsPage() {
               </div>
 
               <div>
+                <SectionTitle tooltip="Your time zone controls how 'today' is calculated for the dashboard and reports. Defaults to your browser's time zone if not overridden.">Time zone</SectionTitle>
+                <Card>
+                  <PrefRow
+                    label="Time zone"
+                    hint={prefs.timezone ? `Saved: ${prefs.timezone}` : `Auto-detected: ${resolveTimezone(prefs)}`}
+                  >
+                    <select
+                      value={prefs.timezone ?? ""}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        updatePrefs({ timezone: v === "" ? null : v });
+                      }}
+                      className="w-full max-w-full rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-white/80 focus:outline-none focus:border-violet-500/50 [color-scheme:dark] sm:max-w-[16rem]"
+                    >
+                      <option value="">Auto-detect from browser</option>
+                      {(() => {
+                        let zones: string[] = [];
+                        try {
+                          const fn = (Intl as unknown as { supportedValuesOf?: (k: string) => string[] }).supportedValuesOf;
+                          if (typeof fn === "function") zones = fn("timeZone");
+                        } catch { /* ignore */ }
+                        if (zones.length === 0) {
+                          zones = ["UTC", "America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles", "Europe/London", "Europe/Berlin", "Asia/Karachi", "Asia/Kolkata", "Asia/Tokyo", "Australia/Sydney"];
+                        }
+                        return zones.map((z) => <option key={z} value={z}>{z}</option>);
+                      })()}
+                    </select>
+                  </PrefRow>
+                  <PrefRow label="Local time now">
+                    <span className="text-sm text-white/55 tabular-nums">
+                      {new Date().toLocaleString("en-US", {
+                        timeZone: resolveTimezone(prefs),
+                        hour: "2-digit", minute: "2-digit", hour12: false,
+                        weekday: "short", month: "short", day: "numeric",
+                      })}
+                    </span>
+                  </PrefRow>
+                </Card>
+              </div>
+
+              <div>
                 <SectionTitle tooltip="Steps to get the Chrome extension working correctly with your account.">Extension setup</SectionTitle>
                 <Card>
                   <div className="py-3 space-y-3">
@@ -916,6 +954,30 @@ export default function SettingsPage() {
                       value={prefs.idleTimeoutMinutes}
                       format={(v) => `${v as number}m`}
                       onChange={(v) => updatePrefs({ idleTimeoutMinutes: v as number })}
+                    />
+                  </PrefRow>
+                </Card>
+              </div>
+
+              <div>
+                <SectionTitle tooltip="Desktop notifications from the Klokrs Chrome extension. Browser must allow notifications for klokrs.com / the extension.">Notifications</SectionTitle>
+                <Card>
+                  <PrefRow
+                    label="Day started"
+                    hint={`Notify me when my work day begins (${String(prefs.workStartHour).padStart(2, "0")}:00)`}
+                  >
+                    <Toggle
+                      checked={prefs.notifications.dayStart}
+                      onChange={(v) => updatePrefs({ notifications: { ...prefs.notifications, dayStart: v } })}
+                    />
+                  </PrefRow>
+                  <PrefRow
+                    label="Day complete"
+                    hint={`Notify me with today's recap when my work day ends (${String(prefs.workEndHour).padStart(2, "0")}:00)`}
+                  >
+                    <Toggle
+                      checked={prefs.notifications.dayComplete}
+                      onChange={(v) => updatePrefs({ notifications: { ...prefs.notifications, dayComplete: v } })}
                     />
                   </PrefRow>
                 </Card>
