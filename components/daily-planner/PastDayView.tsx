@@ -1,6 +1,6 @@
 "use client";
 
-import type { DailyPlannerV4, DayData, PlannerTask } from "@/lib/daily-planner/types";
+import type { DailyPlannerV5, DayData, PlannerTask } from "@/lib/daily-planner/types";
 import { dayKey } from "@/lib/daily-planner/date";
 import { TimelineView } from "./TimelineView";
 
@@ -43,7 +43,7 @@ function ReadOnlyTask({ task }: { task: PlannerTask }) {
 }
 
 type Props = {
-  state: DailyPlannerV4;
+  state: DailyPlannerV5;
   forDate: Date;
 };
 

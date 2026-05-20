@@ -4,6 +4,20 @@ export type PlannerGroup = {
   order: number;
 };
 
+/**
+ * Time range (minutes since local midnight) credited to a task via the red-block
+ * "Background activity" modal. Stored on the task, separate from its scheduled
+ * window, so the schedule stays honest while reports reflect reality.
+ */
+export type ManualAttribution = {
+  fromMinutes: number;
+  toMinutes: number;
+  /** Minutes counted toward this task (sum of overlapping tab session durations). */
+  addedMinutes: number;
+  /** ms timestamp of when the attribution was made. */
+  addedAt: number;
+};
+
 export type PlannerTask = {
   id: string;
   groupId: string;
@@ -26,11 +40,41 @@ export type PlannerTask = {
    * Always > startMinutes when both are set.
    */
   endMinutes: number | null;
+  /** Set when on-task % crossed the threshold at end of the task's window. */
+  autoCompleted?: boolean;
+  /** ms timestamp when `done` last flipped true (manual or auto). */
+  completedAt?: number;
+  /** Red-block assignments — see ManualAttribution. */
+  manualAttributions?: ManualAttribution[];
+  /** ID of the template task this instance was cloned from (A1 lineage). */
+  sourceTemplateTaskId?: string;
+  /** Which template kind this lineage points into. */
+  sourceTemplateKind?: RoutineTemplateKind;
+  /**
+   * Set true when user explicitly skipped a zero-activity scheduled task via the
+   * offline-detection prompt — Phase 5. Distinct from `done` so reports can tell
+   * "completed offline" from "skipped".
+   */
+  skipped?: boolean;
+};
+
+/**
+ * Per-day "idle" time ranges — red blocks the user explicitly dismissed via the
+ * Background-activity modal. Tracked separately so reports can show idle vs
+ * unassigned vs attributed.
+ */
+export type IdleRange = {
+  fromMinutes: number;
+  toMinutes: number;
+  /** ms timestamp the user marked this idle. */
+  markedAt: number;
 };
 
 export type DayData = {
   groups: PlannerGroup[];
   tasks: PlannerTask[];
+  /** Idle ranges for this day, populated via the Background-activity modal. */
+  idleRanges?: IdleRange[];
 };
 
 export type TemplateKey = "weekday" | "saturday" | "sunday";
@@ -113,7 +157,22 @@ export type DailyPlannerV4 = {
   routineTemplates: Record<RoutineTemplateKind, DayData>;
 };
 
-export type DailyPlannerState = DailyPlannerV4;
+/**
+ * v5: extends v4 tasks with auto-completion fields (autoCompleted, completedAt),
+ * red-block manual attributions, template lineage (sourceTemplateTaskId +
+ * sourceTemplateKind), and skipped flag. DayData gains optional idleRanges.
+ * No structural shape changes — migration is purely additive.
+ */
+export type DailyPlannerV5 = {
+  v: 5;
+  recurringRules: RecurringRule[];
+  adHocByDate: Record<string, DayData | undefined>;
+  taskDump: DayData;
+  recurringCompletions: Record<string, boolean>;
+  routineTemplates: Record<RoutineTemplateKind, DayData>;
+};
+
+export type DailyPlannerState = DailyPlannerV5;
 
 export type PlannerTaskRule = {
   taskId: string;

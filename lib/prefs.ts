@@ -13,6 +13,12 @@ export interface KlokrsPrefs {
   notifications: KlokrsNotificationPrefs;
   /** IANA time zone, e.g. "America/New_York". null = auto-detect from browser. */
   timezone: string | null;
+  /** When true, scheduled tasks auto-complete at window end if on-task % >= threshold. */
+  autoCompleteEnabled: boolean;
+  /** % of the scheduled window that must be on tagged domains for auto-completion. Range 50–100. */
+  autoCompleteThreshold: number;
+  /** Minimum unscheduled gap (minutes) that surfaces as a red Background-activity block. */
+  redBlockMinGapMinutes: number;
 }
 
 export const DEFAULT_PREFS: KlokrsPrefs = {
@@ -27,6 +33,9 @@ export const DEFAULT_PREFS: KlokrsPrefs = {
     dayComplete: true,
   },
   timezone: null,
+  autoCompleteEnabled: true,
+  autoCompleteThreshold: 80,
+  redBlockMinGapMinutes: 15,
 };
 
 /** Resolves the user's effective time zone: stored override or browser default. */
