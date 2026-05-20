@@ -960,6 +960,43 @@ export default function SettingsPage() {
               </div>
 
               <div>
+                <SectionTitle tooltip="When a scheduled task's window ends and you spent at least this much of it on the task's tagged domains, the task closes itself. The Daily Planner also surfaces unscheduled stretches of activity as red Background-activity blocks you can assign or dismiss.">Daily Planner</SectionTitle>
+                <Card>
+                  <PrefRow
+                    label="Auto-complete tasks"
+                    hint="When on, scheduled tasks flip to done at the end of their window if you hit the threshold"
+                  >
+                    <Toggle
+                      checked={prefs.autoCompleteEnabled}
+                      onChange={(v) => updatePrefs({ autoCompleteEnabled: v })}
+                    />
+                  </PrefRow>
+                  <PrefRow
+                    label="Completion threshold"
+                    hint="% of the window that must be spent on the task's tagged domains"
+                  >
+                    <ChipSelect
+                      options={[50, 60, 70, 75, 80, 85, 90, 95] as number[]}
+                      value={prefs.autoCompleteThreshold}
+                      format={(v) => `${v as number}%`}
+                      onChange={(v) => updatePrefs({ autoCompleteThreshold: v as number })}
+                    />
+                  </PrefRow>
+                  <PrefRow
+                    label="Background-activity minimum gap"
+                    hint="Unscheduled stretches longer than this surface as red blocks"
+                  >
+                    <ChipSelect
+                      options={[5, 10, 15, 20, 30, 45, 60] as number[]}
+                      value={prefs.redBlockMinGapMinutes}
+                      format={(v) => `${v as number}m`}
+                      onChange={(v) => updatePrefs({ redBlockMinGapMinutes: v as number })}
+                    />
+                  </PrefRow>
+                </Card>
+              </div>
+
+              <div>
                 <SectionTitle tooltip="Desktop notifications from the Klokrs Chrome extension. Browser must allow notifications for klokrs.com / the extension.">Notifications</SectionTitle>
                 <Card>
                   <PrefRow
