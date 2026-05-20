@@ -12,6 +12,8 @@ import type {
 } from "@fullcalendar/core";
 import type { EventResizeDoneArg } from "@fullcalendar/interaction";
 import type { PlannerTask } from "@/lib/daily-planner/types";
+import type { TabSession } from "@/lib/supabase";
+import { computeOnTaskStats, type OnTaskStats } from "@/lib/daily-planner/onTask";
 import {
   SNAP_MINUTES,
   dateToMinutes,
@@ -38,9 +40,14 @@ type Props = {
   onExternalDrop?: (taskId: string, startMinutes: number, endMinutes: number) => void;
   /** Read-only mode for past days. */
   readOnly?: boolean;
+  /** Today's (or `forDate`'s) tab sessions — used to render fill bars per task. */
+  sessions?: TabSession[];
+  /** Auto-completion threshold % — drives the fill-bar color and corner check. */
+  autoCompleteThreshold?: number;
 };
 
 const SNAP_DURATION = `00:${String(SNAP_MINUTES).padStart(2, "0")}:00`;
+const EMPTY_SESSIONS: TabSession[] = [];
 
 export function TimelineView({
   forDate,
@@ -52,7 +59,18 @@ export function TimelineView({
   externalDropContainerRef,
   onExternalDrop,
   readOnly = false,
+  sessions = EMPTY_SESSIONS,
+  autoCompleteThreshold = 80,
 }: Props) {
+  const statsByTaskId = useMemo(() => {
+    const map = new Map<string, OnTaskStats>();
+    for (const t of tasks) {
+      if (t.startMinutes == null || t.endMinutes == null) continue;
+      map.set(t.id, computeOnTaskStats(t, sessions, forDate, autoCompleteThreshold));
+    }
+    return map;
+  }, [tasks, sessions, forDate, autoCompleteThreshold]);
+
   const calendarRef = useRef<FullCalendar | null>(null);
   const dragRef = useRef<Draggable | null>(null);
 
@@ -180,6 +198,17 @@ export function TimelineView({
           const end = arg.event.end ? dateToMinutes(arg.event.end) : start;
           const done = task?.done === true;
           const canToggle = !readOnly && task != null && onToggleDone != null;
+          const stats = task ? statsByTaskId.get(task.id) : undefined;
+          // Fill bar width: cap visual at 100% even if percent exceeds it.
+          const fillWidth = stats ? Math.min(100, Math.max(0, stats.percent)) : 0;
+          const fillClass = stats
+            ? stats.status === "no-activity"
+              ? ""
+              : stats.status === "below"
+              ? "klokrs-event-fill--below"
+              : "klokrs-event-fill--above"
+            : "";
+          const showCheck = stats != null && stats.percent >= 100;
           // The checkbox swallows mouse/pointer events so it doesn't trigger
           // FullCalendar's eventClick (which opens the edit modal) or start a
           // drag on the block. `mouseDownCapture` is the early hook FullCalendar
@@ -225,8 +254,33 @@ export function TimelineView({
                 <div className={`klokrs-event-title ${done ? "klokrs-event-title--done" : ""}`}>
                   {arg.event.title}
                 </div>
+                {showCheck && (
+                  <span
+                    className="klokrs-event-corner-check"
+                    aria-label="Task completed on time"
+                    title={`${Math.round(stats!.percent)}% on tagged domains`}
+                  >
+                    <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden>
+                      <path
+                        d="M2.5 6.5L5 9L9.5 3.5"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </span>
+                )}
               </div>
               <div className="klokrs-event-meta">{formatRange(start, end)}</div>
+              {stats && stats.totalWindowMinutes > 0 && (
+                <div className="klokrs-event-fill-track" aria-hidden>
+                  <div
+                    className={`klokrs-event-fill ${fillClass}`}
+                    style={{ width: `${fillWidth}%` }}
+                  />
+                </div>
+              )}
             </div>
           );
         }}

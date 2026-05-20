@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
@@ -13,9 +13,11 @@ import { UnscheduledRail } from "./UnscheduledRail";
 import { TimelineTaskModal, type TimelineTaskDraft } from "./TimelineTaskModal";
 import { ExtensionPlannerSync } from "@/components/ExtensionPlannerSync";
 import { useDailyPlannerState } from "@/lib/daily-planner/useDailyPlannerState";
+import { useTodaySessions } from "@/lib/daily-planner/useTodaySessions";
 import { createEmptyDayData, dayKey } from "@/lib/daily-planner/storage";
 import { suggestedRoutineTemplateKind } from "@/lib/daily-planner/date";
 import { normalizeRange } from "@/lib/daily-planner/timeline";
+import { DEFAULT_PREFS, loadPrefs, type KlokrsPrefs } from "@/lib/prefs";
 import type {
   DayData,
   PlannerTask,
@@ -122,6 +124,13 @@ export function DailyPlannerApp({ accountCreatedAt = null }: DailyPlannerAppProp
 
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("today");
   const [viewDate, setViewDate] = useState<Date>(() => new Date());
+  const [prefs, setPrefs] = useState<KlokrsPrefs>(DEFAULT_PREFS);
+  useEffect(() => {
+    setPrefs(loadPrefs());
+  }, []);
+  // Fetch sessions for whatever day is being viewed (today → realtime + 30s poll;
+  // past days → one-shot fetch). Used to render fill bars on each task block.
+  const { sessions } = useTodaySessions(viewDate);
   const [confirmTemplate, setConfirmTemplate] = useState<RoutineTemplateKind | null>(null);
   const [confirmDuplicateRule, setConfirmDuplicateRule] = useState<RecurringRule | null>(null);
   const [modal, setModal] = useState<
@@ -399,7 +408,12 @@ export function DailyPlannerApp({ accountCreatedAt = null }: DailyPlannerAppProp
                     exit={{ opacity: 0, y: -4 }}
                     transition={{ duration: 0.15 }}
                   >
-                    <PastDayView state={state} forDate={viewDate} />
+                    <PastDayView
+                      state={state}
+                      forDate={viewDate}
+                      sessions={sessions}
+                      autoCompleteThreshold={prefs.autoCompleteThreshold}
+                    />
                   </motion.div>
                 </AnimatePresence>
               ) : (
@@ -459,6 +473,8 @@ export function DailyPlannerApp({ accountCreatedAt = null }: DailyPlannerAppProp
                         onToggleDone={toggleTaskDone}
                         externalDropContainerRef={unscheduledRailRef}
                         onExternalDrop={upsertTaskTime}
+                        sessions={sessions}
+                        autoCompleteThreshold={prefs.autoCompleteThreshold}
                       />
                       <UnscheduledRail
                         ref={unscheduledRailRef}
