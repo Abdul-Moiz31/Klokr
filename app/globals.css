@@ -168,6 +168,39 @@ html {
   gap: 6px;
   align-items: center;
 }
+.klokrs-timeline .klokrs-event-fill-track {
+  margin-top: auto;
+  height: 3px;
+  width: 100%;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+.klokrs-timeline .klokrs-event-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 350ms ease-out, background-color 350ms ease-out;
+  background: rgba(167, 139, 250, 0.45);
+}
+.klokrs-timeline .klokrs-event-fill--below {
+  background: rgba(167, 139, 250, 0.45);
+}
+.klokrs-timeline .klokrs-event-fill--above {
+  background: rgba(167, 139, 250, 0.95);
+  box-shadow: 0 0 8px rgba(167, 139, 250, 0.35);
+}
+.klokrs-timeline .klokrs-event-corner-check {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: rgba(167, 139, 250, 0.25);
+  color: rgb(237, 233, 254);
+  margin-left: 4px;
+}
 .klokrs-timeline .fc-highlight {
   background: rgba(167, 139, 250, 0.12);
 }
