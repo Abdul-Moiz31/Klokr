@@ -346,6 +346,29 @@ export function DailyPlannerApp({ accountCreatedAt = null }: DailyPlannerAppProp
     );
   };
 
+  // Phase 5 — offline-detection prompt handlers. "Mark complete" stamps a
+  // manual completion (no autoCompleted flag — this was offline work, not
+  // tracked). "Skipped" sets the skipped flag so auto-completion ignores it
+  // forever and reports can distinguish skipped vs completed.
+  const markOfflineComplete = (taskId: string) => {
+    setTodayTasks((tasks) =>
+      tasks.map((t) =>
+        t.id === taskId
+          ? { ...t, done: true, completedAt: Date.now() }
+          : t
+      )
+    );
+    toast.success("Marked complete");
+  };
+  const markSkipped = (taskId: string) => {
+    setTodayTasks((tasks) =>
+      tasks.map((t) =>
+        t.id === taskId ? { ...t, skipped: true } : t
+      )
+    );
+    toast.success("Marked skipped");
+  };
+
   // Phase 3 — Background-activity modal handlers.
   // "Assign to task" pushes a ManualAttribution onto the chosen task. The task
   // window stays put; the on-task % calc reads manualAttributions and credits
@@ -629,6 +652,9 @@ export function DailyPlannerApp({ accountCreatedAt = null }: DailyPlannerAppProp
                         unscheduledGaps={unscheduledGaps}
                         idleRanges={todayIdleRanges}
                         onGapClick={setGapModal}
+                        nowMinutes={isViewingToday ? localMinutesNow() : null}
+                        onMarkOfflineComplete={markOfflineComplete}
+                        onMarkSkipped={markSkipped}
                       />
                       <UnscheduledRail
                         ref={unscheduledRailRef}

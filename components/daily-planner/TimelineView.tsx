@@ -54,6 +54,16 @@ type Props = {
   idleRanges?: IdleRange[];
   /** Click handler for red unscheduled-gap blocks. */
   onGapClick?: (gap: UnscheduledGap) => void;
+  /**
+   * Local time in minutes since midnight — used to decide whether a task's
+   * window is in the past for the offline-prompt and other end-of-window UI.
+   * Pass null to disable any "past-window" treatment (e.g. on past days).
+   */
+  nowMinutes?: number | null;
+  /** Phase 5 — confirm an offline-only completion of a zero-activity task. */
+  onMarkOfflineComplete?: (taskId: string) => void;
+  /** Phase 5 — mark a zero-activity task as skipped. */
+  onMarkSkipped?: (taskId: string) => void;
 };
 
 const SNAP_DURATION = `00:${String(SNAP_MINUTES).padStart(2, "0")}:00`;
@@ -92,6 +102,9 @@ export function TimelineView({
   unscheduledGaps = EMPTY_GAPS,
   idleRanges = EMPTY_IDLE,
   onGapClick,
+  nowMinutes = null,
+  onMarkOfflineComplete,
+  onMarkSkipped,
 }: Props) {
   const statsByTaskId = useMemo(() => {
     const map = new Map<string, OnTaskStats>();
@@ -294,6 +307,27 @@ export function TimelineView({
               : "klokrs-event-fill--above"
             : "";
           const showCheck = stats != null && stats.percent >= 100;
+          // Offline prompt: window in the past, zero tracked activity, no manual
+          // attributions, and not already done/skipped. Only on today (caller
+          // controls this via the nowMinutes prop).
+          const windowEndedInPast =
+            task != null &&
+            task.endMinutes != null &&
+            nowMinutes != null &&
+            (task.endMinutes as number) <= nowMinutes;
+          const noActivityInWindow =
+            stats != null &&
+            stats.onTaskMinutes === 0 &&
+            (!task?.manualAttributions || task.manualAttributions.length === 0);
+          const showOfflinePrompt =
+            !readOnly &&
+            task != null &&
+            !task.done &&
+            !task.skipped &&
+            windowEndedInPast &&
+            noActivityInWindow &&
+            onMarkOfflineComplete != null &&
+            onMarkSkipped != null;
           // The checkbox swallows mouse/pointer events so it doesn't trigger
           // FullCalendar's eventClick (which opens the edit modal) or start a
           // drag on the block. `mouseDownCapture` is the early hook FullCalendar
@@ -358,6 +392,35 @@ export function TimelineView({
                 )}
               </div>
               <div className="klokrs-event-meta">{formatRange(start, end)}</div>
+              {showOfflinePrompt && task && (
+                <div className="klokrs-event-offline">
+                  <span className="klokrs-event-offline-text">Done offline?</span>
+                  <button
+                    type="button"
+                    className="klokrs-event-offline-btn klokrs-event-offline-btn--yes"
+                    onMouseDownCapture={(e) => e.stopPropagation()}
+                    onPointerDownCapture={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onMarkOfflineComplete!(task.id);
+                    }}
+                  >
+                    Done
+                  </button>
+                  <button
+                    type="button"
+                    className="klokrs-event-offline-btn"
+                    onMouseDownCapture={(e) => e.stopPropagation()}
+                    onPointerDownCapture={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onMarkSkipped!(task.id);
+                    }}
+                  >
+                    Skip
+                  </button>
+                </div>
+              )}
               {stats && stats.totalWindowMinutes > 0 && (
                 <div className="klokrs-event-fill-track" aria-hidden>
                   <div

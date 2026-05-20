@@ -217,6 +217,40 @@ html {
 .klokrs-timeline .klokrs-event-body--gap .klokrs-event-meta {
   color: rgba(254, 226, 226, 0.7);
 }
+/* Offline-detection prompt — Phase 5, inline on zero-activity past tasks. */
+.klokrs-timeline .klokrs-event-offline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+.klokrs-timeline .klokrs-event-offline-text {
+  font-size: 11px;
+  color: rgba(252, 211, 77, 0.85);
+}
+.klokrs-timeline .klokrs-event-offline-btn {
+  font-size: 11px;
+  line-height: 1;
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(237, 233, 254, 0.85);
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+.klokrs-timeline .klokrs-event-offline-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgb(237, 233, 254);
+}
+.klokrs-timeline .klokrs-event-offline-btn--yes {
+  border-color: rgba(167, 139, 250, 0.45);
+  color: rgba(196, 181, 253, 0.95);
+}
+.klokrs-timeline .klokrs-event-offline-btn--yes:hover {
+  background: rgba(167, 139, 250, 0.15);
+}
 /* Idle block — muted gray, non-interactive. */
 .klokrs-timeline .fc-event.klokrs-event--idle {
   background: rgba(148, 163, 184, 0.12);
