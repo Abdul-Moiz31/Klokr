@@ -14,10 +14,12 @@ import { TimelineTaskModal, type TimelineTaskDraft } from "./TimelineTaskModal";
 import { ExtensionPlannerSync } from "@/components/ExtensionPlannerSync";
 import { useDailyPlannerState } from "@/lib/daily-planner/useDailyPlannerState";
 import { useTodaySessions } from "@/lib/daily-planner/useTodaySessions";
+import { findUnscheduledGaps, type UnscheduledGap } from "@/lib/daily-planner/onTask";
 import { createEmptyDayData, dayKey } from "@/lib/daily-planner/storage";
 import { suggestedRoutineTemplateKind } from "@/lib/daily-planner/date";
 import { normalizeRange } from "@/lib/daily-planner/timeline";
 import { DEFAULT_PREFS, loadPrefs, type KlokrsPrefs } from "@/lib/prefs";
+import { BackgroundActivityModal } from "./BackgroundActivityModal";
 import type {
   DayData,
   PlannerTask,
@@ -138,6 +140,7 @@ export function DailyPlannerApp({ accountCreatedAt = null }: DailyPlannerAppProp
     | { mode: "edit"; taskId: string }
     | null
   >(null);
+  const [gapModal, setGapModal] = useState<UnscheduledGap | null>(null);
   const unscheduledRailRef = useRef<HTMLDivElement | null>(null);
 
   const todayK = getTodayKey();
@@ -165,6 +168,22 @@ export function DailyPlannerApp({ accountCreatedAt = null }: DailyPlannerAppProp
     () => todayAdHoc.tasks.filter((t) => t.startMinutes == null),
     [todayAdHoc]
   );
+  const todayIdleRanges = todayAdHoc.idleRanges ?? [];
+  const unscheduledGaps = useMemo(() => {
+    const raw = findUnscheduledGaps(
+      scheduledTasks,
+      sessions,
+      viewDate,
+      prefs.redBlockMinGapMinutes
+    );
+    if (todayIdleRanges.length === 0) return raw;
+    // Hide any gap fully covered by an idle range the user already marked.
+    return raw.filter((g) => {
+      return !todayIdleRanges.some(
+        (r) => r.fromMinutes <= g.fromMinutes && r.toMinutes >= g.toMinutes
+      );
+    });
+  }, [scheduledTasks, sessions, viewDate, prefs.redBlockMinGapMinutes, todayIdleRanges]);
 
   const rules = getTrackingRules();
   const suggestedKind = suggestedRoutineTemplateKind(now);
@@ -251,6 +270,64 @@ export function DailyPlannerApp({ accountCreatedAt = null }: DailyPlannerAppProp
     setTodayTasks((tasks) =>
       tasks.map((t) => (t.id === taskId ? { ...t, done: !t.done } : t))
     );
+  };
+
+  // Phase 3 — Background-activity modal handlers.
+  // "Assign to task" pushes a ManualAttribution onto the chosen task. The task
+  // window stays put; the on-task % calc reads manualAttributions and credits
+  // the gap's domain minutes (not the wall-clock gap length, so noise doesn't
+  // inflate the bar).
+  const assignGapToTask = (gap: UnscheduledGap, taskId: string) => {
+    const now = Date.now();
+    setTodayTasks((tasks) =>
+      tasks.map((t) => {
+        if (t.id !== taskId) return t;
+        const prev = t.manualAttributions ?? [];
+        return {
+          ...t,
+          manualAttributions: [
+            ...prev,
+            {
+              fromMinutes: gap.fromMinutes,
+              toMinutes: gap.toMinutes,
+              addedMinutes: Math.round(gap.activityMinutes),
+              addedAt: now,
+            },
+          ],
+        };
+      })
+    );
+    setGapModal(null);
+    toast.success("Background activity assigned");
+  };
+
+  // "Skip → mark as idle" appends the gap range to today's idleRanges. The
+  // gap disappears from red blocks because findUnscheduledGaps doesn't see the
+  // range as a gap anymore once we also pretend it's owned (we filter gaps
+  // overlapping idle ranges below — see DailyPlannerApp render).
+  const markGapIdle = (gap: UnscheduledGap) => {
+    const now = Date.now();
+    const prev = todayAdHoc.idleRanges ?? [];
+    setTodayAdHoc({
+      ...todayAdHoc,
+      idleRanges: [
+        ...prev,
+        { fromMinutes: gap.fromMinutes, toMinutes: gap.toMinutes, markedAt: now },
+      ],
+    });
+    setGapModal(null);
+    toast.success("Marked as idle");
+  };
+
+  // "Copy as task" opens the create-task modal pre-filled with the gap's
+  // range, falling back to a sensible default title if no top domain is
+  // available.
+  const copyGapAsTask = (gap: UnscheduledGap) => {
+    setGapModal(null);
+    setModal({
+      mode: "create",
+      initialRange: { start: gap.fromMinutes, end: gap.toMinutes },
+    });
   };
 
   const quickCreateUnscheduled = (title: string) => {
@@ -475,6 +552,9 @@ export function DailyPlannerApp({ accountCreatedAt = null }: DailyPlannerAppProp
                         onExternalDrop={upsertTaskTime}
                         sessions={sessions}
                         autoCompleteThreshold={prefs.autoCompleteThreshold}
+                        unscheduledGaps={unscheduledGaps}
+                        idleRanges={todayIdleRanges}
+                        onGapClick={setGapModal}
                       />
                       <UnscheduledRail
                         ref={unscheduledRailRef}
@@ -578,6 +658,18 @@ export function DailyPlannerApp({ accountCreatedAt = null }: DailyPlannerAppProp
             </div>
           </motion.div>
         </div>
+      )}
+
+      {/* Background-activity modal — Phase 3 */}
+      {gapModal && (
+        <BackgroundActivityModal
+          gap={gapModal}
+          scheduledTasks={scheduledTasks}
+          onAssignToTask={(taskId) => assignGapToTask(gapModal, taskId)}
+          onMarkIdle={() => markGapIdle(gapModal)}
+          onCopyAsTask={() => copyGapAsTask(gapModal)}
+          onClose={() => setGapModal(null)}
+        />
       )}
 
       {/* Timeline task modal (create / edit) */}
