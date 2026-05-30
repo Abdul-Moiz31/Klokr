@@ -14,6 +14,7 @@ import { DomainDrilldownModal } from "@/components/reports/DomainDrilldownModal"
 import { Loader } from "@/components/ui/Loader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { WorkDayCompleteBanner } from "@/components/dashboard/WorkDayCompleteBanner";
+import { StreakStrip } from "@/components/dashboard/StreakStrip";
 import { getSiteName } from "@/lib/domain";
 import type { TabSession } from "@/lib/supabase";
 
@@ -206,6 +207,8 @@ export default function DashboardPage() {
           </>
         }
       />
+
+            <StreakStrip userId={userId} />
 
             <WorkDayCompleteBanner totalSecondsToday={totalSeconds} />
 

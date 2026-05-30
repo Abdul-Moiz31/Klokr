@@ -14,8 +14,6 @@ Desktop.ini
 *~
 
 # ─── Environment variables / secrets ─────────────────────────────
-.env
-.env.*
 *.env
 # Allow example/template env files
 !*.env.example
