@@ -12,8 +12,8 @@ async function verifyAdmin() {
 export async function POST(req: NextRequest) {
   if (!(await verifyAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { tier, name, description } = await req.json() as {
-    tier: string; name: string; description?: string;
+  const { tier, name, description, feature_key } = await req.json() as {
+    tier: string; name: string; description?: string; feature_key?: string;
   };
 
   if (!tier || !name?.trim()) {
@@ -23,7 +23,13 @@ export async function POST(req: NextRequest) {
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("feature_flags")
-    .insert({ tier, name: name.trim(), description: description?.trim() ?? "" })
+    .insert({
+      tier,
+      name: name.trim(),
+      description: description?.trim() ?? "",
+      // Optional machine key used for in-product gating. Blank → display-only.
+      feature_key: feature_key?.trim() || null,
+    })
     .select()
     .single();
 

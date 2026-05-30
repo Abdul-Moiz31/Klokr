@@ -47,6 +47,7 @@ function AddFeatureModal({
   const router = useRouter();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [featureKey, setFeatureKey] = useState("");
   const [error, setError] = useState("");
   const [pending, start] = useTransition();
 
@@ -57,7 +58,7 @@ function AddFeatureModal({
       const res = await fetch("/api/admin/features", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tier, name, description }),
+        body: JSON.stringify({ tier, name, description, feature_key: featureKey }),
       });
       if (!res.ok) {
         const { error: msg } = await res.json() as { error: string };
@@ -97,6 +98,20 @@ function AddFeatureModal({
               placeholder="Short description of the feature"
               className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-white/20 outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30"
             />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-white/50">
+              Feature key <span className="text-white/25">(optional — enables gating)</span>
+            </label>
+            <input
+              value={featureKey}
+              onChange={(e) => setFeatureKey(e.target.value)}
+              placeholder="e.g. ai_ask, export_pdf"
+              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 font-mono text-sm text-white placeholder-white/20 outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30"
+            />
+            <p className="mt-1.5 text-[11px] leading-relaxed text-white/30">
+              Code checks this key to grant access. Leave blank for a pricing-page-only feature.
+            </p>
           </div>
         </div>
 
@@ -157,7 +172,12 @@ function FeatureRow({ flag }: { flag: FeatureFlag }) {
   return (
     <div className={`flex items-start justify-between gap-4 rounded-xl border px-4 py-3 transition-all ${enabled ? "border-white/[0.06] bg-white/[0.02]" : "border-white/[0.03] bg-white/[0.01] opacity-50"}`}>
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-white/80">{flag.name}</p>
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-medium text-white/80">{flag.name}</p>
+          {flag.feature_key && (
+            <span className="rounded bg-cyan-500/10 px-1.5 py-0.5 font-mono text-[10px] text-cyan-400/80">{flag.feature_key}</span>
+          )}
+        </div>
         {flag.description && <p className="mt-0.5 text-xs text-white/35">{flag.description}</p>}
       </div>
       <div className="flex shrink-0 items-center gap-2">
