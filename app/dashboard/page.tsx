@@ -14,6 +14,7 @@ import { DomainDrilldownModal } from "@/components/reports/DomainDrilldownModal"
 import { Loader } from "@/components/ui/Loader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { WorkDayCompleteBanner } from "@/components/dashboard/WorkDayCompleteBanner";
+import { FocusScoreCard } from "@/components/dashboard/FocusScoreCard";
 import { getSiteName } from "@/lib/domain";
 import type { TabSession } from "@/lib/supabase";
 
@@ -208,6 +209,11 @@ export default function DashboardPage() {
       />
 
             <WorkDayCompleteBanner totalSecondsToday={totalSeconds} />
+
+            <FocusScoreCard
+              domains={domainStats.map((d) => ({ domain: d.domain, totalSeconds: d.totalSeconds }))}
+              goalHours={loadPrefs().productiveHoursThreshold}
+            />
 
             {/* Fetch error banner */}
             {fetchError && (
