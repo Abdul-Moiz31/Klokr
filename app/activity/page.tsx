@@ -10,15 +10,7 @@ import { ActivityHeatmap, type DayStat } from "@/components/activity/ActivityHea
 import { DayReportModal } from "@/components/activity/DayReportModal";
 import { loadPrefs } from "@/lib/prefs";
 import { Loader } from "@/components/ui/Loader";
-import type { User } from "@supabase/supabase-js";
-
-function localDateStr(d: Date): string {
-  return [
-    d.getFullYear(),
-    String(d.getMonth() + 1).padStart(2, "0"),
-    String(d.getDate()).padStart(2, "0"),
-  ].join("-");
-}
+import { calcStreak, localDateStr } from "@/lib/streak";
 
 function formatTime(s: number): string {
   if (s < 60) return `${s}s`;
@@ -26,27 +18,6 @@ function formatTime(s: number): string {
   const m = Math.floor((s % 3600) / 60);
   if (h > 0) return `${h}h ${m}m`;
   return `${m}m`;
-}
-
-// Counts consecutive days with any tracked time.
-// If today has no data yet (day just started), checks from yesterday so the
-// streak doesn't reset at midnight before you've had a chance to browse.
-function calcStreak(dailyMap: Map<string, number>, todayStr: string): number {
-  let streak = 0;
-  const cursor = new Date(todayStr + "T00:00:00");
-  if ((dailyMap.get(todayStr) ?? 0) === 0) {
-    cursor.setDate(cursor.getDate() - 1);
-  }
-  while (true) {
-    const key = localDateStr(cursor);
-    if ((dailyMap.get(key) ?? 0) > 0) {
-      streak++;
-      cursor.setDate(cursor.getDate() - 1);
-    } else {
-      break;
-    }
-  }
-  return streak;
 }
 
 export default function ActivityPage() {
