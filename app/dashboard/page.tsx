@@ -14,6 +14,7 @@ import { DomainDrilldownModal } from "@/components/reports/DomainDrilldownModal"
 import { Loader } from "@/components/ui/Loader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { WorkDayCompleteBanner } from "@/components/dashboard/WorkDayCompleteBanner";
+import { AskYourTime } from "@/components/dashboard/AskYourTime";
 import { getSiteName } from "@/lib/domain";
 import type { TabSession } from "@/lib/supabase";
 
@@ -208,6 +209,8 @@ export default function DashboardPage() {
       />
 
             <WorkDayCompleteBanner totalSecondsToday={totalSeconds} />
+
+            <AskYourTime />
 
             {/* Fetch error banner */}
             {fetchError && (
