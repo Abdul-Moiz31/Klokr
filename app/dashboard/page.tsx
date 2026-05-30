@@ -12,8 +12,8 @@ import { DomainChart } from "@/components/dashboard/DomainChart";
 import { DomainTable } from "@/components/dashboard/DomainTable";
 import { DomainDrilldownModal } from "@/components/reports/DomainDrilldownModal";
 import { Loader } from "@/components/ui/Loader";
-import { EmptyState } from "@/components/ui/EmptyState";
 import { WorkDayCompleteBanner } from "@/components/dashboard/WorkDayCompleteBanner";
+import { ActivationChecklist } from "@/components/dashboard/ActivationChecklist";
 import { getSiteName } from "@/lib/domain";
 import type { TabSession } from "@/lib/supabase";
 
@@ -318,27 +318,7 @@ export default function DashboardPage() {
             </div>
 
             {sessions.length === 0 ? (
-              <EmptyState
-                icon="⏱️"
-                title="No data yet for today"
-                description="Keep the Klokrs extension enabled and use Chrome as usual. Time per domain will show up here as sessions sync—usually within a few seconds of browsing."
-                action={
-                  <div className="flex flex-col items-center justify-center gap-3 sm:flex-row sm:gap-4">
-                    <Link
-                      href="/daily-planner"
-                      className="inline-flex min-w-[10rem] items-center justify-center rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-500"
-                    >
-                      Open daily planner
-                    </Link>
-                    <Link
-                      href="/pomodoro"
-                      className="inline-flex min-w-[10rem] items-center justify-center rounded-xl border border-white/15 bg-white/5 px-5 py-2.5 text-sm font-medium text-white/85 transition hover:border-white/25 hover:bg-white/10"
-                    >
-                      Pomodoro
-                    </Link>
-                  </div>
-                }
-              />
+              <ActivationChecklist />
             ) : (
               <div className="space-y-6 lg:space-y-8">
                 <DomainChart data={domainStats} totalSeconds={totalSeconds} />
