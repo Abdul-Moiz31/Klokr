@@ -26,7 +26,6 @@ import { ReportsDomainTable } from "@/components/reports/ReportsDomainTable";
 import { DomainDrilldownModal } from "@/components/reports/DomainDrilldownModal";
 import { getSiteName } from "@/lib/domain";
 import { loadPrefs } from "@/lib/prefs";
-import type { User } from "@supabase/supabase-js";
 
 // ─── Types ────────────────────────────────────────────────────────
 
