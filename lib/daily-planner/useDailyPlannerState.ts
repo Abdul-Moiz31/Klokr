@@ -167,6 +167,25 @@ export function useDailyPlannerState() {
     [setAdHocForDate]
   );
 
+  /**
+   * Functional variant of setTodayAdHoc — receives the latest committed day
+   * data and returns the new value. Use this whenever two writes can race
+   * (intervals, async handlers, anything where the captured state could be
+   * stale). The non-functional setTodayAdHoc is fine for direct user actions
+   * that fire one at a time.
+   */
+  const patchTodayAdHoc = useCallback(
+    (mutate: (cur: DayData) => DayData) => {
+      const k = dayKey(new Date());
+      update((s) => {
+        const cur = s.adHocByDate[k] ?? createEmptyDayData();
+        s.adHocByDate[k] = mutate(cur);
+        return s;
+      });
+    },
+    [update]
+  );
+
   const setTaskDump = useCallback(
     (data: DayData) => {
       update((s) => {
@@ -415,6 +434,7 @@ export function useDailyPlannerState() {
     patchState: update,
     getTodayKey,
     setTodayAdHoc,
+    patchTodayAdHoc,
     setAdHocForDate,
     setTaskDump,
     clearAdHocForToday,
