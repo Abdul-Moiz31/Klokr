@@ -10,7 +10,6 @@ import { ActivityHeatmap, type DayStat } from "@/components/activity/ActivityHea
 import { DayReportModal } from "@/components/activity/DayReportModal";
 import { loadPrefs } from "@/lib/prefs";
 import { Loader } from "@/components/ui/Loader";
-import type { User } from "@supabase/supabase-js";
 
 function localDateStr(d: Date): string {
   return [
@@ -55,7 +54,6 @@ export default function ActivityPage() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<DayStat[]>([]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [selectedSeconds, setSelectedSeconds] = useState(0);
   const userIdRef = useRef<string | null>(null);
 
   const prefs = useMemo(() => loadPrefs(), []);
@@ -133,9 +131,8 @@ export default function ActivityPage() {
     return stats.reduce((best, cur) => cur.totalSeconds > best.totalSeconds ? cur : best);
   }, [stats]);
 
-  const handleDayClick = useCallback((date: string, seconds: number) => {
+  const handleDayClick = useCallback((date: string) => {
     setSelectedDate(date);
-    setSelectedSeconds(seconds);
   }, []);
 
   if (loading) {

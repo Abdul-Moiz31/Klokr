@@ -114,7 +114,6 @@ export function DailyPlannerApp({ accountCreatedAt = null }: DailyPlannerAppProp
     hydrated,
     getTodayKey,
     patchTodayAdHoc,
-    setTaskDump,
     clearAdHocForToday,
     addRecurringRule,
     replaceRecurringRule,
