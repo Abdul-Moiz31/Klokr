@@ -20,7 +20,10 @@ export default function DailyPlannerPage() {
   return (
     <AppShell title="Daily planner">
       <PageHeader eyebrow="Plan" title="Daily planner" />
-      <DailyPlannerApp accountCreatedAt={session.user.created_at ?? null} />
+      <DailyPlannerApp
+        accountCreatedAt={session.user.created_at ?? null}
+        userId={session.user.id ?? null}
+      />
     </AppShell>
   );
 }
