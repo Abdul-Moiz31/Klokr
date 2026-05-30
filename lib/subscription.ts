@@ -26,11 +26,24 @@ export async function getUserSubscription(
 ): Promise<Subscription> {
   const { data, error } = await supabase
     .from("subscriptions")
-    .select("plan, status, current_period_end, stripe_customer_id")
+    .select("plan, manual_plan, status, current_period_end, stripe_customer_id")
     .eq("user_id", userId)
     .maybeSingle();
 
   if (error || !data) return FREE;
+
+  // A manual admin grant wins over Stripe and is treated as paid (comps / team /
+  // support). It's never billed, and Stripe webhooks don't clear it.
+  const manualPlan = (data.manual_plan as PlanTier | null) ?? null;
+  if (manualPlan && manualPlan !== "free") {
+    return {
+      plan: manualPlan,
+      status: "manual",
+      currentPeriodEnd: null,
+      stripeCustomerId: (data.stripe_customer_id as string | null) ?? null,
+      isPaid: true,
+    };
+  }
 
   const status = (data.status as string | null) ?? null;
   // Downgrade to free if the plan is set but the subscription is no longer paid
