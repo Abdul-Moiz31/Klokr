@@ -14,7 +14,11 @@ import { TimelineTaskModal, type TimelineTaskDraft } from "./TimelineTaskModal";
 import { ExtensionPlannerSync } from "@/components/ExtensionPlannerSync";
 import { useDailyPlannerState } from "@/lib/daily-planner/useDailyPlannerState";
 import { useTodaySessions } from "@/lib/daily-planner/useTodaySessions";
-import { findUnscheduledGaps, type UnscheduledGap } from "@/lib/daily-planner/onTask";
+import {
+  findUnscheduledGaps,
+  mergeIdleRanges,
+  type UnscheduledGap,
+} from "@/lib/daily-planner/onTask";
 import { localMinutesNow, pickAutoCompletions } from "@/lib/daily-planner/autoComplete";
 import { createEmptyDayData, dayKey } from "@/lib/daily-planner/storage";
 import { suggestedRoutineTemplateKind } from "@/lib/daily-planner/date";
@@ -109,7 +113,7 @@ export function DailyPlannerApp({ accountCreatedAt = null }: DailyPlannerAppProp
     state,
     hydrated,
     getTodayKey,
-    setTodayAdHoc,
+    patchTodayAdHoc,
     setTaskDump,
     clearAdHocForToday,
     addRecurringRule,
@@ -243,21 +247,22 @@ export function DailyPlannerApp({ accountCreatedAt = null }: DailyPlannerAppProp
     autoCompleteTick,
   ]);
 
-  const unscheduledGaps = useMemo(() => {
-    const raw = findUnscheduledGaps(
-      scheduledTasks,
-      sessions,
-      viewDate,
-      prefs.redBlockMinGapMinutes
-    );
-    if (todayIdleRanges.length === 0) return raw;
-    // Hide any gap fully covered by an idle range the user already marked.
-    return raw.filter((g) => {
-      return !todayIdleRanges.some(
-        (r) => r.fromMinutes <= g.fromMinutes && r.toMinutes >= g.toMinutes
-      );
-    });
-  }, [scheduledTasks, sessions, viewDate, prefs.redBlockMinGapMinutes, todayIdleRanges]);
+  // Pass idleRanges directly to findUnscheduledGaps so they're treated as
+  // occupied alongside scheduled tasks. This prevents the "Idle block stacks
+  // every minute" bug — once a gap is dismissed, new activity that extends
+  // past the original gap end just produces a separate (smaller) gap, instead
+  // of a new full-size red block that the user would dismiss again.
+  const unscheduledGaps = useMemo(
+    () =>
+      findUnscheduledGaps(
+        scheduledTasks,
+        sessions,
+        viewDate,
+        prefs.redBlockMinGapMinutes,
+        todayIdleRanges
+      ),
+    [scheduledTasks, sessions, viewDate, prefs.redBlockMinGapMinutes, todayIdleRanges]
+  );
 
   const rules = getTrackingRules();
   const suggestedKind = suggestedRoutineTemplateKind(now);
@@ -271,9 +276,11 @@ export function DailyPlannerApp({ accountCreatedAt = null }: DailyPlannerAppProp
     return { data: fresh, groupId: fresh.groups[0]!.id };
   };
 
+  // Always go through patchTodayAdHoc so concurrent writes (e.g. the 60s
+  // auto-complete tick + a user click) merge against the latest committed
+  // state, not the captured render snapshot.
   const setTodayTasks = (mutate: (tasks: PlannerTask[]) => PlannerTask[]) => {
-    const next = mutate(todayAdHoc.tasks);
-    setTodayAdHoc({ ...todayAdHoc, tasks: next });
+    patchTodayAdHoc((cur) => ({ ...cur, tasks: mutate(cur.tasks) }));
   };
 
   const upsertTaskTime = (taskId: string, startMinutes: number, endMinutes: number) => {
@@ -286,22 +293,24 @@ export function DailyPlannerApp({ accountCreatedAt = null }: DailyPlannerAppProp
   };
 
   const createTaskFromModal = (draft: TimelineTaskDraft) => {
-    const { data, groupId } = ensureFirstGroupId(todayAdHoc);
-    const maxOrder = data.tasks
-      .filter((t) => t.groupId === groupId)
-      .reduce((m, t) => Math.max(m, t.order), -1);
-    const newTask: PlannerTask = {
-      id: newIdFn(),
-      groupId,
-      title: draft.title,
-      description: draft.description,
-      done: draft.done,
-      domainTags: draft.domainTags,
-      order: maxOrder + 1,
-      startMinutes: draft.startMinutes,
-      endMinutes: draft.endMinutes,
-    };
-    setTodayAdHoc({ ...data, tasks: [...data.tasks, newTask] });
+    patchTodayAdHoc((cur) => {
+      const { data, groupId } = ensureFirstGroupId(cur);
+      const maxOrder = data.tasks
+        .filter((t) => t.groupId === groupId)
+        .reduce((m, t) => Math.max(m, t.order), -1);
+      const newTask: PlannerTask = {
+        id: newIdFn(),
+        groupId,
+        title: draft.title,
+        description: draft.description,
+        done: draft.done,
+        domainTags: draft.domainTags,
+        order: maxOrder + 1,
+        startMinutes: draft.startMinutes,
+        endMinutes: draft.endMinutes,
+      };
+      return { ...data, tasks: [...data.tasks, newTask] };
+    });
   };
 
   const updateTaskFromModal = (taskId: string, draft: TimelineTaskDraft) => {
@@ -412,20 +421,20 @@ export function DailyPlannerApp({ accountCreatedAt = null }: DailyPlannerAppProp
     toast.success("Background activity assigned");
   };
 
-  // "Skip → mark as idle" appends the gap range to today's idleRanges. The
-  // gap disappears from red blocks because findUnscheduledGaps doesn't see the
-  // range as a gap anymore once we also pretend it's owned (we filter gaps
-  // overlapping idle ranges below — see DailyPlannerApp render).
+  // "Skip → mark as idle" — merges the new range with any existing idle
+  // ranges so repeatedly dismissing the same area doesn't stack entries.
+  // Uses the functional updater (patchTodayAdHoc) so a 60s auto-complete tick
+  // firing in between can't clobber the write with a stale snapshot.
   const markGapIdle = (gap: UnscheduledGap) => {
     const now = Date.now();
-    const prev = todayAdHoc.idleRanges ?? [];
-    setTodayAdHoc({
-      ...todayAdHoc,
-      idleRanges: [
-        ...prev,
-        { fromMinutes: gap.fromMinutes, toMinutes: gap.toMinutes, markedAt: now },
-      ],
-    });
+    patchTodayAdHoc((cur) => ({
+      ...cur,
+      idleRanges: mergeIdleRanges(cur.idleRanges ?? [], {
+        fromMinutes: gap.fromMinutes,
+        toMinutes: gap.toMinutes,
+        markedAt: now,
+      }),
+    }));
     setGapModal(null);
     toast.success("Marked as idle");
   };
@@ -442,22 +451,24 @@ export function DailyPlannerApp({ accountCreatedAt = null }: DailyPlannerAppProp
   };
 
   const quickCreateUnscheduled = (title: string) => {
-    const { data, groupId } = ensureFirstGroupId(todayAdHoc);
-    const maxOrder = data.tasks
-      .filter((t) => t.groupId === groupId)
-      .reduce((m, t) => Math.max(m, t.order), -1);
-    const newTask: PlannerTask = {
-      id: newIdFn(),
-      groupId,
-      title,
-      description: "",
-      done: false,
-      domainTags: [],
-      order: maxOrder + 1,
-      startMinutes: null,
-      endMinutes: null,
-    };
-    setTodayAdHoc({ ...data, tasks: [...data.tasks, newTask] });
+    patchTodayAdHoc((cur) => {
+      const { data, groupId } = ensureFirstGroupId(cur);
+      const maxOrder = data.tasks
+        .filter((t) => t.groupId === groupId)
+        .reduce((m, t) => Math.max(m, t.order), -1);
+      const newTask: PlannerTask = {
+        id: newIdFn(),
+        groupId,
+        title,
+        description: "",
+        done: false,
+        domainTags: [],
+        order: maxOrder + 1,
+        startMinutes: null,
+        endMinutes: null,
+      };
+      return { ...data, tasks: [...data.tasks, newTask] };
+    });
   };
 
   const taskBeingEdited = modal?.mode === "edit"

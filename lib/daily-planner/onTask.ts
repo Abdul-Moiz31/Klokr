@@ -1,5 +1,5 @@
 import type { TabSession } from "@/lib/supabase";
-import type { ManualAttribution, PlannerTask } from "./types";
+import type { IdleRange, ManualAttribution, PlannerTask } from "./types";
 
 /**
  * Pure on-task computation for planner tasks. No React, no IO — these helpers
@@ -120,6 +120,29 @@ export function computeOnTaskStats(
   return { onTaskMinutes, totalWindowMinutes, percent, status };
 }
 
+/**
+ * Insert a new idle range into an existing list, merging any overlapping or
+ * touching ranges. Preserves the earliest `markedAt` for any merged group so
+ * audit history isn't lost. Result is sorted by `fromMinutes`.
+ */
+export function mergeIdleRanges(
+  existing: IdleRange[],
+  added: IdleRange
+): IdleRange[] {
+  const all = [...existing, added].sort((a, b) => a.fromMinutes - b.fromMinutes);
+  const out: IdleRange[] = [];
+  for (const r of all) {
+    const last = out[out.length - 1];
+    if (last && r.fromMinutes <= last.toMinutes) {
+      last.toMinutes = Math.max(last.toMinutes, r.toMinutes);
+      last.markedAt = Math.min(last.markedAt, r.markedAt);
+    } else {
+      out.push({ ...r });
+    }
+  }
+  return out;
+}
+
 export type UnscheduledGap = {
   fromMinutes: number;
   toMinutes: number;
@@ -132,8 +155,13 @@ export type UnscheduledGap = {
 /**
  * Return contiguous unscheduled windows on `dayDate` of at least `minGapMinutes`
  * that contain any tab activity. "Unscheduled" = not covered by any scheduled
- * task in `tasks`. Past day-end is bounded by the latest session end time
+ * task in `tasks` AND not covered by any user-marked idle range in
+ * `idleRanges`. Past day-end is bounded by the latest session end time
  * (capped at 1440); pre day-start is from 0.
+ *
+ * Treating idle ranges as occupied is what stops the red-block from
+ * re-appearing each minute when a session extends past a previously-dismissed
+ * gap — see the "Idle stack" bug in DailyPlannerApp.
  *
  * Used by the Phase 3 red-block renderer.
  */
@@ -141,15 +169,20 @@ export function findUnscheduledGaps(
   tasks: PlannerTask[],
   sessions: TabSession[],
   dayDate: Date,
-  minGapMinutes: number
+  minGapMinutes: number,
+  idleRanges: IdleRange[] = []
 ): UnscheduledGap[] {
   if (minGapMinutes <= 0) return [];
 
-  // Build a sorted list of task occupied ranges.
-  const occupied = tasks
+  // Build a sorted list of occupied ranges — tasks + idle ranges both count.
+  const taskOccupied = tasks
     .filter((t) => t.startMinutes != null && t.endMinutes != null)
-    .map((t) => ({ from: t.startMinutes as number, to: t.endMinutes as number }))
-    .sort((a, b) => a.from - b.from);
+    .map((t) => ({ from: t.startMinutes as number, to: t.endMinutes as number }));
+  const idleOccupied = idleRanges.map((r) => ({
+    from: r.fromMinutes,
+    to: r.toMinutes,
+  }));
+  const occupied = [...taskOccupied, ...idleOccupied].sort((a, b) => a.from - b.from);
 
   // Merge overlapping/touching ranges.
   const merged: { from: number; to: number }[] = [];
