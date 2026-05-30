@@ -9,6 +9,7 @@ import { RecurringRoutinesPanel } from "./RecurringRoutinesPanel";
 import { PastDayView } from "./PastDayView";
 import { RoutineTemplatesEditor } from "./RoutineTemplatesEditor";
 import { TimelineView } from "./TimelineView";
+import { WeekView } from "./WeekView";
 import { UnscheduledRail } from "./UnscheduledRail";
 import { TimelineTaskModal, type TimelineTaskDraft } from "./TimelineTaskModal";
 import { ExtensionPlannerSync } from "@/components/ExtensionPlannerSync";
@@ -38,6 +39,16 @@ const TABS = [
       </svg>
     ),
     tooltip: "Your plan for the day: load a template or edit tasks directly. Use the date arrows to browse past days in journal mode.",
+  },
+  {
+    id: "week",
+    label: "Week",
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="3" y1="10" x2="21" y2="10" /><line x1="9" y1="4" x2="9" y2="22" /><line x1="15" y1="4" x2="15" y2="22" />
+      </svg>
+    ),
+    tooltip: "See your whole week at a glance. Click any day or block to open that day's full editor.",
   },
   {
     id: "routines",
@@ -681,6 +692,24 @@ export function DailyPlannerApp({ accountCreatedAt = null }: DailyPlannerAppProp
                     </div>
                 </>
               )}
+            </div>
+          )}
+
+          {tab === "week" && (
+            <div>
+              <SectionHeader
+                label="This week"
+                tooltip="Every scheduled block across the week. Click a day header, a time slot, or a task to open that day in the editor and make changes."
+              />
+              <WeekView
+                anchorDate={viewDate}
+                adHocByDate={state.adHocByDate}
+                minViewableDay={minViewableDay}
+                onOpenDay={(date) => {
+                  setViewDate(date);
+                  setTab("today");
+                }}
+              />
             </div>
           )}
 
