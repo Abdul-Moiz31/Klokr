@@ -1,6 +1,7 @@
 "use client";
 
-import type { DailyPlannerV4, DayData, PlannerTask } from "@/lib/daily-planner/types";
+import type { DailyPlannerV5, DayData, PlannerTask } from "@/lib/daily-planner/types";
+import type { TabSession } from "@/lib/supabase";
 import { dayKey } from "@/lib/daily-planner/date";
 import { TimelineView } from "./TimelineView";
 
@@ -43,11 +44,13 @@ function ReadOnlyTask({ task }: { task: PlannerTask }) {
 }
 
 type Props = {
-  state: DailyPlannerV4;
+  state: DailyPlannerV5;
   forDate: Date;
+  sessions?: TabSession[];
+  autoCompleteThreshold?: number;
 };
 
-export function PastDayView({ state, forDate }: Props) {
+export function PastDayView({ state, forDate, sessions, autoCompleteThreshold }: Props) {
   const k = dayKey(forDate);
   const adHoc: DayData = state.adHocByDate[k] ?? { groups: [], tasks: [] };
   const scheduled = adHoc.tasks.filter(
@@ -104,6 +107,8 @@ export function PastDayView({ state, forDate }: Props) {
             onCreateRange={() => {}}
             onEditTask={() => {}}
             readOnly
+            sessions={sessions}
+            autoCompleteThreshold={autoCompleteThreshold}
           />
         </div>
       )}

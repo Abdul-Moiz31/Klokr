@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
@@ -13,9 +13,14 @@ import { UnscheduledRail } from "./UnscheduledRail";
 import { TimelineTaskModal, type TimelineTaskDraft } from "./TimelineTaskModal";
 import { ExtensionPlannerSync } from "@/components/ExtensionPlannerSync";
 import { useDailyPlannerState } from "@/lib/daily-planner/useDailyPlannerState";
+import { useTodaySessions } from "@/lib/daily-planner/useTodaySessions";
+import { findUnscheduledGaps, type UnscheduledGap } from "@/lib/daily-planner/onTask";
+import { localMinutesNow, pickAutoCompletions } from "@/lib/daily-planner/autoComplete";
 import { createEmptyDayData, dayKey } from "@/lib/daily-planner/storage";
 import { suggestedRoutineTemplateKind } from "@/lib/daily-planner/date";
 import { normalizeRange } from "@/lib/daily-planner/timeline";
+import { DEFAULT_PREFS, loadPrefs, type KlokrsPrefs } from "@/lib/prefs";
+import { BackgroundActivityModal } from "./BackgroundActivityModal";
 import type {
   DayData,
   PlannerTask,
@@ -116,11 +121,33 @@ export function DailyPlannerApp({ accountCreatedAt = null }: DailyPlannerAppProp
     getTrackingRules,
     applyRoutineTemplateToToday,
     setRoutineTemplate,
+    setTemplateTaskDomains,
     newId: newIdFn,
   } = useDailyPlannerState();
 
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("today");
   const [viewDate, setViewDate] = useState<Date>(() => new Date());
+  const [prefs, setPrefs] = useState<KlokrsPrefs>(DEFAULT_PREFS);
+  useEffect(() => {
+    setPrefs(loadPrefs());
+    // Re-read on focus/visibility so Settings changes (made in another tab or
+    // earlier in the session) take effect without a full reload.
+    const reload = () => setPrefs(loadPrefs());
+    const onVis = () => {
+      if (document.visibilityState === "visible") reload();
+    };
+    window.addEventListener("focus", reload);
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("storage", reload);
+    return () => {
+      window.removeEventListener("focus", reload);
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("storage", reload);
+    };
+  }, []);
+  // Fetch sessions for whatever day is being viewed (today → realtime + 30s poll;
+  // past days → one-shot fetch). Used to render fill bars on each task block.
+  const { sessions } = useTodaySessions(viewDate);
   const [confirmTemplate, setConfirmTemplate] = useState<RoutineTemplateKind | null>(null);
   const [confirmDuplicateRule, setConfirmDuplicateRule] = useState<RecurringRule | null>(null);
   const [modal, setModal] = useState<
@@ -128,6 +155,14 @@ export function DailyPlannerApp({ accountCreatedAt = null }: DailyPlannerAppProp
     | { mode: "edit"; taskId: string }
     | null
   >(null);
+  const [gapModal, setGapModal] = useState<UnscheduledGap | null>(null);
+  // Task IDs the user manually un-completed this session — auto-complete skips
+  // them so they don't immediately flip back to done. Cleared on page reload.
+  const ignoredAutoCompleteRef = useRef<Set<string>>(new Set());
+  // Tick state to drive the 60s re-evaluation of end-of-window tasks. Bumping
+  // this number re-runs the auto-completion effect even when state/sessions
+  // didn't change (e.g. a task window just ended).
+  const [autoCompleteTick, setAutoCompleteTick] = useState(0);
   const unscheduledRailRef = useRef<HTMLDivElement | null>(null);
 
   const todayK = getTodayKey();
@@ -155,6 +190,74 @@ export function DailyPlannerApp({ accountCreatedAt = null }: DailyPlannerAppProp
     () => todayAdHoc.tasks.filter((t) => t.startMinutes == null),
     [todayAdHoc]
   );
+  const todayIdleRanges = todayAdHoc.idleRanges ?? [];
+
+  // 60s ticker so end-of-window auto-completion fires for tasks whose window
+  // ends while the planner is open. Cheap — just a state bump.
+  useEffect(() => {
+    if (!isViewingToday) return;
+    const id = setInterval(() => setAutoCompleteTick((n) => n + 1), 60_000);
+    return () => clearInterval(id);
+  }, [isViewingToday]);
+
+  // Auto-completion check. Runs whenever scheduledTasks / sessions / prefs /
+  // tick change. Only writes when viewing today — past days shouldn't flip
+  // retroactively, and future days obviously have no past windows.
+  useEffect(() => {
+    if (!isViewingToday) return;
+    if (!prefs.autoCompleteEnabled) return;
+    if (scheduledTasks.length === 0) return;
+    const nowMin = localMinutesNow();
+    const picks = pickAutoCompletions(
+      scheduledTasks,
+      sessions,
+      viewDate,
+      prefs,
+      nowMin,
+      ignoredAutoCompleteRef.current
+    );
+    if (picks.length === 0) return;
+    const pickIds = new Set(picks.map((p) => p.taskId));
+    setTodayTasks((tasks) =>
+      tasks.map((t) => {
+        const p = picks.find((x) => x.taskId === t.id);
+        if (!p) return t;
+        return {
+          ...t,
+          done: true,
+          autoCompleted: true,
+          completedAt: p.completedAt,
+        };
+      })
+    );
+    // Use the local var so the closure doesn't reference the ref directly.
+    void pickIds;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    isViewingToday,
+    scheduledTasks,
+    sessions,
+    prefs.autoCompleteEnabled,
+    prefs.autoCompleteThreshold,
+    viewDate,
+    autoCompleteTick,
+  ]);
+
+  const unscheduledGaps = useMemo(() => {
+    const raw = findUnscheduledGaps(
+      scheduledTasks,
+      sessions,
+      viewDate,
+      prefs.redBlockMinGapMinutes
+    );
+    if (todayIdleRanges.length === 0) return raw;
+    // Hide any gap fully covered by an idle range the user already marked.
+    return raw.filter((g) => {
+      return !todayIdleRanges.some(
+        (r) => r.fromMinutes <= g.fromMinutes && r.toMinutes >= g.toMinutes
+      );
+    });
+  }, [scheduledTasks, sessions, viewDate, prefs.redBlockMinGapMinutes, todayIdleRanges]);
 
   const rules = getTrackingRules();
   const suggestedKind = suggestedRoutineTemplateKind(now);
@@ -202,21 +305,35 @@ export function DailyPlannerApp({ accountCreatedAt = null }: DailyPlannerAppProp
   };
 
   const updateTaskFromModal = (taskId: string, draft: TimelineTaskDraft) => {
+    let propagateTo: { kind: RoutineTemplateKind; templateTaskId: string } | null = null;
     setTodayTasks((tasks) =>
-      tasks.map((t) =>
-        t.id === taskId
-          ? {
-              ...t,
-              title: draft.title,
-              description: draft.description,
-              done: draft.done,
-              domainTags: draft.domainTags,
-              startMinutes: draft.startMinutes,
-              endMinutes: draft.endMinutes,
-            }
-          : t
-      )
+      tasks.map((t) => {
+        if (t.id !== taskId) return t;
+        if (
+          draft.applyDomainsToTemplate &&
+          t.sourceTemplateTaskId &&
+          t.sourceTemplateKind
+        ) {
+          propagateTo = { kind: t.sourceTemplateKind, templateTaskId: t.sourceTemplateTaskId };
+        }
+        return {
+          ...t,
+          title: draft.title,
+          description: draft.description,
+          done: draft.done,
+          domainTags: draft.domainTags,
+          startMinutes: draft.startMinutes,
+          endMinutes: draft.endMinutes,
+        };
+      })
     );
+    if (propagateTo) {
+      setTemplateTaskDomains(
+        (propagateTo as { kind: RoutineTemplateKind; templateTaskId: string }).kind,
+        (propagateTo as { kind: RoutineTemplateKind; templateTaskId: string }).templateTaskId,
+        draft.domainTags
+      );
+    }
   };
 
   const deleteTask = (taskId: string) => {
@@ -225,8 +342,103 @@ export function DailyPlannerApp({ accountCreatedAt = null }: DailyPlannerAppProp
 
   const toggleTaskDone = (taskId: string) => {
     setTodayTasks((tasks) =>
-      tasks.map((t) => (t.id === taskId ? { ...t, done: !t.done } : t))
+      tasks.map((t) => {
+        if (t.id !== taskId) return t;
+        const nextDone = !t.done;
+        // Un-completing an auto-completed task: clear the auto flag and add
+        // the task to the ignore set so the next 60s tick doesn't re-flip it.
+        if (!nextDone && t.autoCompleted) {
+          ignoredAutoCompleteRef.current.add(t.id);
+          return { ...t, done: false, autoCompleted: false, completedAt: undefined };
+        }
+        // Manually completing: stamp completedAt for parity with auto path.
+        if (nextDone) {
+          return { ...t, done: true, completedAt: Date.now() };
+        }
+        return { ...t, done: false, completedAt: undefined };
+      })
     );
+  };
+
+  // Phase 5 — offline-detection prompt handlers. "Mark complete" stamps a
+  // manual completion (no autoCompleted flag — this was offline work, not
+  // tracked). "Skipped" sets the skipped flag so auto-completion ignores it
+  // forever and reports can distinguish skipped vs completed.
+  const markOfflineComplete = (taskId: string) => {
+    setTodayTasks((tasks) =>
+      tasks.map((t) =>
+        t.id === taskId
+          ? { ...t, done: true, completedAt: Date.now() }
+          : t
+      )
+    );
+    toast.success("Marked complete");
+  };
+  const markSkipped = (taskId: string) => {
+    setTodayTasks((tasks) =>
+      tasks.map((t) =>
+        t.id === taskId ? { ...t, skipped: true } : t
+      )
+    );
+    toast.success("Marked skipped");
+  };
+
+  // Phase 3 — Background-activity modal handlers.
+  // "Assign to task" pushes a ManualAttribution onto the chosen task. The task
+  // window stays put; the on-task % calc reads manualAttributions and credits
+  // the gap's domain minutes (not the wall-clock gap length, so noise doesn't
+  // inflate the bar).
+  const assignGapToTask = (gap: UnscheduledGap, taskId: string) => {
+    const now = Date.now();
+    setTodayTasks((tasks) =>
+      tasks.map((t) => {
+        if (t.id !== taskId) return t;
+        const prev = t.manualAttributions ?? [];
+        return {
+          ...t,
+          manualAttributions: [
+            ...prev,
+            {
+              fromMinutes: gap.fromMinutes,
+              toMinutes: gap.toMinutes,
+              addedMinutes: Math.round(gap.activityMinutes),
+              addedAt: now,
+            },
+          ],
+        };
+      })
+    );
+    setGapModal(null);
+    toast.success("Background activity assigned");
+  };
+
+  // "Skip → mark as idle" appends the gap range to today's idleRanges. The
+  // gap disappears from red blocks because findUnscheduledGaps doesn't see the
+  // range as a gap anymore once we also pretend it's owned (we filter gaps
+  // overlapping idle ranges below — see DailyPlannerApp render).
+  const markGapIdle = (gap: UnscheduledGap) => {
+    const now = Date.now();
+    const prev = todayAdHoc.idleRanges ?? [];
+    setTodayAdHoc({
+      ...todayAdHoc,
+      idleRanges: [
+        ...prev,
+        { fromMinutes: gap.fromMinutes, toMinutes: gap.toMinutes, markedAt: now },
+      ],
+    });
+    setGapModal(null);
+    toast.success("Marked as idle");
+  };
+
+  // "Copy as task" opens the create-task modal pre-filled with the gap's
+  // range, falling back to a sensible default title if no top domain is
+  // available.
+  const copyGapAsTask = (gap: UnscheduledGap) => {
+    setGapModal(null);
+    setModal({
+      mode: "create",
+      initialRange: { start: gap.fromMinutes, end: gap.toMinutes },
+    });
   };
 
   const quickCreateUnscheduled = (title: string) => {
@@ -384,7 +596,12 @@ export function DailyPlannerApp({ accountCreatedAt = null }: DailyPlannerAppProp
                     exit={{ opacity: 0, y: -4 }}
                     transition={{ duration: 0.15 }}
                   >
-                    <PastDayView state={state} forDate={viewDate} />
+                    <PastDayView
+                      state={state}
+                      forDate={viewDate}
+                      sessions={sessions}
+                      autoCompleteThreshold={prefs.autoCompleteThreshold}
+                    />
                   </motion.div>
                 </AnimatePresence>
               ) : (
@@ -444,6 +661,14 @@ export function DailyPlannerApp({ accountCreatedAt = null }: DailyPlannerAppProp
                         onToggleDone={toggleTaskDone}
                         externalDropContainerRef={unscheduledRailRef}
                         onExternalDrop={upsertTaskTime}
+                        sessions={sessions}
+                        autoCompleteThreshold={prefs.autoCompleteThreshold}
+                        unscheduledGaps={unscheduledGaps}
+                        idleRanges={todayIdleRanges}
+                        onGapClick={setGapModal}
+                        nowMinutes={isViewingToday ? localMinutesNow() : null}
+                        onMarkOfflineComplete={markOfflineComplete}
+                        onMarkSkipped={markSkipped}
                       />
                       <UnscheduledRail
                         ref={unscheduledRailRef}
@@ -547,6 +772,18 @@ export function DailyPlannerApp({ accountCreatedAt = null }: DailyPlannerAppProp
             </div>
           </motion.div>
         </div>
+      )}
+
+      {/* Background-activity modal — Phase 3 */}
+      {gapModal && (
+        <BackgroundActivityModal
+          gap={gapModal}
+          scheduledTasks={scheduledTasks}
+          onAssignToTask={(taskId) => assignGapToTask(gapModal, taskId)}
+          onMarkIdle={() => markGapIdle(gapModal)}
+          onCopyAsTask={() => copyGapAsTask(gapModal)}
+          onClose={() => setGapModal(null)}
+        />
       )}
 
       {/* Timeline task modal (create / edit) */}

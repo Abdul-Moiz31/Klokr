@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useAuthSession } from "@/lib/useAuthSession";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   BarChart,
@@ -21,6 +21,7 @@ import { AppShell } from "@/components/dashboard/AppShell";
 import { PageHeader } from "@/components/dashboard/PageHeader";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { Loader } from "@/components/ui/Loader";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { ReportsDomainTable } from "@/components/reports/ReportsDomainTable";
 import { DomainDrilldownModal } from "@/components/reports/DomainDrilldownModal";
 import { getSiteName } from "@/lib/domain";
@@ -343,33 +344,22 @@ function generatePdf(
 
 // ─── Empty state ──────────────────────────────────────────────────
 
-function EmptyState() {
+function ReportsEmpty() {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="flex flex-col items-center justify-center gap-4 rounded-2xl border border-dashed border-white/15 bg-white/[0.02] py-20 text-center"
-    >
-      <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-500/20 bg-gradient-to-br from-violet-500/15 to-cyan-500/10 text-2xl">
-        📊
-      </div>
-      <div>
-        <p className="text-base font-semibold text-white/60">
-          No sessions tracked for this period
-        </p>
-        <p className="mt-1 text-sm text-white/30">
-          Keep the extension running and check back later
-        </p>
-      </div>
-    </motion.div>
+    <EmptyState
+      icon="📊"
+      title="No sessions tracked for this period"
+      description="Keep the extension running and check back later."
+    />
   );
 }
 
 // ─── Main page ────────────────────────────────────────────────────
 
 export default function ReportsPage() {
-  const [user, setUser] = useState<User | null>(null);
-  const [authToken, setAuthToken] = useState<string | null>(null);
+  const { session: authSession } = useAuthSession();
+  const user = authSession?.user ?? null;
+  const authToken = authSession?.access_token ?? null;
   const [pageLoading, setPageLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("weekly");
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -381,8 +371,6 @@ export default function ReportsPage() {
   const [drilldown, setDrilldown] = useState<DrillTarget | null>(null);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [chartMounted, setChartMounted] = useState(false);
-  const router = useRouter();
-
   useEffect(() => { setChartMounted(true); }, []);
 
   // True when the current period is "now" — disables the Next button.
@@ -393,20 +381,10 @@ export default function ReportsPage() {
     return monthDate.getFullYear() === today.getFullYear() && monthDate.getMonth() === today.getMonth();
   }, [tab, selectedDate, weekStart, monthDate]);
 
-  // ── Auth ────────────────────────────────────────────────────────
+  // Auth state lives in useAuthSession above; flip pageLoading off when ready.
   useEffect(() => {
-    const supabase = createClient();
-    void (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        router.push("/login");
-        return;
-      }
-      setUser(session.user);
-      setAuthToken(session.access_token ?? null);
-      setPageLoading(false);
-    })();
-  }, [router]);
+    if (authSession) setPageLoading(false);
+  }, [authSession]);
 
   // ── Date range (memoised) ───────────────────────────────────────
   const dateRange = useMemo(() => {
@@ -806,7 +784,7 @@ export default function ReportsPage() {
             className="space-y-6 lg:space-y-8"
           >
             {!hasData ? (
-              <EmptyState />
+              <ReportsEmpty />
             ) : (
               <>
                 {/* ── KPI cards ─────────────────────────────────── */}

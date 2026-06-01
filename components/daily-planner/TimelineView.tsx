@@ -11,7 +11,13 @@ import type {
   EventInput,
 } from "@fullcalendar/core";
 import type { EventResizeDoneArg } from "@fullcalendar/interaction";
-import type { PlannerTask } from "@/lib/daily-planner/types";
+import type { IdleRange, PlannerTask } from "@/lib/daily-planner/types";
+import type { TabSession } from "@/lib/supabase";
+import {
+  computeOnTaskStats,
+  type OnTaskStats,
+  type UnscheduledGap,
+} from "@/lib/daily-planner/onTask";
 import {
   SNAP_MINUTES,
   dateToMinutes,
@@ -38,9 +44,48 @@ type Props = {
   onExternalDrop?: (taskId: string, startMinutes: number, endMinutes: number) => void;
   /** Read-only mode for past days. */
   readOnly?: boolean;
+  /** Today's (or `forDate`'s) tab sessions — used to render fill bars per task. */
+  sessions?: TabSession[];
+  /** Auto-completion threshold % — drives the fill-bar color and corner check. */
+  autoCompleteThreshold?: number;
+  /** Unscheduled gaps with tracked activity — rendered as red coral blocks. */
+  unscheduledGaps?: UnscheduledGap[];
+  /** User-marked idle ranges — rendered as muted gray blocks. */
+  idleRanges?: IdleRange[];
+  /** Click handler for red unscheduled-gap blocks. */
+  onGapClick?: (gap: UnscheduledGap) => void;
+  /**
+   * Local time in minutes since midnight — used to decide whether a task's
+   * window is in the past for the offline-prompt and other end-of-window UI.
+   * Pass null to disable any "past-window" treatment (e.g. on past days).
+   */
+  nowMinutes?: number | null;
+  /** Phase 5 — confirm an offline-only completion of a zero-activity task. */
+  onMarkOfflineComplete?: (taskId: string) => void;
+  /** Phase 5 — mark a zero-activity task as skipped. */
+  onMarkSkipped?: (taskId: string) => void;
 };
 
 const SNAP_DURATION = `00:${String(SNAP_MINUTES).padStart(2, "0")}:00`;
+const EMPTY_SESSIONS: TabSession[] = [];
+const EMPTY_GAPS: UnscheduledGap[] = [];
+const EMPTY_IDLE: IdleRange[] = [];
+
+/** Stable id for a gap so FullCalendar can diff it across renders. */
+function gapEventId(gap: UnscheduledGap): string {
+  return `gap-${gap.fromMinutes}-${gap.toMinutes}`;
+}
+function idleEventId(r: IdleRange): string {
+  return `idle-${r.fromMinutes}-${r.toMinutes}`;
+}
+function fmtMinutes(min: number): string {
+  const total = Math.round(min);
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  if (h === 0) return `${m} min`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
+}
 
 export function TimelineView({
   forDate,
@@ -52,7 +97,24 @@ export function TimelineView({
   externalDropContainerRef,
   onExternalDrop,
   readOnly = false,
+  sessions = EMPTY_SESSIONS,
+  autoCompleteThreshold = 80,
+  unscheduledGaps = EMPTY_GAPS,
+  idleRanges = EMPTY_IDLE,
+  onGapClick,
+  nowMinutes = null,
+  onMarkOfflineComplete,
+  onMarkSkipped,
 }: Props) {
+  const statsByTaskId = useMemo(() => {
+    const map = new Map<string, OnTaskStats>();
+    for (const t of tasks) {
+      if (t.startMinutes == null || t.endMinutes == null) continue;
+      map.set(t.id, computeOnTaskStats(t, sessions, forDate, autoCompleteThreshold));
+    }
+    return map;
+  }, [tasks, sessions, forDate, autoCompleteThreshold]);
+
   const calendarRef = useRef<FullCalendar | null>(null);
   const dragRef = useRef<Draggable | null>(null);
 
@@ -94,7 +156,7 @@ export function TimelineView({
   }, [forDate]);
 
   const events: EventInput[] = useMemo(() => {
-    return tasks
+    const taskEvents: EventInput[] = tasks
       .filter((t) => t.startMinutes != null && t.endMinutes != null)
       .map((t) => {
         const start = minutesToDate(forDate, t.startMinutes!);
@@ -109,10 +171,32 @@ export function TimelineView({
             "klokrs-event",
             t.done ? "klokrs-event--done" : "",
           ].filter(Boolean),
-          extendedProps: { task: t },
+          extendedProps: { kind: "task", task: t },
         } satisfies EventInput;
       });
-  }, [tasks, forDate, readOnly]);
+
+    const gapEvents: EventInput[] = unscheduledGaps.map((gap) => ({
+      id: gapEventId(gap),
+      title: "Background activity",
+      start: minutesToDate(forDate, gap.fromMinutes),
+      end: minutesToDate(forDate, gap.toMinutes),
+      editable: false,
+      classNames: ["klokrs-event", "klokrs-event--gap"],
+      extendedProps: { kind: "gap", gap },
+    }));
+
+    const idleEvents: EventInput[] = idleRanges.map((r) => ({
+      id: idleEventId(r),
+      title: "Idle",
+      start: minutesToDate(forDate, r.fromMinutes),
+      end: minutesToDate(forDate, r.toMinutes),
+      editable: false,
+      classNames: ["klokrs-event", "klokrs-event--idle"],
+      extendedProps: { kind: "idle", idle: r },
+    }));
+
+    return [...taskEvents, ...gapEvents, ...idleEvents];
+  }, [tasks, forDate, readOnly, unscheduledGaps, idleRanges]);
 
   const handleDrop = (info: EventDropArg) => {
     const ev = info.event;
@@ -141,6 +225,13 @@ export function TimelineView({
   };
 
   const handleEventClick = (info: EventClickArg) => {
+    const kind = info.event.extendedProps?.kind as string | undefined;
+    if (kind === "gap") {
+      const gap = info.event.extendedProps?.gap as UnscheduledGap | undefined;
+      if (gap && onGapClick) onGapClick(gap);
+      return;
+    }
+    if (kind === "idle") return;
     if (readOnly) return;
     onEditTask(info.event.id);
   };
@@ -175,11 +266,68 @@ export function TimelineView({
         select={handleSelect}
         eventClick={handleEventClick}
         eventContent={(arg) => {
-          const task = arg.event.extendedProps?.task as PlannerTask | undefined;
+          const kind = (arg.event.extendedProps?.kind as string | undefined) ?? "task";
           const start = arg.event.start ? dateToMinutes(arg.event.start) : 0;
           const end = arg.event.end ? dateToMinutes(arg.event.end) : start;
+          if (kind === "gap") {
+            const gap = arg.event.extendedProps?.gap as UnscheduledGap | undefined;
+            const activity = gap?.activityMinutes ?? end - start;
+            return (
+              <div className="klokrs-event-body klokrs-event-body--gap">
+                <div className="klokrs-event-row">
+                  <div className="klokrs-event-title">Background activity</div>
+                </div>
+                <div className="klokrs-event-meta">
+                  {formatRange(start, end)} · {fmtMinutes(activity)}
+                </div>
+              </div>
+            );
+          }
+          if (kind === "idle") {
+            return (
+              <div className="klokrs-event-body klokrs-event-body--idle">
+                <div className="klokrs-event-row">
+                  <div className="klokrs-event-title">Idle</div>
+                </div>
+                <div className="klokrs-event-meta">{formatRange(start, end)}</div>
+              </div>
+            );
+          }
+          const task = arg.event.extendedProps?.task as PlannerTask | undefined;
           const done = task?.done === true;
           const canToggle = !readOnly && task != null && onToggleDone != null;
+          const stats = task ? statsByTaskId.get(task.id) : undefined;
+          // Fill bar width: cap visual at 100% even if percent exceeds it.
+          const fillWidth = stats ? Math.min(100, Math.max(0, stats.percent)) : 0;
+          const fillClass = stats
+            ? stats.status === "no-activity"
+              ? ""
+              : stats.status === "below"
+              ? "klokrs-event-fill--below"
+              : "klokrs-event-fill--above"
+            : "";
+          const showCheck = stats != null && stats.percent >= 100;
+          // Offline prompt: window in the past, zero tracked activity, no manual
+          // attributions, and not already done/skipped. Only on today (caller
+          // controls this via the nowMinutes prop).
+          const windowEndedInPast =
+            task != null &&
+            task.endMinutes != null &&
+            nowMinutes != null &&
+            (task.endMinutes as number) <= nowMinutes;
+          const noActivityInWindow =
+            stats != null &&
+            stats.onTaskMinutes === 0 &&
+            (!task?.manualAttributions || task.manualAttributions.length === 0);
+          const showOfflinePrompt =
+            !readOnly &&
+            task != null &&
+            !task.done &&
+            !task.skipped &&
+            windowEndedInPast &&
+            noActivityInWindow &&
+            onMarkOfflineComplete != null &&
+            onMarkSkipped != null;
           // The checkbox swallows mouse/pointer events so it doesn't trigger
           // FullCalendar's eventClick (which opens the edit modal) or start a
           // drag on the block. `mouseDownCapture` is the early hook FullCalendar
@@ -225,8 +373,62 @@ export function TimelineView({
                 <div className={`klokrs-event-title ${done ? "klokrs-event-title--done" : ""}`}>
                   {arg.event.title}
                 </div>
+                {showCheck && (
+                  <span
+                    className="klokrs-event-corner-check"
+                    aria-label="Task completed on time"
+                    title={`${Math.round(stats!.percent)}% on tagged domains`}
+                  >
+                    <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden>
+                      <path
+                        d="M2.5 6.5L5 9L9.5 3.5"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </span>
+                )}
               </div>
               <div className="klokrs-event-meta">{formatRange(start, end)}</div>
+              {showOfflinePrompt && task && (
+                <div className="klokrs-event-offline">
+                  <span className="klokrs-event-offline-text">Done offline?</span>
+                  <button
+                    type="button"
+                    className="klokrs-event-offline-btn klokrs-event-offline-btn--yes"
+                    onMouseDownCapture={(e) => e.stopPropagation()}
+                    onPointerDownCapture={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onMarkOfflineComplete!(task.id);
+                    }}
+                  >
+                    Done
+                  </button>
+                  <button
+                    type="button"
+                    className="klokrs-event-offline-btn"
+                    onMouseDownCapture={(e) => e.stopPropagation()}
+                    onPointerDownCapture={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onMarkSkipped!(task.id);
+                    }}
+                  >
+                    Skip
+                  </button>
+                </div>
+              )}
+              {stats && stats.totalWindowMinutes > 0 && (
+                <div className="klokrs-event-fill-track" aria-hidden>
+                  <div
+                    className={`klokrs-event-fill ${fillClass}`}
+                    style={{ width: `${fillWidth}%` }}
+                  />
+                </div>
+              )}
             </div>
           );
         }}

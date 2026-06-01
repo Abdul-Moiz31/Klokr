@@ -22,7 +22,12 @@ export async function GET(request: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const prefs: KlokrsPrefs = { ...DEFAULT_PREFS, ...((data?.prefs as Partial<KlokrsPrefs>) ?? {}) };
+  const stored = (data?.prefs as Partial<KlokrsPrefs>) ?? {};
+  const prefs: KlokrsPrefs = {
+    ...DEFAULT_PREFS,
+    ...stored,
+    notifications: { ...DEFAULT_PREFS.notifications, ...(stored.notifications ?? {}) },
+  };
   return NextResponse.json({ prefs });
 }
 
@@ -40,7 +45,11 @@ export async function POST(request: NextRequest) {
 
   if (!body.prefs) return NextResponse.json({ error: "Missing prefs" }, { status: 400 });
 
-  const merged: KlokrsPrefs = { ...DEFAULT_PREFS, ...body.prefs };
+  const merged: KlokrsPrefs = {
+    ...DEFAULT_PREFS,
+    ...body.prefs,
+    notifications: { ...DEFAULT_PREFS.notifications, ...(body.prefs.notifications ?? {}) },
+  };
 
   const { error } = await supabase
     .from("user_preferences")

@@ -168,6 +168,100 @@ html {
   gap: 6px;
   align-items: center;
 }
+.klokrs-timeline .klokrs-event-fill-track {
+  margin-top: auto;
+  height: 3px;
+  width: 100%;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+.klokrs-timeline .klokrs-event-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 350ms ease-out, background-color 350ms ease-out;
+  background: rgba(167, 139, 250, 0.45);
+}
+.klokrs-timeline .klokrs-event-fill--below {
+  background: rgba(167, 139, 250, 0.45);
+}
+.klokrs-timeline .klokrs-event-fill--above {
+  background: rgba(167, 139, 250, 0.95);
+  box-shadow: 0 0 8px rgba(167, 139, 250, 0.35);
+}
+.klokrs-timeline .klokrs-event-corner-check {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: rgba(167, 139, 250, 0.25);
+  color: rgb(237, 233, 254);
+  margin-left: 4px;
+}
+/* Red coral "background activity" block — Phase 3 unscheduled gap. */
+.klokrs-timeline .fc-event.klokrs-event--gap {
+  background: rgba(248, 113, 113, 0.18);
+  border-color: rgba(248, 113, 113, 0.65);
+  color: rgba(254, 226, 226, 0.95);
+  cursor: pointer;
+}
+.klokrs-timeline .fc-event.klokrs-event--gap:hover {
+  background: rgba(248, 113, 113, 0.26);
+}
+.klokrs-timeline .klokrs-event-body--gap .klokrs-event-title {
+  color: rgba(254, 226, 226, 0.95);
+}
+.klokrs-timeline .klokrs-event-body--gap .klokrs-event-meta {
+  color: rgba(254, 226, 226, 0.7);
+}
+/* Offline-detection prompt — Phase 5, inline on zero-activity past tasks. */
+.klokrs-timeline .klokrs-event-offline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+.klokrs-timeline .klokrs-event-offline-text {
+  font-size: 11px;
+  color: rgba(252, 211, 77, 0.85);
+}
+.klokrs-timeline .klokrs-event-offline-btn {
+  font-size: 11px;
+  line-height: 1;
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(237, 233, 254, 0.85);
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+.klokrs-timeline .klokrs-event-offline-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgb(237, 233, 254);
+}
+.klokrs-timeline .klokrs-event-offline-btn--yes {
+  border-color: rgba(167, 139, 250, 0.45);
+  color: rgba(196, 181, 253, 0.95);
+}
+.klokrs-timeline .klokrs-event-offline-btn--yes:hover {
+  background: rgba(167, 139, 250, 0.15);
+}
+/* Idle block — muted gray, non-interactive. */
+.klokrs-timeline .fc-event.klokrs-event--idle {
+  background: rgba(148, 163, 184, 0.12);
+  border-color: rgba(148, 163, 184, 0.35);
+  color: rgba(226, 232, 240, 0.7);
+  cursor: default;
+}
+.klokrs-timeline .klokrs-event-body--idle .klokrs-event-title,
+.klokrs-timeline .klokrs-event-body--idle .klokrs-event-meta {
+  color: rgba(226, 232, 240, 0.6);
+}
 .klokrs-timeline .fc-highlight {
   background: rgba(167, 139, 250, 0.12);
 }

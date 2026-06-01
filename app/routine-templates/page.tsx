@@ -1,40 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase";
 import { AppShell } from "@/components/dashboard/AppShell";
 import { PageHeader } from "@/components/dashboard/PageHeader";
 import { RoutineTemplatesEditor } from "@/components/daily-planner/RoutineTemplatesEditor";
 import { Loader } from "@/components/ui/Loader";
 import { useDailyPlannerState } from "@/lib/daily-planner/useDailyPlannerState";
-import type { User } from "@supabase/supabase-js";
+import { useAuthSession } from "@/lib/useAuthSession";
 
 export default function RoutineTemplatesPage() {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const router = useRouter();
+  const { session, status } = useAuthSession();
   const { state, hydrated, setRoutineTemplate, newId } = useDailyPlannerState();
 
-  useEffect(() => {
-    const supabase = createClient();
-    void (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { router.push("/login"); return; }
-      setUser(session.user);
-      setLoading(false);
-    })();
-  }, [router]);
-
-  if (loading || !hydrated || !state) {
+  if (status === "loading" || !session || !hydrated || !state) {
     return (
       <AppShell title="Routine templates">
         <Loader />
       </AppShell>
     );
   }
-
-  void user;
 
   return (
     <AppShell title="Routine templates">
