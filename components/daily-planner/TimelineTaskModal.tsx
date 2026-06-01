@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import type { PlannerTask } from "@/lib/daily-planner/types";
+import type { PlannerTask, RoutineTemplateKind } from "@/lib/daily-planner/types";
 import {
   MIN_DURATION_MINUTES,
   SNAP_MINUTES,
@@ -17,7 +17,27 @@ export type TimelineTaskDraft = {
   domainTags: string[];
   startMinutes: number | null;
   endMinutes: number | null;
+  /**
+   * Set true when the user picked "Apply to template" in the A1 confirm dialog.
+   * Only meaningful when editing an instance that has template lineage and the
+   * user changed `domainTags`. Parent uses this to also patch the template.
+   */
+  applyDomainsToTemplate?: boolean;
 };
+
+const TEMPLATE_LABELS: Record<RoutineTemplateKind, string> = {
+  weekdays: "Weekdays",
+  saturday: "Saturday",
+  sunday: "Sunday",
+  fallback: "Fallback",
+};
+
+function sameDomainSet(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  const sa = new Set(a);
+  for (const d of b) if (!sa.has(d)) return false;
+  return true;
+}
 
 type Props = {
   /** When editing: the existing task. When creating: null. */
@@ -66,6 +86,9 @@ export function TimelineTaskModal({ initial, initialRange, onSave, onDelete, onC
   const [endStr, setEndStr] = useState<string>(
     minutesToTimeString(initial?.endMinutes ?? initialRange?.end ?? null)
   );
+  // Captured once on mount so we can detect "domains changed" reliably.
+  const originalDomains = useMemo(() => initial?.domainTags ?? [], [initial]);
+  const [pendingDraft, setPendingDraft] = useState<TimelineTaskDraft | null>(null);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -90,14 +113,25 @@ export function TimelineTaskModal({ initial, initialRange, onSave, onDelete, onC
       endMinutes = range.end;
     }
 
-    onSave({
+    const draft: TimelineTaskDraft = {
       title: t,
       description: description.trim(),
       done,
       domainTags: splitDomains(domains),
       startMinutes,
       endMinutes,
-    });
+    };
+
+    // A1 confirm dialog: editing an instance with template lineage and the
+    // domain set has changed → ask whether to also update the template.
+    const hasLineage = Boolean(initial?.sourceTemplateTaskId && initial?.sourceTemplateKind);
+    const domainsChanged = !sameDomainSet(originalDomains, draft.domainTags);
+    if (initial && hasLineage && domainsChanged) {
+      setPendingDraft(draft);
+      return;
+    }
+
+    onSave(draft);
   };
 
   return (
@@ -260,6 +294,57 @@ export function TimelineTaskModal({ initial, initialRange, onSave, onDelete, onC
           </div>
         </div>
       </motion.div>
+
+      {pendingDraft && initial?.sourceTemplateKind && (
+        <div
+          className="absolute inset-0 z-10 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#0f0f16] p-6 shadow-2xl"
+          >
+            <h3 className="mb-2 text-base font-semibold text-white">Domain tags changed</h3>
+            <p className="mb-5 text-sm leading-relaxed text-white/55">
+              Apply the new tags to this instance only, or also update the
+              <span className="px-1 font-medium text-white/85">
+                {TEMPLATE_LABELS[initial.sourceTemplateKind]}
+              </span>
+              template so future days inherit them?
+            </p>
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  onSave({ ...pendingDraft, applyDomainsToTemplate: true });
+                  setPendingDraft(null);
+                }}
+                className="w-full rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-violet-500"
+              >
+                Apply to {TEMPLATE_LABELS[initial.sourceTemplateKind]} template
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onSave({ ...pendingDraft, applyDomainsToTemplate: false });
+                  setPendingDraft(null);
+                }}
+                className="w-full rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white/80 transition hover:bg-white/[0.04]"
+              >
+                Apply to today only
+              </button>
+              <button
+                type="button"
+                onClick={() => setPendingDraft(null)}
+                className="w-full px-4 py-2 text-xs text-white/40 transition hover:text-white/65"
+              >
+                Cancel
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }
