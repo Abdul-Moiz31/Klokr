@@ -14,7 +14,10 @@ import { DomainDrilldownModal } from "@/components/reports/DomainDrilldownModal"
 import { Loader } from "@/components/ui/Loader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { WorkDayCompleteBanner } from "@/components/dashboard/WorkDayCompleteBanner";
+<<<<<<< feat/goals-streaks
 import { StreakStrip } from "@/components/dashboard/StreakStrip";
+=======
+>>>>>>> main
 import { getSiteName } from "@/lib/domain";
 import type { TabSession } from "@/lib/supabase";
 
@@ -208,8 +211,11 @@ export default function DashboardPage() {
         }
       />
 
+<<<<<<< feat/goals-streaks
             <StreakStrip userId={userId} />
 
+=======
+>>>>>>> main
             <WorkDayCompleteBanner totalSecondsToday={totalSeconds} />
 
             {/* Fetch error banner */}
