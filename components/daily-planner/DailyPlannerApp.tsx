@@ -102,6 +102,21 @@ function formatNavDate(d: Date): string {
   return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 }
 
+function startOfWeekLocal(d: Date): Date {
+  const base = startOfLocalDay(d);
+  base.setDate(base.getDate() - base.getDay()); // Sunday start
+  return base;
+}
+
+function weekRangeLabel(anchor: Date): string {
+  const start = startOfWeekLocal(anchor);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 6);
+  const s = start.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const e = end.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return `${s} – ${e}`;
+}
+
 function SectionHeader({ label, tooltip }: { label: string; tooltip: string }) {
   return (
     <div className="flex items-center gap-1.5 mb-3">
@@ -124,6 +139,7 @@ export function DailyPlannerApp({ accountCreatedAt = null, userId = null }: Dail
     hydrated,
     getTodayKey,
     setTodayAdHoc,
+    setAdHocForDate,
     setTaskDump,
     clearAdHocForToday,
     addRecurringRule,
@@ -134,6 +150,7 @@ export function DailyPlannerApp({ accountCreatedAt = null, userId = null }: Dail
     forceAppendRecurringRuleToToday,
     getTrackingRules,
     applyRoutineTemplateToToday,
+    applyRoutineTemplateToDate,
     setRoutineTemplate,
     setTemplateTaskDomains,
     newId: newIdFn,
@@ -141,6 +158,9 @@ export function DailyPlannerApp({ accountCreatedAt = null, userId = null }: Dail
 
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("today");
   const [viewDate, setViewDate] = useState<Date>(() => new Date());
+  // Separate anchor for the Week tab so browsing past/future weeks doesn't move
+  // the Day tab's viewDate. Defaults to the current week.
+  const [weekAnchor, setWeekAnchor] = useState<Date>(() => new Date());
   const [prefs, setPrefs] = useState<KlokrsPrefs>(DEFAULT_PREFS);
   useEffect(() => {
     setPrefs(loadPrefs());
@@ -163,10 +183,16 @@ export function DailyPlannerApp({ accountCreatedAt = null, userId = null }: Dail
   // past days → one-shot fetch). Used to render fill bars on each task block.
   const { sessions } = useTodaySessions(viewDate);
   const [confirmTemplate, setConfirmTemplate] = useState<RoutineTemplateKind | null>(null);
+  // Week-hub: confirm applying a template into a specific day (overwrites it).
+  const [confirmWeekTemplate, setConfirmWeekTemplate] = useState<
+    { kind: RoutineTemplateKind; dateKey: string; label: string } | null
+  >(null);
   const [confirmDuplicateRule, setConfirmDuplicateRule] = useState<RecurringRule | null>(null);
   const [modal, setModal] = useState<
-    | { mode: "create"; initialRange?: { start: number; end: number } }
-    | { mode: "edit"; taskId: string }
+    // dayKey is set when editing/creating from the Week view (a non-today day).
+    // When absent, the modal operates on today (the original Day-view behavior).
+    | { mode: "create"; initialRange?: { start: number; end: number }; dayKey?: string }
+    | { mode: "edit"; taskId: string; dayKey?: string }
     | null
   >(null);
   const [gapModal, setGapModal] = useState<UnscheduledGap | null>(null);
@@ -305,6 +331,106 @@ export function DailyPlannerApp({ accountCreatedAt = null, userId = null }: Dail
         t.id === taskId ? { ...t, startMinutes: range.start, endMinutes: range.end } : t
       )
     );
+  };
+
+  // ── Week-view helpers (operate on an arbitrary day, not just today) ───────
+  const getDayData = (key: string): DayData =>
+    (state?.adHocByDate[key] ?? createEmptyDayData());
+
+  const mutateDay = (key: string, mutate: (d: DayData) => DayData) => {
+    setAdHocForDate(key, mutate(getDayData(key)));
+  };
+
+  // Move/resize a task in the Week view. Handles dragging a task to a different
+  // day: if the new day differs from where the task currently lives, it's
+  // removed from the old day and added to the target day.
+  const weekUpsertTaskTime = (
+    dayDate: Date,
+    taskId: string,
+    startMinutes: number,
+    endMinutes: number
+  ) => {
+    const range = normalizeRange(startMinutes, endMinutes);
+    const targetKey = dayKey(dayDate);
+    // Find which day currently holds the task (search this week's loaded days).
+    let sourceKey: string | null = null;
+    let moved: PlannerTask | null = null;
+    if (state) {
+      for (const [k, d] of Object.entries(state.adHocByDate)) {
+        const found = d?.tasks.find((t) => t.id === taskId);
+        if (found) { sourceKey = k; moved = found; break; }
+      }
+    }
+    if (sourceKey === targetKey || sourceKey == null) {
+      // Same day (or unknown) — just update the time in place on the target day.
+      mutateDay(targetKey, (d) => ({
+        ...d,
+        tasks: d.tasks.map((t) =>
+          t.id === taskId ? { ...t, startMinutes: range.start, endMinutes: range.end } : t
+        ),
+      }));
+      return;
+    }
+    // Cross-day move: remove from source, add to target.
+    mutateDay(sourceKey, (d) => ({ ...d, tasks: d.tasks.filter((t) => t.id !== taskId) }));
+    const taskMoved = moved!;
+    mutateDay(targetKey, (d) => ({
+      ...d,
+      tasks: [...d.tasks, { ...taskMoved, startMinutes: range.start, endMinutes: range.end }],
+    }));
+  };
+
+  const weekCreateRange = (dayDate: Date, startMinutes: number, endMinutes: number) => {
+    setModal({ mode: "create", initialRange: { start: startMinutes, end: endMinutes }, dayKey: dayKey(dayDate) });
+  };
+
+  const weekEditTask = (dayDate: Date, taskId: string) => {
+    setModal({ mode: "edit", taskId, dayKey: dayKey(dayDate) });
+  };
+
+  // Day-aware create/update/delete used when the modal targets a non-today day
+  // (opened from the Week view). These mirror the today handlers below.
+  const createTaskForDay = (key: string, draft: TimelineTaskDraft) => {
+    const day = getDayData(key);
+    const { data, groupId } = ensureFirstGroupId(day);
+    const maxOrder = data.tasks
+      .filter((t) => t.groupId === groupId)
+      .reduce((m, t) => Math.max(m, t.order), -1);
+    const newTask: PlannerTask = {
+      id: newIdFn(),
+      groupId,
+      title: draft.title,
+      description: draft.description,
+      done: draft.done,
+      domainTags: draft.domainTags,
+      order: maxOrder + 1,
+      startMinutes: draft.startMinutes,
+      endMinutes: draft.endMinutes,
+    };
+    setAdHocForDate(key, { ...data, tasks: [...data.tasks, newTask] });
+  };
+
+  const updateTaskForDay = (key: string, taskId: string, draft: TimelineTaskDraft) => {
+    mutateDay(key, (d) => ({
+      ...d,
+      tasks: d.tasks.map((t) =>
+        t.id === taskId
+          ? {
+              ...t,
+              title: draft.title,
+              description: draft.description,
+              done: draft.done,
+              domainTags: draft.domainTags,
+              startMinutes: draft.startMinutes,
+              endMinutes: draft.endMinutes,
+            }
+          : t
+      ),
+    }));
+  };
+
+  const deleteTaskForDay = (key: string, taskId: string) => {
+    mutateDay(key, (d) => ({ ...d, tasks: d.tasks.filter((t) => t.id !== taskId) }));
   };
 
   const createTaskFromModal = (draft: TimelineTaskDraft) => {
@@ -483,7 +609,9 @@ export function DailyPlannerApp({ accountCreatedAt = null, userId = null }: Dail
   };
 
   const taskBeingEdited = modal?.mode === "edit"
-    ? todayAdHoc.tasks.find((t) => t.id === modal.taskId) ?? null
+    ? (modal.dayKey
+        ? getDayData(modal.dayKey).tasks.find((t) => t.id === modal.taskId)
+        : todayAdHoc.tasks.find((t) => t.id === modal.taskId)) ?? null
     : null;
 
   const tryApplyTemplate = (kind: RoutineTemplateKind) => {
@@ -711,17 +839,77 @@ export function DailyPlannerApp({ accountCreatedAt = null, userId = null }: Dail
           {tab === "week" && (
             <div>
               <SectionHeader
-                label="This week"
-                tooltip="Every scheduled block across the week. Click a day header, a time slot, or a task to open that day in the editor and make changes."
+                label="Week"
+                tooltip="Drag on any day to create a task, drag a block to move it (even to another day), drag its edge to resize, or click it to edit. Use the arrows to browse other weeks, and load a template into any day."
               />
+
+              {/* Week navigation + template loader */}
+              <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-white/[0.07] bg-white/[0.02] px-3 py-2.5">
+                <button
+                  type="button"
+                  onClick={() => setWeekAnchor((d) => addDays(d, -7))}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 text-white/50 transition-colors hover:border-white/20 hover:text-white/80"
+                  aria-label="Previous week"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
+                </button>
+                <span className="min-w-[7.5rem] text-center text-sm font-medium text-white/75">
+                  {weekRangeLabel(weekAnchor)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setWeekAnchor((d) => addDays(d, 7))}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 text-white/50 transition-colors hover:border-white/20 hover:text-white/80"
+                  aria-label="Next week"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
+                </button>
+                {startOfWeekLocal(weekAnchor).getTime() !== startOfWeekLocal(new Date()).getTime() && (
+                  <button
+                    type="button"
+                    onClick={() => setWeekAnchor(new Date())}
+                    className="rounded-lg border border-violet-500/25 bg-violet-600/15 px-2.5 py-1.5 text-xs font-medium text-violet-300 transition-colors hover:bg-violet-500/25"
+                  >
+                    This week
+                  </button>
+                )}
+
+                {/* Load a template into a chosen day of the visible week */}
+                <div className="ml-auto flex items-center gap-2">
+                  <span className="text-[11px] text-white/30">Load template into:</span>
+                  <select
+                    value=""
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (!v) return;
+                      const [kind, dayIdx] = v.split("|") as [RoutineTemplateKind, string];
+                      const target = addDays(startOfWeekLocal(weekAnchor), Number(dayIdx));
+                      setConfirmWeekTemplate({ kind, dateKey: dayKey(target), label: formatNavDate(target) });
+                      e.target.value = "";
+                    }}
+                    className="rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1.5 text-xs text-white/70 [color-scheme:dark] focus:border-violet-500/40 focus:outline-none"
+                  >
+                    <option value="">Choose…</option>
+                    {(["weekdays", "saturday", "sunday", "fallback"] as RoutineTemplateKind[]).map((kind) => (
+                      <optgroup key={kind} label={kind.charAt(0).toUpperCase() + kind.slice(1)}>
+                        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d, i) => (
+                          <option key={`${kind}|${i}`} value={`${kind}|${i}`}>
+                            {kind} → {d}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
               <WeekView
-                anchorDate={viewDate}
+                anchorDate={weekAnchor}
                 adHocByDate={state.adHocByDate}
                 minViewableDay={minViewableDay}
-                onOpenDay={(date) => {
-                  setViewDate(date);
-                  setTab("today");
-                }}
+                onTaskTimeChange={weekUpsertTaskTime}
+                onCreateRange={weekCreateRange}
+                onEditTask={weekEditTask}
               />
             </div>
           )}
@@ -835,16 +1023,19 @@ export function DailyPlannerApp({ accountCreatedAt = null, userId = null }: Dail
           initialRange={modal.mode === "create" ? modal.initialRange : undefined}
           onClose={() => setModal(null)}
           onSave={(draft) => {
+            const dk = modal.dayKey;
             if (modal.mode === "edit" && taskBeingEdited) {
-              updateTaskFromModal(taskBeingEdited.id, draft);
+              if (dk) updateTaskForDay(dk, taskBeingEdited.id, draft);
+              else updateTaskFromModal(taskBeingEdited.id, draft);
             } else {
-              createTaskFromModal(draft);
+              if (dk) createTaskForDay(dk, draft);
+              else createTaskFromModal(draft);
             }
             setModal(null);
           }}
           onDelete={
             modal.mode === "edit" && taskBeingEdited
-              ? () => deleteTask(taskBeingEdited.id)
+              ? () => (modal.dayKey ? deleteTaskForDay(modal.dayKey, taskBeingEdited.id) : deleteTask(taskBeingEdited.id))
               : undefined
           }
         />
@@ -878,6 +1069,42 @@ export function DailyPlannerApp({ accountCreatedAt = null, userId = null }: Dail
                 className="flex-1 rounded-xl bg-violet-600 py-2.5 text-sm font-medium text-white transition hover:bg-violet-500"
               >
                 Replace
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Confirm applying a template into a specific day from the Week hub */}
+      {confirmWeekTemplate !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#0f0f16] p-7 shadow-2xl"
+          >
+            <h3 className="mb-2 text-base font-semibold text-white">
+              Load {confirmWeekTemplate.kind} into {confirmWeekTemplate.label}?
+            </h3>
+            <p className="mb-6 text-sm leading-relaxed text-white/50">
+              Any existing tasks on {confirmWeekTemplate.label} will be overwritten with this template.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmWeekTemplate(null)}
+                className="flex-1 rounded-xl border border-white/10 py-2.5 text-sm text-white/50 transition hover:text-white/80"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  applyRoutineTemplateToDate(confirmWeekTemplate.kind, confirmWeekTemplate.dateKey);
+                  toast.success(`${confirmWeekTemplate.kind.charAt(0).toUpperCase() + confirmWeekTemplate.kind.slice(1)} loaded into ${confirmWeekTemplate.label}`);
+                  setConfirmWeekTemplate(null);
+                }}
+                className="flex-1 rounded-xl bg-violet-600 py-2.5 text-sm font-medium text-white transition hover:bg-violet-500"
+              >
+                Load
               </button>
             </div>
           </motion.div>
