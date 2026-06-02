@@ -5,7 +5,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase";
 import { loadPrefs } from "@/lib/prefs";
-import { calcStreak, countProductiveDays, localDateStr } from "@/lib/streak";
+import { calcForgivingStreak, countProductiveDays, localDateStr } from "@/lib/streak";
 
 type Props = {
   userId: string | null;
@@ -13,6 +13,8 @@ type Props = {
 
 type StreakData = {
   streak: number;
+  graceUsed: boolean;
+  atRisk: boolean;
   productiveDays: number;
   totalDays: number;
   goalHours: number;
@@ -50,8 +52,11 @@ export function StreakStrip({ userId }: Props) {
       }
 
       const thresholdS = prefs.productiveHoursThreshold * 3600;
+      const fs = calcForgivingStreak(map, todayStr);
       setData({
-        streak: calcStreak(map, todayStr),
+        streak: fs.count,
+        graceUsed: fs.graceUsed,
+        atRisk: fs.atRisk,
         productiveDays: countProductiveDays(map, thresholdS),
         totalDays: map.size,
         goalHours: prefs.productiveHoursThreshold,
@@ -85,8 +90,14 @@ export function StreakStrip({ userId }: Props) {
             <p className="text-lg font-bold leading-none text-white tabular-nums">
               {data.streak}<span className="ml-0.5 text-sm font-medium text-white/40">day{data.streak === 1 ? "" : "s"}</span>
             </p>
-            <p className="mt-1 text-xs text-white/40">
-              {data.streak > 0 ? "current streak" : "start your streak today"}
+            <p className={`mt-1 text-xs ${data.atRisk ? "text-amber-300/80" : "text-white/40"}`}>
+              {data.streak === 0
+                ? "start your streak today"
+                : data.atRisk
+                  ? "browse today to keep it alive"
+                  : data.graceUsed
+                    ? "current streak · 1 day forgiven"
+                    : "current streak"}
             </p>
           </div>
         </div>

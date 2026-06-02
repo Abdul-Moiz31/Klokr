@@ -10,7 +10,7 @@ import { ActivityHeatmap, type DayStat } from "@/components/activity/ActivityHea
 import { DayReportModal } from "@/components/activity/DayReportModal";
 import { loadPrefs } from "@/lib/prefs";
 import { Loader } from "@/components/ui/Loader";
-import { calcStreak, localDateStr } from "@/lib/streak";
+import { calcForgivingStreak, localDateStr } from "@/lib/streak";
 
 function formatTime(s: number): string {
   if (s < 60) return `${s}s`;
@@ -96,7 +96,7 @@ export default function ActivityPage() {
   );
 
   const streak = useMemo(
-    () => calcStreak(dailyMap, todayStr),
+    () => calcForgivingStreak(dailyMap, todayStr).count,
     [dailyMap, todayStr]
   );
 
@@ -153,8 +153,8 @@ export default function ActivityPage() {
         <StatsCard
           title="Current streak"
           value={`${streak}d`}
-          subtitle={streak > 0 ? "consecutive days tracked" : "Start your streak today"}
-          tooltip="Consecutive days with any tracked browsing, ending today (or yesterday if you haven't browsed yet today). Missing a full day resets the streak."
+          subtitle={streak > 0 ? "days in a row (1 miss forgiven)" : "Start your streak today"}
+          tooltip="Days with tracked browsing, ending today (or yesterday if you haven't browsed yet). Forgiving: a single missed day won't break it — only two misses in a row will."
           accent={streak >= 7 ? "violet" : "neutral"}
           delay={0.1}
           icon={
