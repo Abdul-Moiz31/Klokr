@@ -109,6 +109,9 @@ export function computeOnTaskStats(
     }
   }
   onTaskMinutes += manualAttributionMinutes(task.manualAttributions);
+  // Cap at the window length — overlapping sessions (multiple tabs in the same
+  // window) must not push on-task time above the wall-clock window.
+  onTaskMinutes = Math.min(onTaskMinutes, totalWindowMinutes);
 
   const percent = (onTaskMinutes / totalWindowMinutes) * 100;
   let status: OnTaskStatus;
@@ -200,13 +203,19 @@ export function findUnscheduledGaps(
       byDomain.set(dom, (byDomain.get(dom) ?? 0) + m);
     }
     if (activity <= 0) continue;
+    // Overlapping sessions (multiple tabs/domains tracked in the same window)
+    // would otherwise sum past the wall-clock length of the gap, producing
+    // impossible totals like "216 min · 31h". Activity within a window can
+    // never exceed the window itself — cap it.
+    const windowMinutes = g.to - g.from;
+    const cappedActivity = Math.min(activity, windowMinutes);
     const topDomains = [...byDomain.entries()]
-      .map(([domain, minutes]) => ({ domain, minutes }))
+      .map(([domain, minutes]) => ({ domain, minutes: Math.min(minutes, windowMinutes) }))
       .sort((a, b) => b.minutes - a.minutes);
     out.push({
       fromMinutes: g.from,
       toMinutes: g.to,
-      activityMinutes: activity,
+      activityMinutes: cappedActivity,
       topDomains,
     });
   }

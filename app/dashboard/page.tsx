@@ -18,7 +18,6 @@ import { PlanVsActualCard } from "@/components/dashboard/PlanVsActualCard";
 import { StreakStrip } from "@/components/dashboard/StreakStrip";
 import { WeeklyReviewCard } from "@/components/dashboard/WeeklyReviewCard";
 import { FocusScoreCard } from "@/components/dashboard/FocusScoreCard";
-import { AskYourTime } from "@/components/dashboard/AskYourTime";
 import { getSiteName } from "@/lib/domain";
 import type { TabSession } from "@/lib/supabase";
 
@@ -223,8 +222,6 @@ export default function DashboardPage() {
               domains={domainStats.map((d) => ({ domain: d.domain, totalSeconds: d.totalSeconds }))}
               goalHours={loadPrefs().productiveHoursThreshold}
             />
-
-            <AskYourTime />
 
             {/* Fetch error banner */}
             {fetchError && (
