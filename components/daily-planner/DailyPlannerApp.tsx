@@ -124,6 +124,7 @@ export function DailyPlannerApp({ accountCreatedAt = null, userId = null }: Dail
     hydrated,
     getTodayKey,
     setTodayAdHoc,
+    setAdHocForDate,
     setTaskDump,
     clearAdHocForToday,
     addRecurringRule,
@@ -165,8 +166,10 @@ export function DailyPlannerApp({ accountCreatedAt = null, userId = null }: Dail
   const [confirmTemplate, setConfirmTemplate] = useState<RoutineTemplateKind | null>(null);
   const [confirmDuplicateRule, setConfirmDuplicateRule] = useState<RecurringRule | null>(null);
   const [modal, setModal] = useState<
-    | { mode: "create"; initialRange?: { start: number; end: number } }
-    | { mode: "edit"; taskId: string }
+    // dayKey is set when editing/creating from the Week view (a non-today day).
+    // When absent, the modal operates on today (the original Day-view behavior).
+    | { mode: "create"; initialRange?: { start: number; end: number }; dayKey?: string }
+    | { mode: "edit"; taskId: string; dayKey?: string }
     | null
   >(null);
   const [gapModal, setGapModal] = useState<UnscheduledGap | null>(null);
@@ -305,6 +308,106 @@ export function DailyPlannerApp({ accountCreatedAt = null, userId = null }: Dail
         t.id === taskId ? { ...t, startMinutes: range.start, endMinutes: range.end } : t
       )
     );
+  };
+
+  // ── Week-view helpers (operate on an arbitrary day, not just today) ───────
+  const getDayData = (key: string): DayData =>
+    (state?.adHocByDate[key] ?? createEmptyDayData());
+
+  const mutateDay = (key: string, mutate: (d: DayData) => DayData) => {
+    setAdHocForDate(key, mutate(getDayData(key)));
+  };
+
+  // Move/resize a task in the Week view. Handles dragging a task to a different
+  // day: if the new day differs from where the task currently lives, it's
+  // removed from the old day and added to the target day.
+  const weekUpsertTaskTime = (
+    dayDate: Date,
+    taskId: string,
+    startMinutes: number,
+    endMinutes: number
+  ) => {
+    const range = normalizeRange(startMinutes, endMinutes);
+    const targetKey = dayKey(dayDate);
+    // Find which day currently holds the task (search this week's loaded days).
+    let sourceKey: string | null = null;
+    let moved: PlannerTask | null = null;
+    if (state) {
+      for (const [k, d] of Object.entries(state.adHocByDate)) {
+        const found = d?.tasks.find((t) => t.id === taskId);
+        if (found) { sourceKey = k; moved = found; break; }
+      }
+    }
+    if (sourceKey === targetKey || sourceKey == null) {
+      // Same day (or unknown) — just update the time in place on the target day.
+      mutateDay(targetKey, (d) => ({
+        ...d,
+        tasks: d.tasks.map((t) =>
+          t.id === taskId ? { ...t, startMinutes: range.start, endMinutes: range.end } : t
+        ),
+      }));
+      return;
+    }
+    // Cross-day move: remove from source, add to target.
+    mutateDay(sourceKey, (d) => ({ ...d, tasks: d.tasks.filter((t) => t.id !== taskId) }));
+    const taskMoved = moved!;
+    mutateDay(targetKey, (d) => ({
+      ...d,
+      tasks: [...d.tasks, { ...taskMoved, startMinutes: range.start, endMinutes: range.end }],
+    }));
+  };
+
+  const weekCreateRange = (dayDate: Date, startMinutes: number, endMinutes: number) => {
+    setModal({ mode: "create", initialRange: { start: startMinutes, end: endMinutes }, dayKey: dayKey(dayDate) });
+  };
+
+  const weekEditTask = (dayDate: Date, taskId: string) => {
+    setModal({ mode: "edit", taskId, dayKey: dayKey(dayDate) });
+  };
+
+  // Day-aware create/update/delete used when the modal targets a non-today day
+  // (opened from the Week view). These mirror the today handlers below.
+  const createTaskForDay = (key: string, draft: TimelineTaskDraft) => {
+    const day = getDayData(key);
+    const { data, groupId } = ensureFirstGroupId(day);
+    const maxOrder = data.tasks
+      .filter((t) => t.groupId === groupId)
+      .reduce((m, t) => Math.max(m, t.order), -1);
+    const newTask: PlannerTask = {
+      id: newIdFn(),
+      groupId,
+      title: draft.title,
+      description: draft.description,
+      done: draft.done,
+      domainTags: draft.domainTags,
+      order: maxOrder + 1,
+      startMinutes: draft.startMinutes,
+      endMinutes: draft.endMinutes,
+    };
+    setAdHocForDate(key, { ...data, tasks: [...data.tasks, newTask] });
+  };
+
+  const updateTaskForDay = (key: string, taskId: string, draft: TimelineTaskDraft) => {
+    mutateDay(key, (d) => ({
+      ...d,
+      tasks: d.tasks.map((t) =>
+        t.id === taskId
+          ? {
+              ...t,
+              title: draft.title,
+              description: draft.description,
+              done: draft.done,
+              domainTags: draft.domainTags,
+              startMinutes: draft.startMinutes,
+              endMinutes: draft.endMinutes,
+            }
+          : t
+      ),
+    }));
+  };
+
+  const deleteTaskForDay = (key: string, taskId: string) => {
+    mutateDay(key, (d) => ({ ...d, tasks: d.tasks.filter((t) => t.id !== taskId) }));
   };
 
   const createTaskFromModal = (draft: TimelineTaskDraft) => {
@@ -483,7 +586,9 @@ export function DailyPlannerApp({ accountCreatedAt = null, userId = null }: Dail
   };
 
   const taskBeingEdited = modal?.mode === "edit"
-    ? todayAdHoc.tasks.find((t) => t.id === modal.taskId) ?? null
+    ? (modal.dayKey
+        ? getDayData(modal.dayKey).tasks.find((t) => t.id === modal.taskId)
+        : todayAdHoc.tasks.find((t) => t.id === modal.taskId)) ?? null
     : null;
 
   const tryApplyTemplate = (kind: RoutineTemplateKind) => {
@@ -712,16 +817,15 @@ export function DailyPlannerApp({ accountCreatedAt = null, userId = null }: Dail
             <div>
               <SectionHeader
                 label="This week"
-                tooltip="Every scheduled block across the week. Click a day header, a time slot, or a task to open that day in the editor and make changes."
+                tooltip="Drag on any day to create a task, drag a block to move it (even to another day), drag its edge to resize, or click it to edit. Changes save to that day."
               />
               <WeekView
                 anchorDate={viewDate}
                 adHocByDate={state.adHocByDate}
                 minViewableDay={minViewableDay}
-                onOpenDay={(date) => {
-                  setViewDate(date);
-                  setTab("today");
-                }}
+                onTaskTimeChange={weekUpsertTaskTime}
+                onCreateRange={weekCreateRange}
+                onEditTask={weekEditTask}
               />
             </div>
           )}
@@ -835,16 +939,19 @@ export function DailyPlannerApp({ accountCreatedAt = null, userId = null }: Dail
           initialRange={modal.mode === "create" ? modal.initialRange : undefined}
           onClose={() => setModal(null)}
           onSave={(draft) => {
+            const dk = modal.dayKey;
             if (modal.mode === "edit" && taskBeingEdited) {
-              updateTaskFromModal(taskBeingEdited.id, draft);
+              if (dk) updateTaskForDay(dk, taskBeingEdited.id, draft);
+              else updateTaskFromModal(taskBeingEdited.id, draft);
             } else {
-              createTaskFromModal(draft);
+              if (dk) createTaskForDay(dk, draft);
+              else createTaskFromModal(draft);
             }
             setModal(null);
           }}
           onDelete={
             modal.mode === "edit" && taskBeingEdited
-              ? () => deleteTask(taskBeingEdited.id)
+              ? () => (modal.dayKey ? deleteTaskForDay(modal.dayKey, taskBeingEdited.id) : deleteTask(taskBeingEdited.id))
               : undefined
           }
         />

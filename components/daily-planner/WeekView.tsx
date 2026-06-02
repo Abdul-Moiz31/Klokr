@@ -4,23 +4,39 @@ import { useEffect, useMemo, useRef } from "react";
 import FullCalendar from "@fullcalendar/react";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
-import type { DateClickArg } from "@fullcalendar/interaction";
-import type { EventClickArg, EventInput } from "@fullcalendar/core";
+import type {
+  DateSelectArg,
+  EventClickArg,
+  EventDropArg,
+  EventInput,
+} from "@fullcalendar/core";
+import type { EventResizeDoneArg } from "@fullcalendar/interaction";
 import type { DayData, PlannerTask } from "@/lib/daily-planner/types";
 import { dayKey } from "@/lib/daily-planner/storage";
-import { minutesToDate, startOfLocalDay, formatMinutes } from "@/lib/daily-planner/timeline";
+import {
+  SNAP_MINUTES,
+  dateToMinutes,
+  minutesToDate,
+  normalizeRange,
+  startOfLocalDay,
+  formatMinutes,
+} from "@/lib/daily-planner/timeline";
 
-const SNAP_DURATION = "00:15:00";
+const SNAP_DURATION = `00:${String(SNAP_MINUTES).padStart(2, "0")}:00`;
 
 type Props = {
   /** Any date inside the week to display. The view snaps to that week. */
   anchorDate: Date;
   /** Map of dayKey → that day's DayData (read straight from planner state). */
   adHocByDate: Record<string, DayData | undefined>;
-  /** Jump to a specific day in the Today editor. */
-  onOpenDay: (date: Date) => void;
   /** Earliest day the user can navigate to (account creation). */
   minViewableDay?: Date | null;
+  /** Move/resize an existing task on a specific day. Range is already snapped. */
+  onTaskTimeChange: (dayDate: Date, taskId: string, startMinutes: number, endMinutes: number) => void;
+  /** Drag on empty space → create a task on that day, pre-filled with the range. */
+  onCreateRange: (dayDate: Date, startMinutes: number, endMinutes: number) => void;
+  /** Click a task → open the edit modal for it on its day. */
+  onEditTask: (dayDate: Date, taskId: string) => void;
 };
 
 /** Local start-of-week (Sunday) for the given date. */
@@ -36,7 +52,14 @@ function addDays(d: Date, n: number): Date {
   return next;
 }
 
-export function WeekView({ anchorDate, adHocByDate, onOpenDay, minViewableDay = null }: Props) {
+export function WeekView({
+  anchorDate,
+  adHocByDate,
+  minViewableDay = null,
+  onTaskTimeChange,
+  onCreateRange,
+  onEditTask,
+}: Props) {
   const calendarRef = useRef<FullCalendar | null>(null);
 
   const weekStart = useMemo(() => startOfWeek(anchorDate), [anchorDate]);
@@ -47,7 +70,7 @@ export function WeekView({ anchorDate, adHocByDate, onOpenDay, minViewableDay = 
     if (api) api.gotoDate(weekStart);
   }, [weekStart]);
 
-  // Build read-only events for every scheduled task across all 7 days.
+  // Build editable events for every scheduled task across all 7 days.
   const events: EventInput[] = useMemo(() => {
     const out: EventInput[] = [];
     for (let i = 0; i < 7; i++) {
@@ -58,32 +81,59 @@ export function WeekView({ anchorDate, adHocByDate, onOpenDay, minViewableDay = 
       for (const t of day.tasks) {
         if (t.startMinutes == null || t.endMinutes == null) continue;
         out.push({
-          id: `${key}-${t.id}`,
+          id: `${key}::${t.id}`,
           title: t.title || "(untitled)",
           start: minutesToDate(date, t.startMinutes),
           end: minutesToDate(date, t.endMinutes),
-          editable: false,
+          // Done tasks aren't draggable (consistent with Day view).
+          editable: !t.done,
           classNames: [
             "klokrs-event",
             "klokrs-week-event",
             t.done ? "klokrs-event--done" : "",
           ].filter(Boolean),
-          extendedProps: { dayDate: date, task: t },
+          extendedProps: { taskId: t.id, task: t },
         });
       }
     }
     return out;
   }, [weekStart, adHocByDate]);
 
-  const handleEventClick = (info: EventClickArg) => {
-    const date = info.event.extendedProps?.dayDate as Date | undefined;
-    if (date) onOpenDay(date);
+  const handleDrop = (info: EventDropArg) => {
+    const ev = info.event;
+    if (!ev.start || !ev.end) { info.revert(); return; }
+    const taskId = (ev.extendedProps?.taskId as string) ?? ev.id.split("::")[1] ?? ev.id;
+    // ev.start reflects the (possibly new) day after a cross-column drag.
+    const dayDate = startOfLocalDay(ev.start);
+    const { start, end } = normalizeRange(dateToMinutes(ev.start), dateToMinutes(ev.end));
+    onTaskTimeChange(dayDate, taskId, start, end);
   };
 
-  const handleDateClick = (info: DateClickArg) => {
-    // Clicking an empty slot jumps to that day's editor to schedule there.
-    if (minViewableDay && startOfLocalDay(info.date) < startOfLocalDay(minViewableDay)) return;
-    onOpenDay(info.date);
+  const handleResize = (info: EventResizeDoneArg) => {
+    const ev = info.event;
+    if (!ev.start || !ev.end) { info.revert(); return; }
+    const taskId = (ev.extendedProps?.taskId as string) ?? ev.id.split("::")[1] ?? ev.id;
+    const dayDate = startOfLocalDay(ev.start);
+    const { start, end } = normalizeRange(dateToMinutes(ev.start), dateToMinutes(ev.end));
+    onTaskTimeChange(dayDate, taskId, start, end);
+  };
+
+  const handleSelect = (info: DateSelectArg) => {
+    const dayDate = startOfLocalDay(info.start);
+    if (minViewableDay && dayDate < startOfLocalDay(minViewableDay)) {
+      calendarRef.current?.getApi().unselect();
+      return;
+    }
+    const { start, end } = normalizeRange(dateToMinutes(info.start), dateToMinutes(info.end));
+    onCreateRange(dayDate, start, end);
+    calendarRef.current?.getApi().unselect();
+  };
+
+  const handleEventClick = (info: EventClickArg) => {
+    const taskId = info.event.extendedProps?.taskId as string | undefined;
+    if (info.event.start && taskId) {
+      onEditTask(startOfLocalDay(info.event.start), taskId);
+    }
   };
 
   return (
@@ -103,14 +153,18 @@ export function WeekView({ anchorDate, adHocByDate, onOpenDay, minViewableDay = 
         slotMaxTime="24:00:00"
         slotDuration={SNAP_DURATION}
         slotLabelInterval="01:00"
+        snapDuration={SNAP_DURATION}
         dayHeaderFormat={{ weekday: "short", day: "numeric" }}
-        editable={false}
-        selectable={false}
+        editable
+        selectable
+        selectMirror
         events={events}
         eventOverlap
         slotEventOverlap
+        eventDrop={handleDrop}
+        eventResize={handleResize}
+        select={handleSelect}
         eventClick={handleEventClick}
-        dateClick={handleDateClick}
         eventContent={(arg) => {
           const task = arg.event.extendedProps?.task as PlannerTask | undefined;
           const done = task?.done === true;
