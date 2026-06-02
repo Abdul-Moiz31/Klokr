@@ -15,6 +15,7 @@ import { Loader } from "@/components/ui/Loader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { WorkDayCompleteBanner } from "@/components/dashboard/WorkDayCompleteBanner";
 import { PlanVsActualCard } from "@/components/dashboard/PlanVsActualCard";
+import { StreakStrip } from "@/components/dashboard/StreakStrip";
 import { getSiteName } from "@/lib/domain";
 import type { TabSession } from "@/lib/supabase";
 
@@ -208,8 +209,9 @@ export default function DashboardPage() {
         }
       />
 
-            <WorkDayCompleteBanner totalSecondsToday={totalSeconds} />
+            <StreakStrip userId={userId} />
 
+            <WorkDayCompleteBanner totalSecondsToday={totalSeconds} />
             <PlanVsActualCard sessions={sessions} autoCompleteThreshold={loadPrefs().autoCompleteThreshold} />
 
             {/* Fetch error banner */}
