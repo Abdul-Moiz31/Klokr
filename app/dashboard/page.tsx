@@ -16,6 +16,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { WorkDayCompleteBanner } from "@/components/dashboard/WorkDayCompleteBanner";
 import { PlanVsActualCard } from "@/components/dashboard/PlanVsActualCard";
 import { StreakStrip } from "@/components/dashboard/StreakStrip";
+import { FocusScoreCard } from "@/components/dashboard/FocusScoreCard";
 import { getSiteName } from "@/lib/domain";
 import type { TabSession } from "@/lib/supabase";
 
@@ -213,6 +214,11 @@ export default function DashboardPage() {
 
             <WorkDayCompleteBanner totalSecondsToday={totalSeconds} />
             <PlanVsActualCard sessions={sessions} autoCompleteThreshold={loadPrefs().autoCompleteThreshold} />
+
+            <FocusScoreCard
+              domains={domainStats.map((d) => ({ domain: d.domain, totalSeconds: d.totalSeconds }))}
+              goalHours={loadPrefs().productiveHoursThreshold}
+            />
 
             {/* Fetch error banner */}
             {fetchError && (
