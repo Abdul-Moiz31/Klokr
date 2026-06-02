@@ -45,3 +45,59 @@ export function countProductiveDays(
   }
   return count;
 }
+
+export type ForgivingStreak = {
+  /** Streak length (active days within the forgiving run). */
+  count: number;
+  /** True if a grace day is currently in play (a recent single miss was forgiven). */
+  graceUsed: boolean;
+  /** True if missing today would break the streak (yesterday was already a miss). */
+  atRisk: boolean;
+};
+
+/**
+ * Forgiving streak: a SINGLE missed day does not break the streak — only TWO
+ * consecutive missed days do. This is the anti-abandonment design: one off day
+ * shouldn't reset weeks of consistency, but you still can't skip indefinitely.
+ *
+ * Walks backward from today (or yesterday if today has no data yet), counting
+ * active days. A lone gap is "forgiven" and walking continues; two gaps in a
+ * row stop it.
+ */
+export function calcForgivingStreak(
+  dailyMap: Map<string, number>,
+  todayStr: string
+): ForgivingStreak {
+  const active = (d: Date) => (dailyMap.get(localDateStr(d)) ?? 0) > 0;
+
+  const cursor = new Date(todayStr + "T00:00:00");
+  const todayActive = active(cursor);
+  // If today has no data yet, start from yesterday (don't penalize an in-progress day).
+  if (!todayActive) cursor.setDate(cursor.getDate() - 1);
+
+  let count = 0;
+  let graceUsed = false;
+  let prevWasGap = false;
+
+  while (true) {
+    if (active(cursor)) {
+      count++;
+      prevWasGap = false;
+      cursor.setDate(cursor.getDate() - 1);
+    } else if (!prevWasGap) {
+      // First gap in a row — forgive it and keep going.
+      graceUsed = true;
+      prevWasGap = true;
+      cursor.setDate(cursor.getDate() - 1);
+    } else {
+      break; // two gaps in a row — streak ends
+    }
+  }
+
+  // At risk = today not yet active AND yesterday was a miss (one more breaks it).
+  const yesterday = new Date(todayStr + "T00:00:00");
+  yesterday.setDate(yesterday.getDate() - 1);
+  const atRisk = !todayActive && !active(yesterday) && count > 0;
+
+  return { count, graceUsed, atRisk };
+}
