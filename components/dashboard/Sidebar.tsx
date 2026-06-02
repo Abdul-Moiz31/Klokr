@@ -34,6 +34,8 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: Props) {
   const menuId = useId();
   const [user, setUser] = useState<User | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  // Desktop collapse to an icon-only rail. Persisted so it survives reloads.
+  const [collapsed, setCollapsed] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
   const gradId = `sbgrad-${useId().replace(/:/g, "")}`;
 
@@ -53,6 +55,21 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: Props) {
       setUser(session?.user ?? null);
     });
     return () => subscription.unsubscribe();
+  }, []);
+
+  // Load persisted collapse state on mount.
+  useEffect(() => {
+    try {
+      setCollapsed(localStorage.getItem("Klokrs_sidebar_collapsed") === "1");
+    } catch { /* ignore */ }
+  }, []);
+
+  const toggleCollapsed = useCallback(() => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      try { localStorage.setItem("Klokrs_sidebar_collapsed", next ? "1" : "0"); } catch { /* ignore */ }
+      return next;
+    });
   }, []);
 
   useEffect(() => {
@@ -227,6 +244,8 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: Props) {
 
   const linkClass = (active: boolean) =>
     `flex min-h-[2.75rem] items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
+      collapsed ? "lg:justify-center lg:px-2" : ""
+    } ${
       active
         ? "border border-violet-500/20 bg-violet-600/20 text-violet-300"
         : "border border-transparent text-white/50 hover:bg-white/5 hover:text-white"
@@ -235,11 +254,13 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: Props) {
   return (
     <aside
       id="app-sidebar"
-      className={`flex w-64 shrink-0 flex-col border-r border-white/10 bg-white/3 backdrop-blur-xl transition-transform duration-200 ease-out min-h-0 max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:z-50 max-lg:h-[100dvh] max-lg:min-h-0 max-lg:w-[min(18rem,100vw-3rem)] max-lg:max-w-sm max-lg:bg-[#0c0c12]/95 lg:static lg:z-auto lg:h-full lg:max-w-none lg:translate-x-0 ${
+      className={`flex w-64 shrink-0 flex-col border-r border-white/10 bg-white/3 backdrop-blur-xl transition-all duration-200 ease-out min-h-0 max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:z-50 max-lg:h-[100dvh] max-lg:min-h-0 max-lg:w-[min(18rem,100vw-3rem)] max-lg:max-w-sm max-lg:bg-[#0c0c12]/95 lg:static lg:z-auto lg:h-full lg:max-w-none lg:translate-x-0 ${
+        collapsed ? "lg:w-[4.5rem]" : "lg:w-64"
+      } ${
         mobileOpen ? "max-lg:translate-x-0" : "max-lg:-translate-x-full"
       }`}
     >
-      <div className="border-b border-white/10 p-4 sm:p-5 lg:p-6">
+      <div className={`flex items-center justify-between border-b border-white/10 p-4 sm:p-5 lg:p-6 ${collapsed ? "lg:justify-center lg:px-2" : ""}`}>
         <Link
           href="/"
           onClick={closeIfMobile}
@@ -280,9 +301,34 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: Props) {
               </linearGradient>
             </defs>
           </svg>
-          <span className="font-bold text-white">Klokrs</span>
+          <span className={`font-bold text-white ${collapsed ? "lg:hidden" : ""}`}>Klokrs</span>
         </Link>
+        {/* Desktop collapse toggle */}
+        <button
+          type="button"
+          onClick={toggleCollapsed}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          className={`hidden h-8 w-8 items-center justify-center rounded-lg border border-white/10 text-white/40 transition hover:border-white/20 hover:text-white/80 lg:flex ${collapsed ? "lg:hidden" : ""}`}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" /><line x1="9" y1="3" x2="9" y2="21" />
+          </svg>
+        </button>
       </div>
+
+      {/* Expand button — only visible (desktop) when collapsed */}
+      {collapsed && (
+        <button
+          type="button"
+          onClick={toggleCollapsed}
+          aria-label="Expand sidebar"
+          className="mx-auto mt-3 hidden h-8 w-8 items-center justify-center rounded-lg border border-white/10 text-white/40 transition hover:border-white/20 hover:text-white/80 lg:flex"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" /><line x1="15" y1="3" x2="15" y2="21" />
+          </svg>
+        </button>
+      )}
 
       <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto p-3 sm:p-4">
         {navItems.map((item) => {
@@ -299,10 +345,11 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: Props) {
               key={item.href}
               href={item.href}
               onClick={closeIfMobile}
+              title={collapsed ? item.label : undefined}
               className={linkClass(active)}
             >
               {item.icon}
-              <span className="leading-tight">{item.label}</span>
+              <span className={`leading-tight ${collapsed ? "lg:hidden" : ""}`}>{item.label}</span>
             </Link>
           );
         })}
@@ -317,7 +364,8 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: Props) {
             aria-expanded={menuOpen}
             aria-controls={menuOpen ? `profile-menu-${menuId}` : undefined}
             onClick={() => setMenuOpen((o) => !o)}
-            className="flex w-full min-w-0 items-center gap-3 rounded-xl px-2 py-2 text-left text-sm transition-colors hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/50"
+            title={collapsed ? (user?.email ?? "Account") : undefined}
+            className={`flex w-full min-w-0 items-center gap-3 rounded-xl px-2 py-2 text-left text-sm transition-colors hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/50 ${collapsed ? "lg:justify-center" : ""}`}
           >
             <span
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-cyan-600 text-sm font-semibold text-white shadow-lg shadow-violet-900/30"
@@ -325,7 +373,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: Props) {
             >
               {initialsFromUser(user)}
             </span>
-            <span className="min-w-0 flex-1">
+            <span className={`min-w-0 flex-1 ${collapsed ? "lg:hidden" : ""}`}>
               <span className="block truncate text-white/90">Account</span>
               <span className="block truncate text-xs text-white/40">
                 {user?.email ?? "…"}
@@ -334,7 +382,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: Props) {
             <svg
               className={`h-4 w-4 shrink-0 text-white/35 transition-transform ${
                 menuOpen ? "rotate-180" : ""
-              }`}
+              } ${collapsed ? "lg:hidden" : ""}`}
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
