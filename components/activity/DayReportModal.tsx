@@ -94,7 +94,8 @@ export function DayReportModal({ date, userId, productiveThresholdSeconds, strea
   const toggleGroup = (domain: string) => {
     setExpandedGroups((prev) => {
       const next = new Set(prev);
-      next.has(domain) ? next.delete(domain) : next.add(domain);
+      if (next.has(domain)) next.delete(domain);
+      else next.add(domain);
       return next;
     });
   };
