@@ -268,3 +268,21 @@ html {
 .klokrs-timeline .fc-timegrid-event-harness:hover .fc-event {
   filter: brightness(1.06);
 }
+
+/* ── Week view overrides ─────────────────────────────────── */
+/* Read-only: blocks and slots act as navigation, not drag handles. */
+.klokrs-week .fc-event,
+.klokrs-week .fc-timegrid-col {
+  cursor: pointer;
+}
+/* 7 columns are narrower than the single-day view — tighten event text. */
+.klokrs-week .klokrs-week-event-body .klokrs-event-title {
+  font-size: 11px;
+}
+.klokrs-week .klokrs-week-event-body .klokrs-event-meta {
+  font-size: 9px;
+}
+/* Highlight today's column header in the week grid. */
+.klokrs-week .fc-day-today .fc-col-header-cell-cushion {
+  color: rgb(167, 139, 250);
+}
