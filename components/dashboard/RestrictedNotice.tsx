@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
-import { SUPPORT_EMAIL , AdminEmail } from "@/lib/constants";
+import { AdminEmail } from "@/lib/constants";
 
 export function RestrictedNotice() {
   const router = useRouter();
