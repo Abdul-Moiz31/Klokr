@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@/lib/supabase";
+import { AiAccessCard } from "@/components/dashboard/AiAccessCard";
 
 const SUGGESTIONS = [
   "How much time did I spend on YouTube this week?",
@@ -15,6 +16,8 @@ export function AskYourTime() {
   const [answer, setAnswer] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Bumped after each ask so the usage meter re-fetches and reflects the new count.
+  const [accessKey, setAccessKey] = useState(0);
 
   const ask = async (q: string) => {
     const trimmed = q.trim();
@@ -33,8 +36,9 @@ export function AskYourTime() {
         body: JSON.stringify({ question: trimmed }),
       });
       const json = await res.json() as { answer?: string; error?: string };
-      if (!res.ok) { setError(json.error ?? "Something went wrong."); setLoading(false); return; }
+      if (!res.ok) { setError(json.error ?? "Something went wrong."); setAccessKey((k) => k + 1); setLoading(false); return; }
       setAnswer(json.answer ?? "");
+      setAccessKey((k) => k + 1); // refresh usage meter
     } catch {
       setError("Couldn't reach the server. Try again.");
     }
@@ -106,6 +110,8 @@ export function AskYourTime() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <AiAccessCard key={accessKey} />
     </div>
   );
 }
