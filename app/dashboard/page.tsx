@@ -211,17 +211,20 @@ export default function DashboardPage() {
         }
       />
 
-            <StreakStrip userId={userId} />
-
-            <WeeklyReviewCard userId={userId} />
-
             <WorkDayCompleteBanner totalSecondsToday={totalSeconds} />
-            <PlanVsActualCard sessions={sessions} autoCompleteThreshold={loadPrefs().autoCompleteThreshold} />
 
-            <FocusScoreCard
-              domains={domainStats.map((d) => ({ domain: d.domain, totalSeconds: d.totalSeconds }))}
-              goalHours={loadPrefs().productiveHoursThreshold}
-            />
+            {/* Insight cards — two-up on wide screens so they don't dominate the page */}
+            <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-2 [&>*]:mb-0">
+              <StreakStrip userId={userId} />
+              <WeeklyReviewCard userId={userId} />
+            </div>
+            <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-2 [&>*]:mb-0">
+              <PlanVsActualCard sessions={sessions} autoCompleteThreshold={loadPrefs().autoCompleteThreshold} />
+              <FocusScoreCard
+                domains={domainStats.map((d) => ({ domain: d.domain, totalSeconds: d.totalSeconds }))}
+                goalHours={loadPrefs().productiveHoursThreshold}
+              />
+            </div>
 
             {/* Fetch error banner */}
             {fetchError && (
