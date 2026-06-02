@@ -102,6 +102,21 @@ function formatNavDate(d: Date): string {
   return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 }
 
+function startOfWeekLocal(d: Date): Date {
+  const base = startOfLocalDay(d);
+  base.setDate(base.getDate() - base.getDay()); // Sunday start
+  return base;
+}
+
+function weekRangeLabel(anchor: Date): string {
+  const start = startOfWeekLocal(anchor);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 6);
+  const s = start.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const e = end.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return `${s} – ${e}`;
+}
+
 function SectionHeader({ label, tooltip }: { label: string; tooltip: string }) {
   return (
     <div className="flex items-center gap-1.5 mb-3">
@@ -135,6 +150,7 @@ export function DailyPlannerApp({ accountCreatedAt = null, userId = null }: Dail
     forceAppendRecurringRuleToToday,
     getTrackingRules,
     applyRoutineTemplateToToday,
+    applyRoutineTemplateToDate,
     setRoutineTemplate,
     setTemplateTaskDomains,
     newId: newIdFn,
@@ -142,6 +158,9 @@ export function DailyPlannerApp({ accountCreatedAt = null, userId = null }: Dail
 
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("today");
   const [viewDate, setViewDate] = useState<Date>(() => new Date());
+  // Separate anchor for the Week tab so browsing past/future weeks doesn't move
+  // the Day tab's viewDate. Defaults to the current week.
+  const [weekAnchor, setWeekAnchor] = useState<Date>(() => new Date());
   const [prefs, setPrefs] = useState<KlokrsPrefs>(DEFAULT_PREFS);
   useEffect(() => {
     setPrefs(loadPrefs());
@@ -164,6 +183,10 @@ export function DailyPlannerApp({ accountCreatedAt = null, userId = null }: Dail
   // past days → one-shot fetch). Used to render fill bars on each task block.
   const { sessions } = useTodaySessions(viewDate);
   const [confirmTemplate, setConfirmTemplate] = useState<RoutineTemplateKind | null>(null);
+  // Week-hub: confirm applying a template into a specific day (overwrites it).
+  const [confirmWeekTemplate, setConfirmWeekTemplate] = useState<
+    { kind: RoutineTemplateKind; dateKey: string; label: string } | null
+  >(null);
   const [confirmDuplicateRule, setConfirmDuplicateRule] = useState<RecurringRule | null>(null);
   const [modal, setModal] = useState<
     // dayKey is set when editing/creating from the Week view (a non-today day).
@@ -816,11 +839,72 @@ export function DailyPlannerApp({ accountCreatedAt = null, userId = null }: Dail
           {tab === "week" && (
             <div>
               <SectionHeader
-                label="This week"
-                tooltip="Drag on any day to create a task, drag a block to move it (even to another day), drag its edge to resize, or click it to edit. Changes save to that day."
+                label="Week"
+                tooltip="Drag on any day to create a task, drag a block to move it (even to another day), drag its edge to resize, or click it to edit. Use the arrows to browse other weeks, and load a template into any day."
               />
+
+              {/* Week navigation + template loader */}
+              <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-white/[0.07] bg-white/[0.02] px-3 py-2.5">
+                <button
+                  type="button"
+                  onClick={() => setWeekAnchor((d) => addDays(d, -7))}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 text-white/50 transition-colors hover:border-white/20 hover:text-white/80"
+                  aria-label="Previous week"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
+                </button>
+                <span className="min-w-[7.5rem] text-center text-sm font-medium text-white/75">
+                  {weekRangeLabel(weekAnchor)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setWeekAnchor((d) => addDays(d, 7))}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 text-white/50 transition-colors hover:border-white/20 hover:text-white/80"
+                  aria-label="Next week"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
+                </button>
+                {startOfWeekLocal(weekAnchor).getTime() !== startOfWeekLocal(new Date()).getTime() && (
+                  <button
+                    type="button"
+                    onClick={() => setWeekAnchor(new Date())}
+                    className="rounded-lg border border-violet-500/25 bg-violet-600/15 px-2.5 py-1.5 text-xs font-medium text-violet-300 transition-colors hover:bg-violet-500/25"
+                  >
+                    This week
+                  </button>
+                )}
+
+                {/* Load a template into a chosen day of the visible week */}
+                <div className="ml-auto flex items-center gap-2">
+                  <span className="text-[11px] text-white/30">Load template into:</span>
+                  <select
+                    value=""
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (!v) return;
+                      const [kind, dayIdx] = v.split("|") as [RoutineTemplateKind, string];
+                      const target = addDays(startOfWeekLocal(weekAnchor), Number(dayIdx));
+                      setConfirmWeekTemplate({ kind, dateKey: dayKey(target), label: formatNavDate(target) });
+                      e.target.value = "";
+                    }}
+                    className="rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1.5 text-xs text-white/70 [color-scheme:dark] focus:border-violet-500/40 focus:outline-none"
+                  >
+                    <option value="">Choose…</option>
+                    {(["weekdays", "saturday", "sunday", "fallback"] as RoutineTemplateKind[]).map((kind) => (
+                      <optgroup key={kind} label={kind.charAt(0).toUpperCase() + kind.slice(1)}>
+                        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d, i) => (
+                          <option key={`${kind}|${i}`} value={`${kind}|${i}`}>
+                            {kind} → {d}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
               <WeekView
-                anchorDate={viewDate}
+                anchorDate={weekAnchor}
                 adHocByDate={state.adHocByDate}
                 minViewableDay={minViewableDay}
                 onTaskTimeChange={weekUpsertTaskTime}
@@ -985,6 +1069,42 @@ export function DailyPlannerApp({ accountCreatedAt = null, userId = null }: Dail
                 className="flex-1 rounded-xl bg-violet-600 py-2.5 text-sm font-medium text-white transition hover:bg-violet-500"
               >
                 Replace
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Confirm applying a template into a specific day from the Week hub */}
+      {confirmWeekTemplate !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#0f0f16] p-7 shadow-2xl"
+          >
+            <h3 className="mb-2 text-base font-semibold text-white">
+              Load {confirmWeekTemplate.kind} into {confirmWeekTemplate.label}?
+            </h3>
+            <p className="mb-6 text-sm leading-relaxed text-white/50">
+              Any existing tasks on {confirmWeekTemplate.label} will be overwritten with this template.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmWeekTemplate(null)}
+                className="flex-1 rounded-xl border border-white/10 py-2.5 text-sm text-white/50 transition hover:text-white/80"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  applyRoutineTemplateToDate(confirmWeekTemplate.kind, confirmWeekTemplate.dateKey);
+                  toast.success(`${confirmWeekTemplate.kind.charAt(0).toUpperCase() + confirmWeekTemplate.kind.slice(1)} loaded into ${confirmWeekTemplate.label}`);
+                  setConfirmWeekTemplate(null);
+                }}
+                className="flex-1 rounded-xl bg-violet-600 py-2.5 text-sm font-medium text-white transition hover:bg-violet-500"
+              >
+                Load
               </button>
             </div>
           </motion.div>

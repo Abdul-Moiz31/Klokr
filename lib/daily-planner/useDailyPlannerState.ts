@@ -404,6 +404,19 @@ export function useDailyPlannerState() {
     [update]
   );
 
+  // Apply a template to an arbitrary day (used by the Week hub). Replaces that
+  // day's ad-hoc tasks with a fresh-id copy of the template.
+  const applyRoutineTemplateToDate = useCallback(
+    (kind: RoutineTemplateKind, dateKey: string) => {
+      update((s) => {
+        const src = s.routineTemplates[kind];
+        s.adHocByDate[dateKey] = dayDataWithFreshIds(deepClone(src), kind);
+        return s;
+      });
+    },
+    [update]
+  );
+
   const getTrackingRules = useCallback(() => {
     if (!state) return [];
     return buildTabTrackingRules(state, new Date());
@@ -431,5 +444,6 @@ export function useDailyPlannerState() {
     setRoutineTemplate,
     setTemplateTaskDomains,
     applyRoutineTemplateToToday,
+    applyRoutineTemplateToDate,
   };
 }
