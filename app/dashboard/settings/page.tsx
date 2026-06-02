@@ -11,6 +11,7 @@ import { PasswordInput } from "@/components/ui/PasswordInput";
 import { Button } from "@/components/ui/Button";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { Loader } from "@/components/ui/Loader";
+import { BillingCard } from "@/components/dashboard/BillingCard";
 import { DEFAULT_PREFS, loadPrefs, savePrefs, resolveTimezone, type KlokrsPrefs } from "@/lib/prefs";
 import { getSiteName } from "@/lib/domain";
 import { jsPDF } from "jspdf";
@@ -381,6 +382,15 @@ const TABS = [
     icon: (
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
         <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
+      </svg>
+    ),
+  },
+  {
+    id: "billing",
+    label: "Billing",
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="2" y="5" width="20" height="14" rx="2" /><line x1="2" y1="10" x2="22" y2="10" />
       </svg>
     ),
   },
@@ -1173,6 +1183,9 @@ export default function SettingsPage() {
           )}
 
           {/* ── Diagnostics ── */}
+          {/* ── Billing ── */}
+          {activeTab === "billing" && <BillingCard />}
+
           {activeTab === "diagnostics" && (
             <>
               {/* Connection & sync status */}

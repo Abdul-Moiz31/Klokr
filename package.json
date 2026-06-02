@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.100.1",
     "@fullcalendar/core": "^6.1.20",
     "@fullcalendar/interaction": "^6.1.20",
     "@fullcalendar/react": "^6.1.20",
@@ -27,6 +28,7 @@
     "react-dom": "19.2.4",
     "recharts": "^3.8.1",
     "sonner": "^2.0.7",
+    "stripe": "^22.2.0",
     "three": "^0.184.0"
   },
   "devDependencies": {

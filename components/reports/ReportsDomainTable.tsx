@@ -123,7 +123,8 @@ export function ReportsDomainTable({
   const toggleGroup = (root: string) => {
     setExpandedGroups((prev) => {
       const next = new Set(prev);
-      next.has(root) ? next.delete(root) : next.add(root);
+      if (next.has(root)) next.delete(root);
+      else next.add(root);
       return next;
     });
   };
