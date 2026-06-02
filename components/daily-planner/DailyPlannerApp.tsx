@@ -10,6 +10,7 @@ import { PastDayView } from "./PastDayView";
 import { RoutineTemplatesEditor } from "./RoutineTemplatesEditor";
 import { TimelineView } from "./TimelineView";
 import { WeekView } from "./WeekView";
+import { CapacityWarning } from "./CapacityWarning";
 import { UnscheduledRail } from "./UnscheduledRail";
 import { TimelineTaskModal, type TimelineTaskDraft } from "./TimelineTaskModal";
 import { ExtensionPlannerSync } from "@/components/ExtensionPlannerSync";
@@ -113,9 +114,11 @@ function SectionHeader({ label, tooltip }: { label: string; tooltip: string }) {
 type DailyPlannerAppProps = {
   /** ISO timestamp of when the user signed up; bounds how far back they can journal. */
   accountCreatedAt?: string | null;
+  /** Current user id — used by the capacity warning to read tracked history. */
+  userId?: string | null;
 };
 
-export function DailyPlannerApp({ accountCreatedAt = null }: DailyPlannerAppProps = {}) {
+export function DailyPlannerApp({ accountCreatedAt = null, userId = null }: DailyPlannerAppProps = {}) {
   const {
     state,
     hydrated,
@@ -196,6 +199,14 @@ export function DailyPlannerApp({ accountCreatedAt = null }: DailyPlannerAppProp
   const scheduledTasks = useMemo(
     () => todayAdHoc.tasks.filter((t) => t.startMinutes != null && t.endMinutes != null),
     [todayAdHoc]
+  );
+  const plannedMinutesToday = useMemo(
+    () =>
+      scheduledTasks.reduce(
+        (sum, t) => sum + ((t.endMinutes as number) - (t.startMinutes as number)),
+        0
+      ),
+    [scheduledTasks]
   );
   const unscheduledTasks = useMemo(
     () => todayAdHoc.tasks.filter((t) => t.startMinutes == null),
@@ -659,6 +670,8 @@ export function DailyPlannerApp({ accountCreatedAt = null }: DailyPlannerAppProp
                         )}
                       </div>
                     </div>
+
+                    <CapacityWarning userId={userId} plannedMinutes={plannedMinutesToday} />
 
                     <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
                       <TimelineView
