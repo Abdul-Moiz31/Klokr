@@ -6,6 +6,8 @@ export type FeatureFlag = {
   tier: "free" | "standard" | "pro";
   name: string;
   description: string;
+  /** Machine key for in-product gating; null = display-only on pricing page. */
+  feature_key: string | null;
   enabled: boolean;
   sort_order: number;
   created_at: string;
