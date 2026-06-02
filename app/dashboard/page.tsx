@@ -16,6 +16,7 @@ import { WorkDayCompleteBanner } from "@/components/dashboard/WorkDayCompleteBan
 import { ActivationChecklist } from "@/components/dashboard/ActivationChecklist";
 import { PlanVsActualCard } from "@/components/dashboard/PlanVsActualCard";
 import { StreakStrip } from "@/components/dashboard/StreakStrip";
+import { WeeklyReviewCard } from "@/components/dashboard/WeeklyReviewCard";
 import { FocusScoreCard } from "@/components/dashboard/FocusScoreCard";
 import { AskYourTime } from "@/components/dashboard/AskYourTime";
 import { getSiteName } from "@/lib/domain";
@@ -212,6 +213,8 @@ export default function DashboardPage() {
       />
 
             <StreakStrip userId={userId} />
+
+            <WeeklyReviewCard userId={userId} />
 
             <WorkDayCompleteBanner totalSecondsToday={totalSeconds} />
             <PlanVsActualCard sessions={sessions} autoCompleteThreshold={loadPrefs().autoCompleteThreshold} />
