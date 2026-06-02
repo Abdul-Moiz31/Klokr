@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createSupabaseForUserJwt } from "@/lib/supabase-user-client";
+import { createAdminClient } from "@/lib/supabase-admin";
+import { decryptSecret } from "@/lib/crypto";
+import { getQuotaStatus, incrementUsage } from "@/lib/ai-quota";
 
 // "Ask Your Time" — natural-language Q&A scoped strictly to the user's own
 // tracked data. A single, non-streaming Messages call: answers are short, so
@@ -79,13 +82,6 @@ export async function POST(request: NextRequest) {
     const auth_token = request.headers.get("authorization")?.replace("Bearer ", "");
     if (!auth_token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    if (!process.env.ANTHROPIC_API_KEY) {
-      return NextResponse.json(
-        { error: "AI insights are not configured on this server." },
-        { status: 503 }
-      );
-    }
-
     const supabase = createSupabaseForUserJwt(auth_token);
     const { data: { user }, error: authError } = await supabase.auth.getUser(auth_token);
     if (authError || !user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -98,6 +94,37 @@ export async function POST(request: NextRequest) {
     if (!question) return NextResponse.json({ error: "Missing question" }, { status: 400 });
     if (question.length > MAX_QUESTION_LEN) {
       return NextResponse.json({ error: "Question too long" }, { status: 400 });
+    }
+
+    // ── Resolve which key to use, and gate on quota ────────────────────────
+    // BYOK: if the user stored their own key, use it (unmetered). Otherwise use
+    // Klokrs's server key, gated by the user's monthly plan quota.
+    const { data: keyRow } = await supabase
+      .from("ai_keys")
+      .select("encrypted_key")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    const ownKey = keyRow?.encrypted_key ? decryptSecret(keyRow.encrypted_key as string) : null;
+    const hasOwnKey = Boolean(ownKey);
+
+    const apiKey = ownKey ?? process.env.ANTHROPIC_API_KEY ?? null;
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: "AI insights are not configured. Add your own API key in Settings to use this feature." },
+        { status: 503 }
+      );
+    }
+
+    const quota = await getQuotaStatus(supabase, user.id, hasOwnKey);
+    if (!quota.allowed) {
+      return NextResponse.json(
+        {
+          error: `You've used all ${quota.limit} AI questions on your ${quota.plan} plan this month. Upgrade, or add your own API key in Settings for unlimited use.`,
+          quota,
+        },
+        { status: 429 }
+      );
     }
 
     const from = new Date();
@@ -113,7 +140,7 @@ export async function POST(request: NextRequest) {
 
     const summary = buildDataSummary((data as Row[]) ?? []);
 
-    const client = new Anthropic();
+    const client = new Anthropic({ apiKey });
     const response = await client.messages.create({
       model: MODEL,
       max_tokens: 1024,
@@ -126,13 +153,21 @@ export async function POST(request: NextRequest) {
       messages: [{ role: "user", content: question }],
     });
 
+    // Count usage only against Klokrs's key — BYOK calls are unmetered.
+    if (!hasOwnKey) {
+      try { await incrementUsage(createAdminClient(), user.id); } catch { /* non-fatal */ }
+    }
+
     const answer = response.content
       .filter((b): b is Anthropic.TextBlock => b.type === "text")
       .map((b) => b.text)
       .join("")
       .trim();
 
-    return NextResponse.json({ answer: answer || "I couldn't find an answer in your data." });
+    return NextResponse.json({
+      answer: answer || "I couldn't find an answer in your data.",
+      quota: hasOwnKey ? null : { ...quota, used: quota.used + 1, remaining: Math.max(0, quota.remaining - 1) },
+    });
   } catch (err) {
     if (err instanceof Anthropic.APIError) {
       return NextResponse.json({ error: "AI service error. Please try again." }, { status: 502 });
