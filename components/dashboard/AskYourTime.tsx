@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase";
-import { AiAccessCard } from "@/components/dashboard/AiAccessCard";
 
 const HISTORY_KEY = "klokrs_ai_history";
 const MAX_HISTORY  = 20;
@@ -54,7 +54,6 @@ export function AskYourTime() {
   const [answer, setAnswer]         = useState<string | null>(null);
   const [loading, setLoading]       = useState(false);
   const [error, setError]           = useState<string | null>(null);
-  const [accessKey, setAccessKey]   = useState(0);
   const [history, setHistory]       = useState<HistoryEntry[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -78,12 +77,11 @@ export function AskYourTime() {
         body: JSON.stringify({ question: trimmed }),
       });
       const json = await res.json() as { answer?: string; error?: string; provider?: string };
-      if (!res.ok) { setError(json.error ?? "Something went wrong."); setAccessKey((k) => k + 1); setLoading(false); return; }
+      if (!res.ok) { setError(json.error ?? "Something went wrong."); setLoading(false); return; }
 
       const text     = json.answer ?? "";
       const provider = json.provider ?? "anthropic";
       setAnswer(text);
-      setAccessKey((k) => k + 1);
 
       const entry: HistoryEntry = { id: crypto.randomUUID(), question: trimmed, answer: text, provider, ts: Date.now() };
       setHistory((prev) => {
@@ -221,7 +219,23 @@ export function AskYourTime() {
         )}
       </AnimatePresence>
 
-      <AiAccessCard key={accessKey} />
+      <div className="mt-3 flex items-center justify-between border-t border-white/[0.06] pt-3">
+        <Link
+          href="/ai"
+          className="text-xs text-white/30 transition hover:text-violet-300"
+        >
+          Open full AI page →
+        </Link>
+        <Link
+          href="/dashboard/settings?tab=ai"
+          className="flex items-center gap-1 text-xs text-white/25 transition hover:text-white/55"
+        >
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
+          </svg>
+          Configure AI key
+        </Link>
+      </div>
     </div>
   );
 }
