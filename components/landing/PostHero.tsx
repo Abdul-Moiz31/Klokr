@@ -5,8 +5,11 @@ import { useRef } from "react";
 
 const chips = [
   "Chrome extension",
-  "Real-time by domain",
-  "Idle-aware",
+  "Automatic tracking",
+  "Daily Planner",
+  "AI insights",
+  "Pomodoro timer",
+  "PDF & CSV export",
 ];
 
 export function PostHero() {
@@ -14,10 +17,7 @@ export function PostHero() {
   const inView = useInView(ref, { once: true, margin: "-40px" });
 
   return (
-    <section
-      className="relative border-y border-white/5 bg-white/[0.02] py-10"
-      ref={ref}
-    >
+    <section className="relative border-y border-white/5 bg-white/[0.02] py-10" ref={ref}>
       <div className="max-w-7xl mx-auto px-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -26,12 +26,9 @@ export function PostHero() {
           className="flex flex-col items-center text-center gap-5 md:flex-row md:justify-between md:text-left"
         >
           <div className="space-y-1.5 max-w-2xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-violet-400/90">
-              Why Klokrs
-            </p>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-violet-400/90">Why Klokrs</p>
             <p className="text-lg text-white/80 md:text-xl font-medium leading-snug">
-              Automatic tab time, a dashboard that makes sense, and a planner
-              that ties focus back to the sites you actually use.
+              Automatic tab time, an analytics dashboard, AI you can ask anything, and a planner that ties your browsing back to your actual plan.
             </p>
           </div>
           <div className="flex flex-wrap justify-center gap-2 md:justify-end">
