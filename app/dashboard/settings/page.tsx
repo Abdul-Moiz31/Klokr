@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/Button";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { Loader } from "@/components/ui/Loader";
 import { BillingCard } from "@/components/dashboard/BillingCard";
+import { AiSettingsTab } from "@/components/dashboard/AiSettingsTab";
 import { DEFAULT_PREFS, loadPrefs, savePrefs, resolveTimezone, type KlokrsPrefs } from "@/lib/prefs";
 import { getSiteName } from "@/lib/domain";
 import { jsPDF } from "jspdf";
@@ -368,6 +369,15 @@ const TABS = [
     ),
   },
   {
+    id: "ai",
+    label: "AI Keys",
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2a10 10 0 1 0 10 10c0-1.5-.3-2.9-.9-4.2" /><path d="M9.1 9a3 3 0 1 1 4 2.8c-.7.3-1.1 1-1.1 1.7v.5" /><line x1="12" y1="17" x2="12" y2="17.01" />
+      </svg>
+    ),
+  },
+  {
     id: "preferences",
     label: "Preferences",
     icon: (
@@ -703,7 +713,7 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <AppShell title="Settings" contentMaxClassName="max-w-2xl">
+      <AppShell title="Settings" contentMaxClassName="max-w-4xl">
         <Loader />
       </AppShell>
     );
@@ -715,11 +725,11 @@ export default function SettingsPage() {
   const timeStrToHour = (s: string) => parseInt(s.split(":")[0] ?? "0", 10);
 
   return (
-    <AppShell title="Settings" contentMaxClassName="max-w-2xl">
+    <AppShell title="Settings" contentMaxClassName="max-w-4xl">
       <PageHeader eyebrow="Account" title="Settings" />
 
-      {/* Tab bar */}
-      <div className="mb-7 flex items-center gap-1 overflow-x-auto rounded-2xl border border-white/[0.07] bg-white/[0.03] p-1">
+      {/* Tab bar — two rows on mobile (4+3), single row on lg */}
+      <div className="mb-7 grid grid-cols-4 gap-1 rounded-2xl border border-white/[0.07] bg-white/[0.03] p-1 lg:grid-cols-7">
         {TABS.map((t) => {
           const isActive = activeTab === t.id;
           return (
@@ -727,16 +737,16 @@ export default function SettingsPage() {
               key={t.id}
               type="button"
               onClick={() => setActiveTab(t.id)}
-              className={`relative flex flex-1 min-w-max items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-all duration-150 ${
+              className={`relative flex items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-xs font-medium transition-all duration-150 sm:gap-2 sm:px-3 ${
                 isActive
                   ? "bg-violet-600/25 text-violet-200 shadow-sm"
                   : "text-white/40 hover:text-white/65 hover:bg-white/[0.04]"
               }`}
             >
-              <span className={isActive ? "text-violet-300/80" : "text-white/30"}>
+              <span className={`shrink-0 ${isActive ? "text-violet-300/80" : "text-white/30"}`}>
                 {t.icon}
               </span>
-              {t.label}
+              <span className="hidden truncate sm:block">{t.label}</span>
               {isActive && (
                 <motion.div
                   layoutId="settings-tab-indicator"
@@ -1183,6 +1193,9 @@ export default function SettingsPage() {
           )}
 
           {/* ── Diagnostics ── */}
+          {/* ── AI Keys ── */}
+          {activeTab === "ai" && <AiSettingsTab />}
+
           {/* ── Billing ── */}
           {activeTab === "billing" && <BillingCard />}
 
