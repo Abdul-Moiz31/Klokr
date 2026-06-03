@@ -53,10 +53,12 @@ export async function POST(req: NextRequest) {
   try { body = (await req.json()) as { provider?: string; key?: string }; }
   catch { return NextResponse.json({ error: "Invalid body" }, { status: 400 }); }
 
-  const provider = body.provider ?? "anthropic";
+  const SUPPORTED_PROVIDERS = ["anthropic", "openai", "gemini", "openrouter"] as const;
+  type Provider = typeof SUPPORTED_PROVIDERS[number];
+  const provider = (body.provider ?? "anthropic") as Provider;
   const key = (body.key ?? "").trim();
-  if (provider !== "anthropic") {
-    return NextResponse.json({ error: "Only Anthropic keys are supported right now." }, { status: 400 });
+  if (!SUPPORTED_PROVIDERS.includes(provider)) {
+    return NextResponse.json({ error: "Unsupported provider." }, { status: 400 });
   }
   if (!key || key.length < 10) {
     return NextResponse.json({ error: "Enter a valid API key." }, { status: 400 });
