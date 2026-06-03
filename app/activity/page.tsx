@@ -8,9 +8,17 @@ import { PageHeader } from "@/components/dashboard/PageHeader";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { ActivityHeatmap, type DayStat } from "@/components/activity/ActivityHeatmap";
 import { DayReportModal } from "@/components/activity/DayReportModal";
+import { DomainTable } from "@/components/dashboard/DomainTable";
+import { DomainDrilldownModal } from "@/components/reports/DomainDrilldownModal";
 import { loadPrefs } from "@/lib/prefs";
 import { Loader } from "@/components/ui/Loader";
 import { calcForgivingStreak, localDateStr } from "@/lib/streak";
+
+interface TodayDomain {
+  domain: string;
+  totalSeconds: number;
+  visits: number;
+}
 
 function formatTime(s: number): string {
   if (s < 60) return `${s}s`;
@@ -26,8 +34,10 @@ export default function ActivityPage() {
   const user = authSession?.user ?? null;
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<DayStat[]>([]);
+  const [todayDomains, setTodayDomains] = useState<TodayDomain[]>([]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedSeconds, setSelectedSeconds] = useState(0);
+  const [drilldown, setDrilldown] = useState<{ domain: string; totalSeconds: number } | null>(null);
   const userIdRef = useRef<string | null>(null);
 
   const prefs = useMemo(() => loadPrefs(), []);
@@ -63,6 +73,29 @@ export default function ActivityPage() {
       totalSeconds,
     }));
     setStats(rows);
+
+    // Today's per-domain breakdown — the full tracking list lives here now.
+    const { data: todayRows } = await supabase
+      .from("tab_sessions")
+      .select("domain, duration_seconds, visits")
+      .eq("user_id", userId)
+      .eq("date", todayStr)
+      .order("duration_seconds", { ascending: false });
+
+    if (todayRows) {
+      const domainMap = new Map<string, { totalSeconds: number; visits: number }>();
+      for (const row of todayRows) {
+        const cur = domainMap.get(row.domain) ?? { totalSeconds: 0, visits: 0 };
+        cur.totalSeconds += row.duration_seconds;
+        cur.visits += row.visits ?? 1;
+        domainMap.set(row.domain, cur);
+      }
+      setTodayDomains(
+        Array.from(domainMap.entries())
+          .map(([domain, v]) => ({ domain, ...v }))
+          .sort((a, b) => b.totalSeconds - a.totalSeconds)
+      );
+    }
   }, [today, todayStr]);
 
   useEffect(() => {
@@ -189,6 +222,16 @@ export default function ActivityPage() {
         onDayClick={handleDayClick}
       />
 
+      {/* Today's full domain breakdown */}
+      {todayDomains.length > 0 && (
+        <div className="mt-6 sm:mt-8">
+          <DomainTable
+            data={todayDomains}
+            onDomainClick={(domain, totalSeconds) => setDrilldown({ domain, totalSeconds })}
+          />
+        </div>
+      )}
+
       {/* Day report modal */}
       {user && (
         <DayReportModal
@@ -199,6 +242,18 @@ export default function ActivityPage() {
           productiveDays={productiveDays}
           totalDays={stats.length}
           onClose={() => setSelectedDate(null)}
+        />
+      )}
+
+      {/* Domain drill-down for today */}
+      {drilldown && (
+        <DomainDrilldownModal
+          domain={drilldown.domain}
+          startDate={todayStr}
+          endDate={todayStr}
+          isDaily
+          totalSeconds={drilldown.totalSeconds}
+          onClose={() => setDrilldown(null)}
         />
       )}
     </AppShell>
