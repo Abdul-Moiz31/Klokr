@@ -6,6 +6,9 @@ import { usePathname } from "next/navigation";
 import { ExtensionAuthSync } from "@/components/ExtensionAuthSync";
 import { Sidebar } from "./Sidebar";
 import { RestrictedNotice } from "./RestrictedNotice";
+import { NotificationBell } from "./NotificationBell";
+import { createClient } from "@/lib/supabase";
+import type { Session } from "@supabase/supabase-js";
 
 type AppShellProps = {
   children: ReactNode;
@@ -21,6 +24,21 @@ export function AppShell({
 }: AppShellProps) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
+  // Lightweight user-id fetch for the notification bell (no redirect logic —
+  // the page itself handles auth gating).
+  const [userId, setUserId] = useState<string | null>(null);
+  useEffect(() => {
+    const supabase = createClient();
+    let cancelled = false;
+    void (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!cancelled) setUserId(session?.user?.id ?? null);
+    })();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e: string, s: Session | null) => {
+      if (!cancelled) setUserId(s?.user?.id ?? null);
+    });
+    return () => { cancelled = true; subscription.unsubscribe(); };
+  }, []);
 
   useEffect(() => {
     setOpen(false);
@@ -83,13 +101,23 @@ export function AppShell({
               {title}
             </span>
           </div>
-          <Link
-            href="/"
-            className="shrink-0 text-xs font-medium text-violet-400/90 hover:text-violet-300"
-          >
-            Klokrs
-          </Link>
+          <div className="flex shrink-0 items-center gap-2">
+            <NotificationBell userId={userId} />
+            <Link
+              href="/"
+              className="text-xs font-medium text-violet-400/90 hover:text-violet-300"
+            >
+              Klokrs
+            </Link>
+          </div>
         </header>
+
+        {/* Desktop notification bell — top-right, single fixed instance */}
+        <div className="pointer-events-none absolute right-5 top-4 z-30 hidden lg:block">
+          <div className="pointer-events-auto">
+            <NotificationBell userId={userId} />
+          </div>
+        </div>
 
         <div className="flex w-full min-h-0 min-w-0 flex-1 items-stretch overflow-hidden">
           {open && (
@@ -105,7 +133,7 @@ export function AppShell({
 
           <main className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain [padding-bottom:max(1rem,env(safe-area-inset-bottom))] sm:px-0 sm:pt-0 touch-pan-y">
             <div
-              className={`mx-auto w-full px-4 pb-4 pt-2 sm:px-5 sm:pb-6 sm:pt-3 lg:px-6 lg:pb-8 lg:pt-4 ${contentMaxClassName}`}
+              className={`mx-auto w-full px-4 pb-4 pt-2 sm:px-5 sm:pb-6 sm:pt-3 lg:px-6 lg:pb-8 lg:pt-4 lg:pr-16 ${contentMaxClassName}`}
             >
               {children}
             </div>
