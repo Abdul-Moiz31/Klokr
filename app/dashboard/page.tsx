@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/dashboard/PageHeader";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { DomainChart } from "@/components/dashboard/DomainChart";
 import { TopDomains } from "@/components/dashboard/TopDomains";
+import { TodayActivityChart } from "@/components/dashboard/TodayActivityChart";
 import { DomainDrilldownModal } from "@/components/reports/DomainDrilldownModal";
 import { Loader } from "@/components/ui/Loader";
 import { WorkDayCompleteBanner } from "@/components/dashboard/WorkDayCompleteBanner";
@@ -337,17 +338,20 @@ export default function DashboardPage() {
             {sessions.length === 0 ? (
               <ActivationChecklist />
             ) : (
-              <div className="grid grid-cols-1 gap-6 lg:grid-cols-5 lg:gap-6">
-                <div className="lg:col-span-3">
-                  <DomainChart data={domainStats} totalSeconds={totalSeconds} />
-                </div>
-                <div className="lg:col-span-2">
-                  <TopDomains
-                    data={domainStats}
-                    onDomainClick={(domain, totalSeconds) =>
-                      setDrilldown({ domain, totalSeconds })
-                    }
-                  />
+              <div className="space-y-6">
+                <TodayActivityChart sessions={sessions} />
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-5 lg:gap-6">
+                  <div className="lg:col-span-3">
+                    <DomainChart data={domainStats} totalSeconds={totalSeconds} />
+                  </div>
+                  <div className="lg:col-span-2">
+                    <TopDomains
+                      data={domainStats}
+                      onDomainClick={(domain, totalSeconds) =>
+                        setDrilldown({ domain, totalSeconds })
+                      }
+                    />
+                  </div>
                 </div>
               </div>
             )}
