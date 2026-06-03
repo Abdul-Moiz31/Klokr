@@ -1,20 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createSupabaseForUserJwt } from "@/lib/supabase-user-client";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { decryptSecret } from "@/lib/crypto";
 import { getQuotaStatus, incrementUsage } from "@/lib/ai-quota";
 
-// "Ask Your Time" — natural-language Q&A scoped strictly to the user's own
-// tracked data. A single, non-streaming Messages call: answers are short, so
-// streaming isn't needed and a plain JSON response is simpler for the client.
-// The data summary is sent as a cached system prefix; the question follows the
-// cache breakpoint so repeated questions in the same session reuse the prefix.
+const ANTHROPIC_MODEL   = "claude-opus-4-8";
+const OPENAI_MODEL      = "gpt-4o-mini";
+const GEMINI_MODEL      = "gemini-1.5-flash";
+const OPENROUTER_MODEL  = "openai/gpt-4o-mini";
 
-const MODEL = "claude-opus-4-8";
-const LOOKBACK_DAYS = 30;
+const LOOKBACK_DAYS   = 30;
 const MAX_QUESTION_LEN = 500;
 
+type Provider = "anthropic" | "openai" | "gemini" | "openrouter";
 type Row = { domain: string; duration_seconds: number; date: string; visits: number | null };
 
 function fmtDuration(seconds: number): string {
@@ -29,25 +30,22 @@ function localDateStr(d: Date): string {
   return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-");
 }
 
-// Build a compact, deterministic text summary of the user's data. Deterministic
-// ordering matters: it keeps the cached prefix byte-stable across requests in
-// the same window so prompt caching actually hits.
 function buildDataSummary(rows: Row[]): string {
   if (rows.length === 0) return "The user has no tracked browsing data in this period.";
 
   const byDomain = new Map<string, { seconds: number; visits: number; days: Set<string> }>();
-  const byDate = new Map<string, number>();
+  const byDate   = new Map<string, number>();
   for (const r of rows) {
     const d = byDomain.get(r.domain) ?? { seconds: 0, visits: 0, days: new Set<string>() };
     d.seconds += r.duration_seconds;
-    d.visits += r.visits ?? 1;
+    d.visits  += r.visits ?? 1;
     d.days.add(r.date);
     byDomain.set(r.domain, d);
     byDate.set(r.date, (byDate.get(r.date) ?? 0) + r.duration_seconds);
   }
 
   const totalSeconds = rows.reduce((s, r) => s + r.duration_seconds, 0);
-  const activeDays = byDate.size;
+  const activeDays   = byDate.size;
 
   const topDomains = [...byDomain.entries()]
     .sort((a, b) => b[1].seconds - a[1].seconds)
@@ -61,7 +59,7 @@ function buildDataSummary(rows: Row[]): string {
     .join("\n");
 
   return [
-    `Period: last ${LOOKBACK_DAYS} days. Active days (any tracked time): ${activeDays}. Total tracked: ${fmtDuration(totalSeconds)}.`,
+    `Period: last ${LOOKBACK_DAYS} days. Active days: ${activeDays}. Total tracked: ${fmtDuration(totalSeconds)}.`,
     ``,
     `Top domains by time:`,
     topDomains,
@@ -72,10 +70,67 @@ function buildDataSummary(rows: Row[]): string {
 }
 
 const SYSTEM_INSTRUCTIONS =
-  "You are Klokrs' time-insights assistant. You answer questions about the user's own browser time-tracking data, which is provided below. " +
-  "Rules: Answer ONLY from the provided data. Be concise — 1-3 sentences, with specific numbers (durations, counts, dates) where relevant. " +
-  "If the data doesn't contain the answer, say so plainly and suggest what to track instead. Never invent figures. " +
-  "Domains are the only browsing detail recorded — there are no page URLs, titles beyond the domain, or keystrokes. Speak in second person ('you spent…').";
+  "You are Klokrs' time-insights assistant. You answer questions about the user's own browser time-tracking data, provided below. " +
+  "Rules: Answer ONLY from the provided data. Be concise — 1–3 sentences with specific numbers where relevant. " +
+  "If the data doesn't contain the answer, say so plainly. Never invent figures. " +
+  "Domains are the only browsing detail recorded — no URLs, page titles, or keystrokes. Speak in second person ('you spent…').";
+
+// ── Provider routing ────────────────────────────────────────────────────────
+
+async function askAnthropic(apiKey: string, summary: string, question: string): Promise<string> {
+  const client   = new Anthropic({ apiKey });
+  const response = await client.messages.create({
+    model: ANTHROPIC_MODEL,
+    max_tokens: 1024,
+    system: [
+      { type: "text", text: SYSTEM_INSTRUCTIONS },
+      { type: "text", text: `User's tracked data:\n\n${summary}`, cache_control: { type: "ephemeral" } },
+    ],
+    messages: [{ role: "user", content: question }],
+  });
+  return response.content
+    .filter((b): b is Anthropic.TextBlock => b.type === "text")
+    .map((b) => b.text)
+    .join("")
+    .trim();
+}
+
+async function askOpenAI(apiKey: string, summary: string, question: string): Promise<string> {
+  const client   = new OpenAI({ apiKey });
+  const response = await client.chat.completions.create({
+    model: OPENAI_MODEL,
+    max_tokens: 1024,
+    messages: [
+      { role: "system", content: `${SYSTEM_INSTRUCTIONS}\n\nUser's tracked data:\n\n${summary}` },
+      { role: "user",   content: question },
+    ],
+  });
+  return response.choices[0]?.message?.content?.trim() ?? "";
+}
+
+async function askOpenRouter(apiKey: string, summary: string, question: string): Promise<string> {
+  const client   = new OpenAI({ apiKey, baseURL: "https://openrouter.ai/api/v1" });
+  const response = await client.chat.completions.create({
+    model: OPENROUTER_MODEL,
+    max_tokens: 1024,
+    messages: [
+      { role: "system", content: `${SYSTEM_INSTRUCTIONS}\n\nUser's tracked data:\n\n${summary}` },
+      { role: "user",   content: question },
+    ],
+  });
+  return response.choices[0]?.message?.content?.trim() ?? "";
+}
+
+async function askGemini(apiKey: string, summary: string, question: string): Promise<string> {
+  const genAI  = new GoogleGenerativeAI(apiKey);
+  const model  = genAI.getGenerativeModel({ model: GEMINI_MODEL });
+  const result = await model.generateContent(
+    `${SYSTEM_INSTRUCTIONS}\n\nUser's tracked data:\n\n${summary}\n\nQuestion: ${question}`
+  );
+  return result.response.text().trim();
+}
+
+// ── Route handler ───────────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
   try {
@@ -96,22 +151,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Question too long" }, { status: 400 });
     }
 
-    // ── Resolve which key to use, and gate on quota ────────────────────────
-    // BYOK: if the user stored their own key, use it (unmetered). Otherwise use
-    // Klokrs's server key, gated by the user's monthly plan quota.
+    // Resolve BYOK key — fallback to server Anthropic key for unregistered users.
     const { data: keyRow } = await supabase
       .from("ai_keys")
-      .select("encrypted_key")
+      .select("encrypted_key, provider")
       .eq("user_id", user.id)
       .maybeSingle();
 
-    const ownKey = keyRow?.encrypted_key ? decryptSecret(keyRow.encrypted_key as string) : null;
+    const ownKey    = keyRow?.encrypted_key ? decryptSecret(keyRow.encrypted_key as string) : null;
+    const provider  = (keyRow?.provider as Provider | undefined) ?? "anthropic";
     const hasOwnKey = Boolean(ownKey);
 
-    const apiKey = ownKey ?? process.env.ANTHROPIC_API_KEY ?? null;
+    // Fall back to server Anthropic key only when no BYOK is set and provider would be anthropic.
+    const apiKey = ownKey ?? (provider === "anthropic" ? (process.env.ANTHROPIC_API_KEY ?? null) : null);
     if (!apiKey) {
       return NextResponse.json(
-        { error: "AI insights are not configured. Add your own API key in Settings to use this feature." },
+        { error: "No AI key configured. Add your own API key in Settings to use this feature." },
         { status: 503 }
       );
     }
@@ -120,7 +175,7 @@ export async function POST(request: NextRequest) {
     if (!quota.allowed) {
       return NextResponse.json(
         {
-          error: `You've used all ${quota.limit} AI questions on your ${quota.plan} plan this month. Upgrade, or add your own API key in Settings for unlimited use.`,
+          error: `You've used all ${quota.limit} AI questions on your ${quota.plan} plan this month. Upgrade, or add your own API key for unlimited use.`,
           quota,
         },
         { status: 429 }
@@ -140,38 +195,29 @@ export async function POST(request: NextRequest) {
 
     const summary = buildDataSummary((data as Row[]) ?? []);
 
-    const client = new Anthropic({ apiKey });
-    const response = await client.messages.create({
-      model: MODEL,
-      max_tokens: 1024,
-      // Cache the stable instructions + data summary; the volatile question
-      // lives in messages, after the cached prefix.
-      system: [
-        { type: "text", text: SYSTEM_INSTRUCTIONS },
-        { type: "text", text: `User's tracked data:\n\n${summary}`, cache_control: { type: "ephemeral" } },
-      ],
-      messages: [{ role: "user", content: question }],
-    });
+    // Route to the correct provider.
+    let answer = "";
+    if (provider === "openai") {
+      answer = await askOpenAI(apiKey, summary, question);
+    } else if (provider === "openrouter") {
+      answer = await askOpenRouter(apiKey, summary, question);
+    } else if (provider === "gemini") {
+      answer = await askGemini(apiKey, summary, question);
+    } else {
+      answer = await askAnthropic(apiKey, summary, question);
+    }
 
-    // Count usage only against Klokrs's key — BYOK calls are unmetered.
     if (!hasOwnKey) {
       try { await incrementUsage(createAdminClient(), user.id); } catch { /* non-fatal */ }
     }
 
-    const answer = response.content
-      .filter((b): b is Anthropic.TextBlock => b.type === "text")
-      .map((b) => b.text)
-      .join("")
-      .trim();
-
     return NextResponse.json({
       answer: answer || "I couldn't find an answer in your data.",
+      provider,
       quota: hasOwnKey ? null : { ...quota, used: quota.used + 1, remaining: Math.max(0, quota.remaining - 1) },
     });
   } catch (err) {
-    if (err instanceof Anthropic.APIError) {
-      return NextResponse.json({ error: "AI service error. Please try again." }, { status: 502 });
-    }
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    console.error("[ask]", err);
+    return NextResponse.json({ error: "AI service error. Please try again." }, { status: 502 });
   }
 }
