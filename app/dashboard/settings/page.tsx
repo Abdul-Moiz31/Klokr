@@ -15,6 +15,8 @@ import { BillingCard } from "@/components/dashboard/BillingCard";
 import { AiSettingsTab } from "@/components/dashboard/AiSettingsTab";
 import { DEFAULT_PREFS, loadPrefs, savePrefs, resolveTimezone, type KlokrsPrefs } from "@/lib/prefs";
 import { getSiteName } from "@/lib/domain";
+import { getCategoryForDomain, getCategoryStats, CATEGORIES, hexToRgb } from "@/lib/categories";
+import type { CategoryId } from "@/lib/categories";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { User } from "@supabase/supabase-js";
@@ -137,7 +139,7 @@ function formatDuration(seconds: number): string {
 }
 
 type C = [number, number, number];
-const PALETTE = {
+const P = {
   bg:     [10,  10,  15]  as C,
   violet: [124, 58,  237] as C,
   cyan:   [6,   182, 212] as C,
@@ -161,8 +163,8 @@ function generateExportPdf(
   toDate: string,
   userEmail: string,
   preview: { days: number; totalSeconds: number },
+  categoryOverrides: Record<string, CategoryId> = {},
 ) {
-  const P = PALETTE;
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
@@ -177,44 +179,68 @@ function generateExportPdf(
 
   const generatedDate = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
   const periodLabel = `${new Date(fromDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} – ${new Date(toDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
-  const topSite = rows.length > 0 ? getSiteName(rows[0]!.domain) : "—";
 
-  // ── Header bar ───────────────────────────────────────────
+  // Aggregate domain totals and daily totals for charts
+  const domainTotals = new Map<string, number>();
+  const dailyTotals = new Map<string, number>();
+  for (const r of rows) {
+    domainTotals.set(r.domain, (domainTotals.get(r.domain) ?? 0) + r.totalSeconds);
+    dailyTotals.set(r.date, (dailyTotals.get(r.date) ?? 0) + r.totalSeconds);
+  }
+  const topSite = [...domainTotals.entries()].sort((a, b) => b[1] - a[1])[0]?.[0]
+    ? getSiteName([...domainTotals.entries()].sort((a, b) => b[1] - a[1])[0]![0])
+    : "—";
+  const uniqueDomains = domainTotals.size;
+
+  const dailyChartData = [...dailyTotals.entries()]
+    .sort((a, b) => (a[0] < b[0] ? -1 : 1))
+    .map(([date, sec]) => ({
+      label: new Date(date + "T12:00:00").toLocaleDateString("en-US", {
+        month: "numeric", day: "numeric",
+      }),
+      value: parseFloat((sec / 3600).toFixed(2)),
+    }));
+
+  const domainForCats = [...domainTotals.entries()].map(([domain, total_seconds]) => ({ domain, total_seconds }));
+  const catStats = getCategoryStats(domainForCats, categoryOverrides).slice(0, 7);
+
+  // ── 1. Header bar ─────────────────────────────────────────
   const hdrH = 20;
   doc.setFillColor(...P.violet);
   doc.rect(0, 0, pageW, hdrH, "F");
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(16);
+  doc.setFontSize(18);
   doc.setTextColor(...P.white);
-  doc.text("Klokrs", M, 13);
+  doc.text("Klokrs", M, 13.5);
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
-  doc.text(`Data Export  |  ${periodLabel}`, pageW - M, 13, { align: "right" });
+  doc.setFontSize(11);
+  doc.text(`Data Export  ·  ${periodLabel}`, pageW - M, 13.5, { align: "right" });
 
-  // ── Divider ──────────────────────────────────────────────
+  // ── 2. Divider ────────────────────────────────────────────
   doc.setDrawColor(56, 29, 104);
   doc.setLineWidth(0.4);
   doc.line(M, hdrH + 1, pageW - M, hdrH + 1);
 
-  // ── Overview label ───────────────────────────────────────
-  let y = hdrH + 10;
+  let y = hdrH + 9;
+
+  // ── 3. Overview (4 stat cards) ────────────────────────────
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
+  doc.setFontSize(8.5);
   doc.setTextColor(...P.cyan);
   doc.text("OVERVIEW", M, y);
   y += 5;
 
-  // ── 3 stat cards ─────────────────────────────────────────
   const stats = [
-    { title: "Days tracked", value: String(preview.days) },
-    { title: "Total time", value: formatDuration(preview.totalSeconds) },
-    { title: "Top site", value: topSite },
+    { title: "Days Tracked", value: String(preview.days) },
+    { title: "Total Time", value: formatDuration(preview.totalSeconds) },
+    { title: "Top Site", value: topSite },
+    { title: "Unique Domains", value: String(uniqueDomains) },
   ];
-  const gap = 3;
-  const boxW = (pageW - M * 2 - gap * 2) / 3;
-  const boxH = 26;
-  for (let i = 0; i < 3; i++) {
-    const bx = M + i * (boxW + gap);
+  const statGap = 3;
+  const boxW = (pageW - M * 2 - statGap * 3) / 4;
+  const boxH = 24;
+  for (let i = 0; i < 4; i++) {
+    const bx = M + i * (boxW + statGap);
     doc.setFillColor(...P.card);
     doc.roundedRect(bx, y, boxW, boxH, 1.5, 1.5, "F");
     doc.setDrawColor(...P.border);
@@ -223,53 +249,175 @@ function generateExportPdf(
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7.5);
     doc.setTextColor(...P.muted);
-    doc.text(stats[i]!.title.toUpperCase(), bx + 5, y + 8);
+    doc.text(stats[i]!.title.toUpperCase(), bx + 4, y + 7);
+    const valFontSize = stats[i]!.value.length > 7 ? 12 : 16;
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(i === 2 ? 13 : 17);
+    doc.setFontSize(valFontSize);
     doc.setTextColor(...P.body);
-    doc.text(stats[i]!.value, bx + 5, y + 19);
+    doc.text(stats[i]!.value, bx + 4, y + 17.5);
     doc.setFillColor(...P.violet);
-    doc.rect(bx + 5, y + 22, 9, 0.7, "F");
+    doc.rect(bx + 4, y + 20, 8, 0.6, "F");
   }
   y += boxH + 8;
 
-  // ── Section label ────────────────────────────────────────
+  // ── 4. Daily activity bar chart ───────────────────────────
   doc.setFillColor(...P.violet);
   doc.rect(M, y - 3.5, 1.2, 4.5, "F");
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
+  doc.setFontSize(8.5);
+  doc.setTextColor(...P.cyan);
+  doc.text("DAILY ACTIVITY", M + 3.5, y);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.5);
+  doc.setTextColor(...P.muted);
+  doc.text("hours per day", pageW - M, y, { align: "right" });
+  y += 5;
+
+  // Draw chart
+  const chartH = 38;
+  const axisX = M + 9;
+  const axisY = y + chartH;
+  const chartW = pageW - M - axisX - M;
+  const maxVal = Math.max(...dailyChartData.map((p) => p.value), 0.01);
+
+  doc.setFillColor(17, 17, 24);
+  doc.roundedRect(M, y - 2, pageW - M * 2, chartH + 8, 1.5, 1.5, "F");
+  doc.setDrawColor(31, 31, 46);
+  doc.setLineWidth(0.25);
+  doc.roundedRect(M, y - 2, pageW - M * 2, chartH + 8, 1.5, 1.5, "D");
+
+  // Gridlines + Y labels
+  for (let t = 1; t <= 3; t++) {
+    const gy = axisY - (t / 3) * chartH;
+    doc.setDrawColor(31, 31, 46);
+    doc.setLineWidth(0.2);
+    doc.line(axisX, gy, axisX + chartW, gy);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(5.5);
+    doc.setTextColor(...P.muted);
+    doc.text(`${((maxVal * t) / 3).toFixed(1)}h`, axisX - 1.5, gy, { align: "right", baseline: "middle" as const });
+  }
+  doc.setDrawColor(44, 44, 58);
+  doc.setLineWidth(0.3);
+  doc.line(axisX, y - 2, axisX, axisY);
+  doc.line(axisX, axisY, axisX + chartW, axisY);
+
+  // Bars
+  const n = dailyChartData.length;
+  const barW = n > 0 ? Math.max(1.2, (chartW - Math.max(0, n - 1) * 1.5) / n) : 0;
+  const gap = n > 1 ? (chartW - barW * n) / (n - 1) : 0;
+
+  for (let i = 0; i < n; i++) {
+    const bx = axisX + i * (barW + gap);
+    const bh = (dailyChartData[i]!.value / maxVal) * chartH;
+    if (bh > 0.3) {
+      doc.setFillColor(124, 58, 237);
+      doc.rect(bx, axisY - bh, barW, bh, "F");
+      doc.setFillColor(80, 120, 230);
+      doc.rect(bx, axisY - bh, barW, bh * 0.32, "F");
+    }
+    const showLabel = n <= 10 || (n <= 20 && i % 2 === 0) || (n > 20 && (i === 0 || (i + 1) % 5 === 0));
+    if (showLabel) {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(5.5);
+      doc.setTextColor(...P.muted);
+      doc.text(dailyChartData[i]!.label, bx + barW / 2, axisY + 3, { align: "center", baseline: "top" as const });
+    }
+  }
+  y += chartH + 13;
+
+  // ── 5. Category breakdown ─────────────────────────────────
+  if (catStats.length >= 2) {
+    doc.setFillColor(...P.violet);
+    doc.rect(M, y - 3.5, 1.2, 4.5, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8.5);
+    doc.setTextColor(...P.cyan);
+    doc.text("BY CATEGORY", M + 3.5, y);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+    doc.setTextColor(...P.muted);
+    doc.text("time per activity type", pageW - M, y, { align: "right" });
+    y += 5;
+
+    const grandTotal = preview.totalSeconds || 1;
+    const maxCatSec = catStats[0]?.seconds ?? 1;
+    const rowH = 7.5;
+    const labelW = 28;
+    const timeW = 22;
+    const barAreaW = pageW - M * 2 - labelW - timeW - 2;
+
+    for (const cat of catStats) {
+      const pct = Math.round((cat.seconds / grandTotal) * 100);
+      const barFillW = Math.max(1, (cat.seconds / maxCatSec) * barAreaW);
+      const barAreaX = M + labelW;
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7.5);
+      doc.setTextColor(...P.muted);
+      doc.text(cat.label, M, y + rowH / 2, { baseline: "middle" as const });
+
+      doc.setFillColor(22, 22, 32);
+      doc.roundedRect(barAreaX, y + 2, barAreaW, rowH - 4, 0.8, 0.8, "F");
+      const [r, g, b] = hexToRgb(cat.color);
+      doc.setFillColor(r, g, b);
+      doc.roundedRect(barAreaX, y + 2, barFillW, rowH - 4, 0.8, 0.8, "F");
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7.5);
+      doc.setTextColor(...P.body);
+      doc.text(formatDuration(cat.seconds), M + labelW + barAreaW + 2, y + rowH / 2, { baseline: "middle" as const });
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(6.5);
+      doc.setTextColor(...P.muted);
+      doc.text(`${pct}%`, pageW - M, y + rowH / 2, { align: "right", baseline: "middle" as const });
+
+      y += rowH + 1;
+    }
+    y += 5;
+  }
+
+  // ── 6. Domain table ───────────────────────────────────────
+  doc.setFillColor(...P.violet);
+  doc.rect(M, y - 3.5, 1.2, 4.5, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8.5);
   doc.setTextColor(...P.cyan);
   doc.text("BROWSING SUMMARY", M + 3.5, y);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.5);
+  doc.setTextColor(...P.muted);
+  doc.text(`${rows.length} records`, pageW - M, y, { align: "right" });
   y += 4;
 
-  // ── Total seconds for % calculation ──────────────────────
   const grandTotal = rows.reduce((s, r) => s + r.totalSeconds, 0) || 1;
 
-  // ── Table ────────────────────────────────────────────────
   autoTable(doc, {
     startY: y,
     margin: { left: M, right: M, bottom: 16 },
-    head: [["Date", "Site", "Time Spent", "Visits", "% of Total"]],
+    head: [["Date", "Site", "Category", "Time Spent", "Visits", "% of Total"]],
     body: rows.map((r) => [
       new Date(r.date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-      r.domain,
+      getSiteName(r.domain),
+      CATEGORIES[getCategoryForDomain(r.domain, categoryOverrides)].label,
       formatDuration(r.totalSeconds),
       String(r.visits),
       `${Math.round((r.totalSeconds / grandTotal) * 100)}%`,
     ]),
     columnStyles: {
-      0: { cellWidth: 32 },
+      0: { cellWidth: 28 },
       1: { cellWidth: "auto" as const },
-      2: { cellWidth: 26, halign: "right" as const },
-      3: { cellWidth: 18, halign: "right" as const },
-      4: { cellWidth: 34 },
+      2: { cellWidth: 24 },
+      3: { cellWidth: 22, halign: "right" as const },
+      4: { cellWidth: 16, halign: "right" as const },
+      5: { cellWidth: 28 },
     },
     headStyles: {
       fillColor: P.violet,
       textColor: P.white,
       fontStyle: "bold",
       fontSize: 9,
-      cellPadding: { top: 3, bottom: 3, left: 3, right: 3 },
+      cellPadding: { top: 2.5, bottom: 2.5, left: 3, right: 3 },
     },
     bodyStyles: {
       fillColor: P.bg,
@@ -289,7 +437,7 @@ function generateExportPdf(
       doc.setLineWidth(0.3);
       doc.line(0, pageH - 12, pageW, pageH - 12);
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(8);
+      doc.setFontSize(7.5);
       doc.setTextColor(...P.muted);
       doc.text("Generated by Klokrs", M, pageH - 5);
       doc.text(userEmail, pageW / 2, pageH - 5, { align: "center" });
@@ -297,21 +445,42 @@ function generateExportPdf(
     },
 
     didDrawCell: (data) => {
-      if (data.section !== "body" || data.column.index !== 4) return;
-      const pct = parseFloat(String(data.cell.raw));
-      if (isNaN(pct)) return;
-      const isAlt = data.row.index % 2 === 1;
-      doc.setFillColor(...(isAlt ? P.card : P.bg));
-      doc.rect(data.cell.x, data.cell.y, data.cell.width, data.cell.height, "F");
-      const barColor: C = isAlt ? [51, 31, 92] : [44, 24, 82];
-      const maxBarW = data.cell.width - 6;
-      const barW = Math.max(0.5, (pct / 100) * maxBarW);
-      doc.setFillColor(...barColor);
-      doc.rect(data.cell.x + 3, data.cell.y + 1.8, barW, data.cell.height - 3.6, "F");
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(8.5);
-      doc.setTextColor(...P.body);
-      doc.text(`${pct}%`, data.cell.x + 3, data.cell.y + data.cell.height / 2, { baseline: "middle" as const });
+      if (data.section !== "body") return;
+
+      // Category column (idx 2) — coloured text
+      if (data.column.index === 2) {
+        const catLabel = String(data.cell.raw);
+        const catEntry = Object.entries(CATEGORIES).find(([, def]) => def.label === catLabel);
+        if (catEntry) {
+          const [r, g, b] = hexToRgb(catEntry[1].color);
+          const isAlt = data.row.index % 2 === 1;
+          doc.setFillColor(...(isAlt ? P.card : P.bg));
+          doc.rect(data.cell.x, data.cell.y, data.cell.width, data.cell.height, "F");
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(7.5);
+          doc.setTextColor(r, g, b);
+          doc.text(catLabel, data.cell.x + 3, data.cell.y + data.cell.height / 2, { baseline: "middle" as const });
+        }
+      }
+
+      // % of Total column (idx 5) → progress bar
+      if (data.column.index === 5) {
+        const rawStr = String(data.cell.raw);
+        const pct = parseFloat(rawStr);
+        if (isNaN(pct)) return;
+        const isAlt = data.row.index % 2 === 1;
+        doc.setFillColor(...(isAlt ? P.card : P.bg));
+        doc.rect(data.cell.x, data.cell.y, data.cell.width, data.cell.height, "F");
+        const barColor: C = isAlt ? [51, 31, 92] : [44, 24, 82];
+        const maxBarW = data.cell.width - 6;
+        const barW = Math.max(0.5, (pct / 100) * maxBarW);
+        doc.setFillColor(...barColor);
+        doc.rect(data.cell.x + 3, data.cell.y + 1.8, barW, data.cell.height - 3.6, "F");
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8.5);
+        doc.setTextColor(...P.body);
+        doc.text(rawStr, data.cell.x + 3, data.cell.y + data.cell.height / 2, { baseline: "middle" as const });
+      }
     },
   });
 
@@ -606,6 +775,7 @@ export default function SettingsPage() {
       range.to,
       user.email ?? "",
       { days: new Set(summary.map((r) => r.date)).size, totalSeconds },
+      prefs.categoryOverrides,
     );
     toast.success(`Exported ${summary.length} rows.`);
   };

@@ -25,10 +25,16 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { ReportsDomainTable } from "@/components/reports/ReportsDomainTable";
 import { DomainDrilldownModal } from "@/components/reports/DomainDrilldownModal";
 import { getSiteName } from "@/lib/domain";
-import { loadPrefs } from "@/lib/prefs";
-import type { User } from "@supabase/supabase-js";
+import { loadPrefs, savePrefs } from "@/lib/prefs";
+import {
+  getCategoryForDomain,
+  getCategoryStats,
+  CATEGORIES,
+  hexToRgb,
+  type CategoryId,
+} from "@/lib/categories";
 
-// ─── Types ────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────
 
 type Tab = "daily" | "weekly" | "monthly";
 
@@ -59,7 +65,7 @@ interface DrillTarget {
   totalSeconds: number;
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────
 
 function localDateStr(d: Date): string {
   return [
@@ -90,7 +96,7 @@ function getMonday(d: Date): Date {
 
 const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-// ─── Chart tooltip ────────────────────────────────────────────────
+// ─── Chart tooltip ────────────────────────────────────────────
 
 const ChartTooltip = ({
   active,
@@ -117,7 +123,194 @@ const ChartTooltip = ({
   );
 };
 
-// ─── PDF generator ────────────────────────────────────────────────
+// ─── PDF helpers ──────────────────────────────────────────────
+
+type C = [number, number, number];
+const PDF_C = {
+  bg:     [10,  10,  15]  as C,
+  violet: [124, 58,  237] as C,
+  cyan:   [6,   182, 212] as C,
+  card:   [17,  17,  24]  as C,
+  border: [31,  31,  46]  as C,
+  body:   [226, 232, 240] as C,
+  muted:  [100, 116, 139] as C,
+  white:  [255, 255, 255] as C,
+};
+
+interface PdfChartPoint {
+  label: string;
+  value: number;
+}
+
+interface PdfCategoryStat {
+  label: string;
+  color: string;
+  seconds: number;
+}
+
+function drawSectionHeader(
+  doc: jsPDF,
+  label: string,
+  subLabel: string,
+  x: number,
+  y: number,
+  pageW: number,
+  M: number
+) {
+  doc.setFillColor(...PDF_C.violet);
+  doc.rect(x, y - 3.5, 1.2, 4.5, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8.5);
+  doc.setTextColor(...PDF_C.cyan);
+  doc.text(label, x + 3.5, y);
+  if (subLabel) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+    doc.setTextColor(...PDF_C.muted);
+    doc.text(subLabel, pageW - M, y, { align: "right" });
+  }
+}
+
+function drawBarChart(
+  doc: jsPDF,
+  points: PdfChartPoint[],
+  unit: "h" | "m",
+  x: number,
+  y: number,
+  w: number,
+  h: number
+) {
+  if (points.length === 0) return;
+
+  const axisX = x + 9;
+  const axisY = y + h;
+  const chartW = w - 9;
+
+  const maxVal = Math.max(...points.map((p) => p.value), 0.01);
+
+  // Chart card background
+  doc.setFillColor(17, 17, 24);
+  doc.roundedRect(x, y - 2, w, h + 8, 1.5, 1.5, "F");
+  doc.setDrawColor(31, 31, 46);
+  doc.setLineWidth(0.25);
+  doc.roundedRect(x, y - 2, w, h + 8, 1.5, 1.5, "D");
+
+  // Horizontal gridlines + Y-axis tick labels
+  const ticks = 3;
+  for (let t = 1; t <= ticks; t++) {
+    const gy = axisY - (t / ticks) * h;
+    doc.setDrawColor(31, 31, 46);
+    doc.setLineWidth(0.2);
+    doc.line(axisX, gy, axisX + chartW, gy);
+
+    const tickVal = ((maxVal * t) / ticks).toFixed(1);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(5.5);
+    doc.setTextColor(...PDF_C.muted);
+    doc.text(`${tickVal}${unit}`, axisX - 1.5, gy, { align: "right", baseline: "middle" as const });
+  }
+
+  // Y-axis line
+  doc.setDrawColor(44, 44, 58);
+  doc.setLineWidth(0.3);
+  doc.line(axisX, y - 2, axisX, axisY);
+
+  // X-axis line
+  doc.line(axisX, axisY, axisX + chartW, axisY);
+
+  // Bars
+  const n = points.length;
+  const gapFraction = n > 20 ? 0.15 : 0.22;
+  const totalGaps = (n - 1) * chartW * gapFraction;
+  const barW = Math.max(1, (chartW - totalGaps / n * (n - 1)) / n);
+  const gap = n > 1 ? (chartW - barW * n) / (n - 1) : 0;
+
+  for (let i = 0; i < n; i++) {
+    const bx = axisX + i * (barW + gap);
+    const barH = (points[i]!.value / maxVal) * h;
+
+    if (barH > 0.3) {
+      // Gradient effect: top ~40% is cyan-tinted, bottom violet
+      const splitY = axisY - barH * 0.55;
+      doc.setFillColor(124, 58, 237);
+      doc.rect(bx, axisY - barH, barW, barH, "F");
+      // Lighter top accent
+      doc.setFillColor(80, 120, 230);
+      doc.rect(bx, axisY - barH, barW, barH * 0.35, "F");
+    }
+
+    // X-axis label — show every label for <= 12 points, else every other/5th
+    const showLabel =
+      n <= 12 || (n <= 24 && i % 6 === 0) || (n > 24 && (i === 0 || i % 5 === 4));
+    if (showLabel) {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(5.5);
+      doc.setTextColor(...PDF_C.muted);
+      doc.text(String(points[i]!.label), bx + barW / 2, axisY + 3, {
+        align: "center",
+        baseline: "top" as const,
+      });
+    }
+  }
+}
+
+function drawCategoryBars(
+  doc: jsPDF,
+  cats: PdfCategoryStat[],
+  totalSeconds: number,
+  x: number,
+  y: number,
+  w: number
+): number {
+  const maxSec = cats[0]?.seconds ?? 1;
+  const rowH = 7.5;
+  let cy = y;
+
+  for (const cat of cats) {
+    const pct = Math.round((cat.seconds / totalSeconds) * 100);
+    const labelW = 28;
+    const timeW = 20;
+    const barAreaX = x + labelW;
+    const barAreaW = w - labelW - timeW - 2;
+    const barFillW = Math.max(1, (cat.seconds / maxSec) * barAreaW);
+
+    // Label
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+    doc.setTextColor(...PDF_C.muted);
+    doc.text(cat.label, x, cy + rowH / 2, { baseline: "middle" as const });
+
+    // Background track
+    doc.setFillColor(22, 22, 32);
+    doc.roundedRect(barAreaX, cy + 2, barAreaW, rowH - 4, 0.8, 0.8, "F");
+
+    // Filled bar
+    const [r, g, b] = hexToRgb(cat.color);
+    doc.setFillColor(r, g, b);
+    doc.roundedRect(barAreaX, cy + 2, barFillW, rowH - 4, 0.8, 0.8, "F");
+
+    // Time + %
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.5);
+    doc.setTextColor(...PDF_C.body);
+    doc.text(formatTime(cat.seconds), x + w - timeW + 2, cy + rowH / 2, {
+      baseline: "middle" as const,
+    });
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(6.5);
+    doc.setTextColor(...PDF_C.muted);
+    doc.text(`${pct}%`, x + w, cy + rowH / 2, {
+      align: "right",
+      baseline: "middle" as const,
+    });
+
+    cy += rowH + 1;
+  }
+
+  return cy - y;
+}
+
+// ─── PDF generator (Reports) ──────────────────────────────────
 
 function generatePdf(
   tab: Tab,
@@ -125,34 +318,22 @@ function generatePdf(
   startDate: string,
   stats: { title: string; value: string }[],
   domains: ByDomain[],
+  chartData: PdfChartPoint[],
+  chartUnit: "h" | "m",
+  categoryStats: PdfCategoryStat[],
   userEmail: string
 ) {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-  const pageW = doc.internal.pageSize.getWidth();   // 210
-  const pageH = doc.internal.pageSize.getHeight();  // 297
-  const M = 10; // margin
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const M = 12;
 
-  // ── Palette (RGB) ────────────────────────────────────────────
-  const C = {
-    bg:     [10,  10,  15]  as [number, number, number], // #0A0A0F
-    violet: [124, 58,  237] as [number, number, number], // #7C3AED
-    cyan:   [6,   182, 212] as [number, number, number], // #06B6D4
-    card:   [17,  17,  24]  as [number, number, number], // #111118
-    border: [31,  31,  46]  as [number, number, number], // #1F1F2E
-    body:   [226, 232, 240] as [number, number, number], // #E2E8F0
-    muted:  [100, 116, 139] as [number, number, number], // #64748B
-    white:  [255, 255, 255] as [number, number, number], // #FFFFFF
-  };
-
-  // ── Fill page background ─────────────────────────────────────
   const fillBg = () => {
-    doc.setFillColor(...C.bg);
+    doc.setFillColor(...PDF_C.bg);
     doc.rect(0, 0, pageW, pageH, "F");
   };
   fillBg();
 
-  // Patch addPage so every new page gets the dark background
-  // before autoTable draws cells on it.
   const _addPage = doc.addPage.bind(doc);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (doc as any).addPage = (...args: unknown[]) => {
@@ -163,127 +344,156 @@ function generatePdf(
   };
 
   const today = new Date().toLocaleDateString("en-US", {
-    year: "numeric", month: "long", day: "numeric",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
   });
 
-  // ── 1. Header bar ────────────────────────────────────────────
+  // ── 1. Header bar ──────────────────────────────────────────
   const hdrH = 20;
-  doc.setFillColor(...C.violet);
+  doc.setFillColor(...PDF_C.violet);
   doc.rect(0, 0, pageW, hdrH, "F");
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(18);
-  doc.setTextColor(...C.white);
+  doc.setTextColor(...PDF_C.white);
   doc.text("Klokrs", M, 13.5);
 
   const tabCap = tab.charAt(0).toUpperCase() + tab.slice(1);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(11);
-  doc.text(`${tabCap} Report  |  ${label}`, pageW - M, 13.5, { align: "right" });
+  doc.text(`${tabCap} Report  ·  ${label}`, pageW - M, 13.5, { align: "right" });
 
-  // ── 2. Divider — #7C3AED @ 40% blended onto #0A0A0F ────────
+  // ── 2. Divider ─────────────────────────────────────────────
   doc.setDrawColor(56, 29, 104);
   doc.setLineWidth(0.4);
   doc.line(M, hdrH + 1, pageW - M, hdrH + 1);
 
-  // ── 3. Summary section ───────────────────────────────────────
-  let y = hdrH + 10;
+  let y = hdrH + 9;
 
+  // ── 3. Stats cards (4 in a row) ───────────────────────────
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.setTextColor(...C.cyan);
+  doc.setFontSize(8.5);
+  doc.setTextColor(...PDF_C.cyan);
   doc.text("OVERVIEW", M, y);
   y += 5;
 
-  const n = Math.min(stats.length, 3);
+  const statCount = Math.min(stats.length, 4);
   const gap = 3;
-  const boxW = (pageW - M * 2 - gap * (n - 1)) / n;
-  const boxH = 26;
+  const boxW = (pageW - M * 2 - gap * (statCount - 1)) / statCount;
+  const boxH = 24;
 
-  for (let i = 0; i < n; i++) {
+  for (let i = 0; i < statCount; i++) {
     const bx = M + i * (boxW + gap);
-    const by = y;
 
-    doc.setFillColor(...C.card);
-    doc.roundedRect(bx, by, boxW, boxH, 1.5, 1.5, "F");
-    doc.setDrawColor(...C.border);
+    doc.setFillColor(...PDF_C.card);
+    doc.roundedRect(bx, y, boxW, boxH, 1.5, 1.5, "F");
+    doc.setDrawColor(...PDF_C.border);
     doc.setLineWidth(0.3);
-    doc.roundedRect(bx, by, boxW, boxH, 1.5, 1.5, "D");
+    doc.roundedRect(bx, y, boxW, boxH, 1.5, 1.5, "D");
 
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.setTextColor(...C.muted);
-    doc.text(stats[i]!.title.toUpperCase(), bx + 5, by + 8);
+    doc.setFontSize(7.5);
+    doc.setTextColor(...PDF_C.muted);
+    doc.text(stats[i]!.title.toUpperCase(), bx + 4, y + 7);
 
+    const valFontSize = stats[i]!.value.length > 8 ? 13 : 16;
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(18);
-    doc.setTextColor(...C.body);
-    doc.text(stats[i]!.value, bx + 5, by + 18.5);
+    doc.setFontSize(valFontSize);
+    doc.setTextColor(...PDF_C.body);
+    doc.text(stats[i]!.value, bx + 4, y + 17.5);
 
-    // Violet accent underline beneath value
-    doc.setFillColor(...C.violet);
-    doc.rect(bx + 5, by + 21, 9, 0.7, "F");
+    doc.setFillColor(...PDF_C.violet);
+    doc.rect(bx + 4, y + 20, 8, 0.6, "F");
   }
   y += boxH + 8;
 
-  // ── 4. Section title ─────────────────────────────────────────
-  // Small violet accent bar to the left of the label
-  doc.setFillColor(...C.violet);
-  doc.rect(M, y - 3.5, 1.2, 4.5, "F");
+  // ── 4. Bar chart ───────────────────────────────────────────
+  const chartLabel =
+    tab === "daily"
+      ? "HOURLY ACTIVITY"
+      : tab === "weekly"
+      ? "DAILY BREAKDOWN"
+      : "DAILY TREND";
+  const chartSubLabel =
+    tab === "daily" ? "minutes per hour" : "hours per day";
 
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.setTextColor(...C.cyan);
-  doc.text("TIME BY DOMAIN", M + 3.5, y);
+  drawSectionHeader(doc, chartLabel, chartSubLabel, M, y, pageW, M);
+  y += 5;
+
+  const chartH = 40;
+  drawBarChart(doc, chartData, chartUnit, M, y, pageW - M * 2, chartH);
+  y += chartH + 13;
+
+  // ── 5. Category breakdown ─────────────────────────────────
+  const topCats = categoryStats.slice(0, 7);
+  if (topCats.length >= 2) {
+    drawSectionHeader(doc, "BY CATEGORY", "time per activity type", M, y, pageW, M);
+    y += 5;
+
+    const totalCatSeconds = domains.reduce((s, d) => s + d.total_seconds, 0);
+    const catRowsH = drawCategoryBars(
+      doc,
+      topCats,
+      totalCatSeconds,
+      M,
+      y,
+      pageW - M * 2
+    );
+    y += catRowsH + 6;
+  }
+
+  // ── 6. Domain table ────────────────────────────────────────
+  drawSectionHeader(doc, "TIME BY DOMAIN", `${domains.length} domains ranked`, M, y, pageW, M);
   y += 4;
 
-  // ── 5. Domain table ──────────────────────────────────────────
   autoTable(doc, {
     startY: y,
     margin: { left: M, right: M, bottom: 16 },
-    head: [["#", "Domain", "Total Time", "Visits", "% of Total"]],
+    head: [["#", "Domain", "Category", "Total Time", "Visits", "% of Total"]],
     body: domains.map((d, i) => [
       String(i + 1),
       getSiteName(d.domain),
+      CATEGORIES[getCategoryForDomain(d.domain)].label,
       formatTime(d.total_seconds),
       String(d.visit_count),
       `${d.percentage_of_total}%`,
     ]),
     columnStyles: {
-      0: { cellWidth: 11, halign: "center" as const },
+      0: { cellWidth: 10, halign: "center" as const },
       1: { cellWidth: "auto" as const },
-      2: { cellWidth: 28, halign: "right" as const },
-      3: { cellWidth: 20, halign: "right" as const },
-      4: { cellWidth: 38 },
+      2: { cellWidth: 26 },
+      3: { cellWidth: 24, halign: "right" as const },
+      4: { cellWidth: 17, halign: "right" as const },
+      5: { cellWidth: 32 },
     },
     headStyles: {
-      fillColor: C.violet,
-      textColor: C.white,
+      fillColor: PDF_C.violet,
+      textColor: PDF_C.white,
       fontStyle: "bold",
-      fontSize: 10,
-      cellPadding: { top: 3, bottom: 3, left: 3, right: 3 },
+      fontSize: 9,
+      cellPadding: { top: 2.5, bottom: 2.5, left: 3, right: 3 },
     },
     bodyStyles: {
-      fillColor: C.bg,
-      textColor: C.body,
-      fontSize: 9,
-      lineColor: C.border,
+      fillColor: PDF_C.bg,
+      textColor: PDF_C.body,
+      fontSize: 8.5,
+      lineColor: PDF_C.border,
       lineWidth: 0.2,
-      cellPadding: { top: 3, bottom: 3, left: 3, right: 3 },
+      cellPadding: { top: 2.5, bottom: 2.5, left: 3, right: 3 },
     },
-    alternateRowStyles: { fillColor: C.card },
+    alternateRowStyles: { fillColor: PDF_C.card },
     showHead: "everyPage",
 
-    // Footer on every page
     didDrawPage: () => {
-      doc.setFillColor(...C.card);
+      doc.setFillColor(...PDF_C.card);
       doc.rect(0, pageH - 12, pageW, 12, "F");
-      doc.setDrawColor(...C.border);
+      doc.setDrawColor(...PDF_C.border);
       doc.setLineWidth(0.3);
       doc.line(0, pageH - 12, pageW, pageH - 12);
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(8);
-      doc.setTextColor(...C.muted);
+      doc.setFontSize(7.5);
+      doc.setTextColor(...PDF_C.muted);
       doc.text("Generated by Klokrs", M, pageH - 5);
       doc.text(userEmail, pageW / 2, pageH - 5, { align: "center" });
       doc.text(today, pageW - M, pageH - 5, { align: "right" });
@@ -292,13 +502,14 @@ function generatePdf(
     didDrawCell: (data) => {
       if (data.section !== "body") return;
 
-      // Row 0, Total Time column (idx 2) → repaint cyan bold
-      if (data.row.index === 0 && data.column.index === 2) {
-        doc.setFillColor(...C.bg); // row 0 = non-alternate = bg
+      // Row 0, Total Time column (idx 3) → repaint cyan bold
+      if (data.row.index === 0 && data.column.index === 3) {
+        const isAlt = false;
+        doc.setFillColor(...(isAlt ? PDF_C.card : PDF_C.bg));
         doc.rect(data.cell.x, data.cell.y, data.cell.width, data.cell.height, "F");
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(9);
-        doc.setTextColor(...C.cyan);
+        doc.setFontSize(8.5);
+        doc.setTextColor(...PDF_C.cyan);
         doc.text(
           String(data.cell.raw),
           data.cell.x + data.cell.width - 3,
@@ -307,30 +518,42 @@ function generatePdf(
         );
       }
 
-      // % of Total column (idx 4) → progress bar + repaint text
-      if (data.column.index === 4) {
+      // Category column (idx 2) — colour the text to match category
+      if (data.column.index === 2) {
+        const catLabel = String(data.cell.raw);
+        const catEntry = Object.entries(CATEGORIES).find(
+          ([, def]) => def.label === catLabel
+        );
+        if (catEntry) {
+          const [r, g, b] = hexToRgb(catEntry[1].color);
+          const isAlt = data.row.index % 2 === 1;
+          doc.setFillColor(...(isAlt ? PDF_C.card : PDF_C.bg));
+          doc.rect(data.cell.x, data.cell.y, data.cell.width, data.cell.height, "F");
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(7.5);
+          doc.setTextColor(r, g, b);
+          doc.text(catLabel, data.cell.x + 3, data.cell.y + data.cell.height / 2, {
+            baseline: "middle" as const,
+          });
+        }
+      }
+
+      // % of Total column (idx 5) → progress bar
+      if (data.column.index === 5) {
         const rawStr = String(data.cell.raw);
         const pct = parseFloat(rawStr);
         if (isNaN(pct)) return;
-
         const isAlt = data.row.index % 2 === 1;
-
-        // 1. Repaint cell background
-        doc.setFillColor(...(isAlt ? C.card : C.bg));
+        doc.setFillColor(...(isAlt ? PDF_C.card : PDF_C.bg));
         doc.rect(data.cell.x, data.cell.y, data.cell.width, data.cell.height, "F");
-
-        // 2. Progress bar — pre-blended 30% #7C3AED on each bg
-        //    On #0A0A0F: rgb(44, 24, 82)   On #111118: rgb(51, 31, 92)
-        const barColor: [number, number, number] = isAlt ? [51, 31, 92] : [44, 24, 82];
+        const barColor: C = isAlt ? [51, 31, 92] : [44, 24, 82];
         const maxBarW = data.cell.width - 6;
         const barW = Math.max(0.5, (pct / 100) * maxBarW);
         doc.setFillColor(...barColor);
         doc.rect(data.cell.x + 3, data.cell.y + 1.8, barW, data.cell.height - 3.6, "F");
-
-        // 3. Text on top of bar
         doc.setFont("helvetica", data.row.index === 0 ? "bold" : "normal");
-        doc.setFontSize(9);
-        doc.setTextColor(...C.body);
+        doc.setFontSize(8.5);
+        doc.setTextColor(...PDF_C.body);
         doc.text(rawStr, data.cell.x + 3, data.cell.y + data.cell.height / 2, {
           baseline: "middle" as const,
         });
@@ -338,11 +561,10 @@ function generatePdf(
     },
   });
 
-  // ── Save ─────────────────────────────────────────────────────
   doc.save(`Klokrs-report-${tab}-${startDate}.pdf`);
 }
 
-// ─── Empty state ──────────────────────────────────────────────────
+// ─── Empty state ──────────────────────────────────────────────
 
 function ReportsEmpty() {
   return (
@@ -354,7 +576,7 @@ function ReportsEmpty() {
   );
 }
 
-// ─── Main page ────────────────────────────────────────────────────
+// ─── Main page ────────────────────────────────────────────────
 
 export default function ReportsPage() {
   const { session: authSession } = useAuthSession();
@@ -371,22 +593,55 @@ export default function ReportsPage() {
   const [drilldown, setDrilldown] = useState<DrillTarget | null>(null);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [chartMounted, setChartMounted] = useState(false);
+
+  // ── Category overrides (loaded from prefs, saved back on change) ──
+  const [categoryOverrides, setCategoryOverrides] = useState<Record<string, CategoryId>>({});
+
   useEffect(() => { setChartMounted(true); }, []);
 
-  // True when the current period is "now" — disables the Next button.
+  useEffect(() => {
+    const p = loadPrefs();
+    setCategoryOverrides(p.categoryOverrides);
+  }, []);
+
+  const handleCategoryChange = useCallback(
+    async (rootDomain: string, cat: CategoryId) => {
+      const next = { ...categoryOverrides, [rootDomain]: cat };
+      setCategoryOverrides(next);
+      const p = loadPrefs();
+      savePrefs({ ...p, categoryOverrides: next });
+      // Fire-and-forget sync to Supabase
+      if (authToken) {
+        try {
+          await fetch("/api/prefs", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${authToken}`,
+            },
+            body: JSON.stringify({ prefs: { ...p, categoryOverrides: next } }),
+          });
+        } catch { /* silent — localStorage already saved */ }
+      }
+    },
+    [categoryOverrides, authToken]
+  );
+
   const isAtCurrentPeriod = useMemo(() => {
     const today = new Date();
     if (tab === "daily") return localDateStr(selectedDate) === localDateStr(today);
     if (tab === "weekly") return localDateStr(weekStart) === localDateStr(getMonday(today));
-    return monthDate.getFullYear() === today.getFullYear() && monthDate.getMonth() === today.getMonth();
+    return (
+      monthDate.getFullYear() === today.getFullYear() &&
+      monthDate.getMonth() === today.getMonth()
+    );
   }, [tab, selectedDate, weekStart, monthDate]);
 
-  // Auth state lives in useAuthSession above; flip pageLoading off when ready.
   useEffect(() => {
     if (authSession) setPageLoading(false);
   }, [authSession]);
 
-  // ── Date range (memoised) ───────────────────────────────────────
+  // ── Date range (memoised) ─────────────────────────────────
   const dateRange = useMemo(() => {
     if (tab === "daily") {
       const d = localDateStr(selectedDate);
@@ -411,29 +666,17 @@ export default function ReportsPage() {
         isDaily: false,
       };
     }
-    // monthly
-    const first = new Date(
-      monthDate.getFullYear(),
-      monthDate.getMonth(),
-      1
-    );
-    const last = new Date(
-      monthDate.getFullYear(),
-      monthDate.getMonth() + 1,
-      0
-    );
+    const first = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+    const last = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
     return {
       start: localDateStr(first),
       end: localDateStr(last),
-      label: monthDate.toLocaleDateString("en-US", {
-        month: "long",
-        year: "numeric",
-      }),
+      label: monthDate.toLocaleDateString("en-US", { month: "long", year: "numeric" }),
       isDaily: false,
     };
   }, [tab, selectedDate, weekStart, monthDate]);
 
-  // ── Fetch report ────────────────────────────────────────────────
+  // ── Fetch report ──────────────────────────────────────────
   const fetchReport = useCallback(async () => {
     if (!authToken) return;
     setReportLoading(true);
@@ -457,7 +700,7 @@ export default function ReportsPage() {
     if (authToken) void fetchReport();
   }, [authToken, fetchReport]);
 
-  // ── Fetch hourly (daily tab only) ───────────────────────────────
+  // ── Fetch hourly (daily tab only) ─────────────────────────
   useEffect(() => {
     if (tab !== "daily" || !user) return;
     const supabase = createClient();
@@ -486,7 +729,7 @@ export default function ReportsPage() {
     })();
   }, [tab, user, dateRange.start]);
 
-  // ── Derived stats ───────────────────────────────────────────────
+  // ── Derived stats ─────────────────────────────────────────
   const totalSeconds = useMemo(
     () => (reportData?.by_domain ?? []).reduce((s, d) => s + d.total_seconds, 0),
     [reportData]
@@ -514,12 +757,10 @@ export default function ReportsPage() {
     return formatTime(Math.round(avg));
   }, [reportData, totalSeconds]);
 
-  // ── Weekly chart data ───────────────────────────────────────────
+  // ── Weekly chart data ─────────────────────────────────────
   const weeklyChartData = useMemo(() => {
     const map = new Map<string, number>();
-    for (const d of reportData?.by_date ?? []) {
-      map.set(d.date, d.total_seconds);
-    }
+    for (const d of reportData?.by_date ?? []) map.set(d.date, d.total_seconds);
     return DAY_NAMES.map((name, i) => {
       const day = new Date(weekStart);
       day.setDate(weekStart.getDate() + i);
@@ -531,7 +772,7 @@ export default function ReportsPage() {
     });
   }, [reportData, weekStart]);
 
-  // ── Monthly chart data ──────────────────────────────────────────
+  // ── Monthly chart data ────────────────────────────────────
   const monthlyChartData = useMemo(() => {
     const map = new Map<string, number>();
     for (const d of reportData?.by_date ?? []) map.set(d.date, d.total_seconds);
@@ -548,7 +789,13 @@ export default function ReportsPage() {
     });
   }, [reportData, monthDate]);
 
-  // ── PDF export ──────────────────────────────────────────────────
+  // ── Category stats ────────────────────────────────────────
+  const categoryStats = useMemo(
+    () => getCategoryStats(reportData?.by_domain ?? [], categoryOverrides),
+    [reportData, categoryOverrides]
+  );
+
+  // ── PDF export ────────────────────────────────────────────
   const handleExportPdf = useCallback(async () => {
     if (!reportData?.by_domain.length) return;
     setPdfBusy(true);
@@ -560,24 +807,48 @@ export default function ReportsPage() {
               { title: "Total Time", value: formatTime(totalSeconds) },
               { title: "Top Domain", value: topDomain },
               { title: "Domains", value: String(domainCount) },
+              { title: "Peak Hour", value: (() => {
+                  const peak = hourlyData.reduce((a, b) => b.minutes > a.minutes ? b : a, hourlyData[0]!);
+                  return peak.minutes > 0 ? `${peak.hour}:00` : "—";
+                })() },
             ]
           : tab === "weekly"
           ? [
               { title: "Total Hours", value: formatTime(totalSeconds) },
               { title: "Best Day", value: mostProductiveDay },
               { title: "Top Domain", value: topDomain },
+              { title: "Domains", value: String(domainCount) },
             ]
           : [
               { title: "Total Hours", value: formatTime(totalSeconds) },
               { title: "Daily Avg", value: dailyAverage },
               { title: "Top Domain", value: topDomain },
+              { title: "Domains", value: String(domainCount) },
             ];
+
+      // Build chart data for PDF
+      const pdfChartData: PdfChartPoint[] =
+        tab === "daily"
+          ? hourlyData.map((h) => ({ label: String(h.hour), value: h.minutes }))
+          : tab === "weekly"
+          ? weeklyChartData.map((d) => ({ label: d.day, value: d.hours }))
+          : monthlyChartData.map((d) => ({ label: String(d.date), value: d.hours }));
+
+      const pdfCategoryStats: PdfCategoryStat[] = categoryStats.map((c) => ({
+        label: c.label,
+        color: c.color,
+        seconds: c.seconds,
+      }));
+
       generatePdf(
         tab,
         dateRange.label,
         dateRange.start,
         stats,
         reportData.by_domain,
+        pdfChartData,
+        tab === "daily" ? "m" : "h",
+        pdfCategoryStats,
         user?.email ?? ""
       );
     } finally {
@@ -592,9 +863,14 @@ export default function ReportsPage() {
     mostProductiveDay,
     dailyAverage,
     dateRange,
+    hourlyData,
+    weeklyChartData,
+    monthlyChartData,
+    categoryStats,
+    user,
   ]);
 
-  // ── Loading / auth guard ────────────────────────────────────────
+  // ── Loading / auth guard ──────────────────────────────────
   if (pageLoading) {
     return (
       <AppShell title="Reports">
@@ -624,26 +900,11 @@ export default function ReportsPage() {
               className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white/80 transition hover:border-violet-500/30 hover:bg-violet-500/10 hover:text-white disabled:opacity-50"
             >
               {pdfBusy ? (
-                <svg
-                  className="h-4 w-4 animate-spin"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
+                <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M21 12a9 9 0 11-6.219-8.56" />
                 </svg>
               ) : (
-                <svg
-                  width="15"
-                  height="15"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.75"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                   <polyline points="7 10 12 15 17 10" />
                   <line x1="12" y1="15" x2="12" y2="3" />
@@ -655,7 +916,7 @@ export default function ReportsPage() {
         }
       />
 
-      {/* ── Tab bar ─────────────────────────────────────────────── */}
+      {/* ── Tab bar ───────────────────────────────────────────── */}
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative flex gap-1 rounded-2xl border border-white/[0.07] bg-white/[0.03] p-1">
           {TABS.map((t) => (
@@ -663,9 +924,7 @@ export default function ReportsPage() {
               key={t.id}
               onClick={() => setTab(t.id)}
               className={`relative z-10 rounded-xl px-5 py-2 text-sm font-medium transition-colors duration-200 ${
-                tab === t.id
-                  ? "text-white"
-                  : "text-white/45 hover:text-white/70"
+                tab === t.id ? "text-white" : "text-white/45 hover:text-white/70"
               }`}
             >
               {tab === t.id && (
@@ -682,39 +941,20 @@ export default function ReportsPage() {
 
         {/* Date navigation */}
         <div className="flex items-center gap-2">
-          {/* Prev */}
           <button
             onClick={() => {
               if (tab === "daily") {
-                const d = new Date(selectedDate);
-                d.setDate(d.getDate() - 1);
-                setSelectedDate(d);
+                const d = new Date(selectedDate); d.setDate(d.getDate() - 1); setSelectedDate(d);
               } else if (tab === "weekly") {
-                const d = new Date(weekStart);
-                d.setDate(d.getDate() - 7);
-                setWeekStart(d);
+                const d = new Date(weekStart); d.setDate(d.getDate() - 7); setWeekStart(d);
               } else {
-                const d = new Date(
-                  monthDate.getFullYear(),
-                  monthDate.getMonth() - 1,
-                  1
-                );
-                setMonthDate(d);
+                setMonthDate(new Date(monthDate.getFullYear(), monthDate.getMonth() - 1, 1));
               }
             }}
             className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 text-white/40 transition hover:border-white/20 hover:text-white/80"
             aria-label="Previous"
           >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M15 18l-6-6 6-6" />
             </svg>
           </button>
@@ -723,55 +963,31 @@ export default function ReportsPage() {
             {dateRange.label}
           </span>
 
-          {/* Next */}
           <button
             disabled={isAtCurrentPeriod}
             onClick={() => {
               if (tab === "daily") {
-                const d = new Date(selectedDate);
-                d.setDate(d.getDate() + 1);
-                setSelectedDate(d);
+                const d = new Date(selectedDate); d.setDate(d.getDate() + 1); setSelectedDate(d);
               } else if (tab === "weekly") {
-                const d = new Date(weekStart);
-                d.setDate(d.getDate() + 7);
-                setWeekStart(d);
+                const d = new Date(weekStart); d.setDate(d.getDate() + 7); setWeekStart(d);
               } else {
-                const d = new Date(
-                  monthDate.getFullYear(),
-                  monthDate.getMonth() + 1,
-                  1
-                );
-                setMonthDate(d);
+                setMonthDate(new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 1));
               }
             }}
             className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 text-white/40 transition hover:border-white/20 hover:text-white/80 disabled:cursor-not-allowed disabled:opacity-30"
             aria-label="Next"
           >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M9 18l6-6-6-6" />
             </svg>
           </button>
         </div>
       </div>
 
-      {/* ── Tab content ─────────────────────────────────────────── */}
+      {/* ── Tab content ───────────────────────────────────────── */}
       <AnimatePresence mode="wait">
         {reportLoading ? (
-          <motion.div
-            key="loading"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
+          <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <Loader />
           </motion.div>
         ) : (
@@ -787,122 +1003,41 @@ export default function ReportsPage() {
               <ReportsEmpty />
             ) : (
               <>
-                {/* ── KPI cards ─────────────────────────────────── */}
+                {/* ── KPI cards ──────────────────────────── */}
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
                   {tab === "daily" && (
                     <>
-                      <StatsCard
-                        title="Total Time"
-                        value={formatTime(totalSeconds)}
-                        subtitle={dateRange.label}
-                        accent="violet"
-                        icon={
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                            <circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" />
-                          </svg>
-                        }
-                      />
-                      <StatsCard
-                        title="Top Domain"
-                        value={topDomain}
-                        subtitle="Most time spent"
-                        accent="cyan"
-                        icon={
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                          </svg>
-                        }
-                      />
-                      <StatsCard
-                        title="Domains Visited"
-                        value={String(domainCount)}
-                        subtitle="Unique sites"
-                        accent="neutral"
-                        icon={
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                            <rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" />
-                          </svg>
-                        }
-                      />
+                      <StatsCard title="Total Time" value={formatTime(totalSeconds)} subtitle={dateRange.label} accent="violet"
+                        icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>} />
+                      <StatsCard title="Top Domain" value={topDomain} subtitle="Most time spent" accent="cyan"
+                        icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>} />
+                      <StatsCard title="Domains Visited" value={String(domainCount)} subtitle="Unique sites" accent="neutral"
+                        icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" /></svg>} />
                     </>
                   )}
                   {tab === "weekly" && (
                     <>
-                      <StatsCard
-                        title="Total This Week"
-                        value={formatTime(totalSeconds)}
-                        subtitle={dateRange.label}
-                        accent="violet"
-                        icon={
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                            <circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" />
-                          </svg>
-                        }
-                      />
-                      <StatsCard
-                        title="Most Productive Day"
-                        value={mostProductiveDay}
-                        subtitle="Highest single-day total"
-                        accent="cyan"
-                        icon={
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-                          </svg>
-                        }
-                      />
-                      <StatsCard
-                        title="Top Domain"
-                        value={topDomain}
-                        subtitle="Most visited site"
-                        accent="neutral"
-                        icon={
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                          </svg>
-                        }
-                      />
+                      <StatsCard title="Total This Week" value={formatTime(totalSeconds)} subtitle={dateRange.label} accent="violet"
+                        icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>} />
+                      <StatsCard title="Most Productive Day" value={mostProductiveDay} subtitle="Highest single-day total" accent="cyan"
+                        icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" /></svg>} />
+                      <StatsCard title="Top Domain" value={topDomain} subtitle="Most visited site" accent="neutral"
+                        icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>} />
                     </>
                   )}
                   {tab === "monthly" && (
                     <>
-                      <StatsCard
-                        title="Total Hours"
-                        value={formatTime(totalSeconds)}
-                        subtitle={dateRange.label}
-                        accent="violet"
-                        icon={
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                            <circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" />
-                          </svg>
-                        }
-                      />
-                      <StatsCard
-                        title="Daily Average"
-                        value={dailyAverage}
-                        subtitle="Across tracked days"
-                        accent="cyan"
-                        icon={
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" /><polyline points="16 7 22 7 22 13" />
-                          </svg>
-                        }
-                      />
-                      <StatsCard
-                        title="Top Domain"
-                        value={topDomain}
-                        subtitle="Most visited site"
-                        accent="neutral"
-                        icon={
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                          </svg>
-                        }
-                      />
+                      <StatsCard title="Total Hours" value={formatTime(totalSeconds)} subtitle={dateRange.label} accent="violet"
+                        icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>} />
+                      <StatsCard title="Daily Average" value={dailyAverage} subtitle="Across tracked days" accent="cyan"
+                        icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17" /><polyline points="16 7 22 7 22 13" /></svg>} />
+                      <StatsCard title="Top Domain" value={topDomain} subtitle="Most visited site" accent="neutral"
+                        icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>} />
                     </>
                   )}
                 </div>
 
-                {/* ── Chart ─────────────────────────────────────── */}
+                {/* ── Chart ─────────────────────────────── */}
                 <motion.div
                   initial={{ opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -911,192 +1046,117 @@ export default function ReportsPage() {
                 >
                   <div className="border-b border-white/[0.07] px-6 py-5 sm:px-8">
                     <h3 className="text-base font-semibold text-white/95">
-                      {tab === "daily"
-                        ? "Time by hour"
-                        : tab === "weekly"
-                        ? "Daily breakdown"
-                        : "Daily trend"}
+                      {tab === "daily" ? "Time by hour" : tab === "weekly" ? "Daily breakdown" : "Daily trend"}
                     </h3>
                     <p className="mt-0.5 text-sm text-white/40">
-                      {tab === "daily"
-                        ? "Minutes tracked per hour of day"
-                        : "Hours tracked per day"}
+                      {tab === "daily" ? "Minutes tracked per hour of day" : "Hours tracked per day"}
                     </p>
                   </div>
                   <div className="px-2 pb-6 pt-4 sm:px-4 sm:pb-8 sm:pt-6">
                     <div className="h-64 w-full">
-                      {chartMounted && <ResponsiveContainer width="100%" height="100%">
-                        {tab === "monthly" ? (
-                          <LineChart
-                            data={monthlyChartData}
-                            margin={{ top: 4, right: 8, left: 0, bottom: 4 }}
-                          >
-                            <CartesianGrid
-                              strokeDasharray="3 3"
-                              vertical={false}
-                              stroke="rgba(255,255,255,0.05)"
-                            />
-                            <XAxis
-                              dataKey="date"
-                              tick={{ fill: "rgba(255,255,255,0.35)", fontSize: 10 }}
-                              tickLine={false}
-                              axisLine={false}
-                              tickFormatter={(v: number) =>
-                                v % 5 === 1 ? String(v) : ""
-                              }
-                            />
-                            <YAxis
-                              tick={{ fill: "rgba(255,255,255,0.35)", fontSize: 11 }}
-                              tickLine={false}
-                              axisLine={false}
-                              width={38}
-                              tickFormatter={(v: number) => `${v}h`}
-                            />
-                            <Tooltip
-                              content={<ChartTooltip unit="h" />}
-                              cursor={{ stroke: "rgba(124,58,237,0.2)" }}
-                            />
-                            <Line
-                              type="monotone"
-                              dataKey="hours"
-                              stroke="#7C3AED"
-                              strokeWidth={2}
-                              dot={false}
-                              activeDot={{ r: 4, fill: "#7C3AED" }}
-                              isAnimationActive
-                              animationDuration={700}
-                            />
-                          </LineChart>
-                        ) : tab === "weekly" ? (
-                          <BarChart
-                            data={weeklyChartData}
-                            margin={{ top: 4, right: 8, left: 0, bottom: 4 }}
-                            barCategoryGap="24%"
-                          >
-                            <CartesianGrid
-                              strokeDasharray="3 3"
-                              vertical={false}
-                              stroke="rgba(255,255,255,0.05)"
-                            />
-                            <XAxis
-                              dataKey="day"
-                              tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 11 }}
-                              tickLine={false}
-                              axisLine={false}
-                            />
-                            <YAxis
-                              tick={{ fill: "rgba(255,255,255,0.35)", fontSize: 11 }}
-                              tickLine={false}
-                              axisLine={false}
-                              width={38}
-                              tickFormatter={(v: number) => `${v}h`}
-                            />
-                            <Tooltip
-                              content={<ChartTooltip unit="h" />}
-                              cursor={{ fill: "rgba(124,58,237,0.08)", radius: 6 }}
-                            />
-                            <defs>
-                              <linearGradient
-                                id="weekly-bar-grad"
-                                x1="0"
-                                y1="0"
-                                x2="0"
-                                y2="1"
-                              >
-                                <stop
-                                  offset="0%"
-                                  stopColor="#7C3AED"
-                                  stopOpacity={0.9}
-                                />
-                                <stop
-                                  offset="100%"
-                                  stopColor="#06B6D4"
-                                  stopOpacity={0.75}
-                                />
-                              </linearGradient>
-                            </defs>
-                            <Bar
-                              dataKey="hours"
-                              fill="url(#weekly-bar-grad)"
-                              radius={[6, 6, 0, 0]}
-                              maxBarSize={44}
-                              isAnimationActive
-                              animationDuration={700}
-                            />
-                          </BarChart>
-                        ) : (
-                          /* Daily — hours by hour */
-                          <BarChart
-                            data={hourlyData}
-                            margin={{ top: 4, right: 8, left: 0, bottom: 4 }}
-                            barCategoryGap="10%"
-                          >
-                            <CartesianGrid
-                              strokeDasharray="3 3"
-                              vertical={false}
-                              stroke="rgba(255,255,255,0.05)"
-                            />
-                            <XAxis
-                              dataKey="hour"
-                              tick={{ fill: "rgba(255,255,255,0.35)", fontSize: 10 }}
-                              tickLine={false}
-                              axisLine={false}
-                              tickFormatter={(h: number) =>
-                                h % 6 === 0 ? `${h}h` : ""
-                              }
-                            />
-                            <YAxis
-                              tick={{ fill: "rgba(255,255,255,0.35)", fontSize: 11 }}
-                              tickLine={false}
-                              axisLine={false}
-                              width={38}
-                              tickFormatter={(v: number) => `${v}m`}
-                            />
-                            <Tooltip
-                              content={<ChartTooltip unit="m" />}
-                              cursor={{ fill: "rgba(124,58,237,0.08)" }}
-                            />
-                            <defs>
-                              <linearGradient
-                                id="daily-hour-grad"
-                                x1="0"
-                                y1="0"
-                                x2="0"
-                                y2="1"
-                              >
-                                <stop
-                                  offset="0%"
-                                  stopColor="#7C3AED"
-                                  stopOpacity={0.9}
-                                />
-                                <stop
-                                  offset="100%"
-                                  stopColor="#06B6D4"
-                                  stopOpacity={0.7}
-                                />
-                              </linearGradient>
-                            </defs>
-                            <Bar
-                              dataKey="minutes"
-                              fill="url(#daily-hour-grad)"
-                              radius={[4, 4, 0, 0]}
-                              maxBarSize={28}
-                              isAnimationActive
-                              animationDuration={700}
-                            />
-                          </BarChart>
-                        )}
-                      </ResponsiveContainer>}
+                      {chartMounted && (
+                        <ResponsiveContainer width="100%" height="100%">
+                          {tab === "monthly" ? (
+                            <LineChart data={monthlyChartData} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
+                              <XAxis dataKey="date" tick={{ fill: "rgba(255,255,255,0.35)", fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={(v: number) => v % 5 === 1 ? String(v) : ""} />
+                              <YAxis tick={{ fill: "rgba(255,255,255,0.35)", fontSize: 11 }} tickLine={false} axisLine={false} width={38} tickFormatter={(v: number) => `${v}h`} />
+                              <Tooltip content={<ChartTooltip unit="h" />} cursor={{ stroke: "rgba(124,58,237,0.2)" }} />
+                              <Line type="monotone" dataKey="hours" stroke="#7C3AED" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: "#7C3AED" }} isAnimationActive animationDuration={700} />
+                            </LineChart>
+                          ) : tab === "weekly" ? (
+                            <BarChart data={weeklyChartData} margin={{ top: 4, right: 8, left: 0, bottom: 4 }} barCategoryGap="24%">
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
+                              <XAxis dataKey="day" tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 11 }} tickLine={false} axisLine={false} />
+                              <YAxis tick={{ fill: "rgba(255,255,255,0.35)", fontSize: 11 }} tickLine={false} axisLine={false} width={38} tickFormatter={(v: number) => `${v}h`} />
+                              <Tooltip content={<ChartTooltip unit="h" />} cursor={{ fill: "rgba(124,58,237,0.08)", radius: 6 }} />
+                              <defs>
+                                <linearGradient id="weekly-bar-grad" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="0%" stopColor="#7C3AED" stopOpacity={0.9} />
+                                  <stop offset="100%" stopColor="#06B6D4" stopOpacity={0.75} />
+                                </linearGradient>
+                              </defs>
+                              <Bar dataKey="hours" fill="url(#weekly-bar-grad)" radius={[6, 6, 0, 0]} maxBarSize={44} isAnimationActive animationDuration={700} />
+                            </BarChart>
+                          ) : (
+                            <BarChart data={hourlyData} margin={{ top: 4, right: 8, left: 0, bottom: 4 }} barCategoryGap="10%">
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
+                              <XAxis dataKey="hour" tick={{ fill: "rgba(255,255,255,0.35)", fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={(h: number) => h % 6 === 0 ? `${h}h` : ""} />
+                              <YAxis tick={{ fill: "rgba(255,255,255,0.35)", fontSize: 11 }} tickLine={false} axisLine={false} width={38} tickFormatter={(v: number) => `${v}m`} />
+                              <Tooltip content={<ChartTooltip unit="m" />} cursor={{ fill: "rgba(124,58,237,0.08)" }} />
+                              <defs>
+                                <linearGradient id="daily-hour-grad" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="0%" stopColor="#7C3AED" stopOpacity={0.9} />
+                                  <stop offset="100%" stopColor="#06B6D4" stopOpacity={0.7} />
+                                </linearGradient>
+                              </defs>
+                              <Bar dataKey="minutes" fill="url(#daily-hour-grad)" radius={[4, 4, 0, 0]} maxBarSize={28} isAnimationActive animationDuration={700} />
+                            </BarChart>
+                          )}
+                        </ResponsiveContainer>
+                      )}
                     </div>
                   </div>
                 </motion.div>
 
-                {/* ── Domain table ───────────────────────────────── */}
+                {/* ── Category breakdown ────────────────── */}
+                {categoryStats.length >= 2 && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.45, delay: 0.18 }}
+                    className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] shadow-lg shadow-black/25 backdrop-blur-md"
+                  >
+                    <div className="border-b border-white/[0.07] px-6 py-5 sm:px-8">
+                      <h3 className="text-base font-semibold text-white/95">By category</h3>
+                      <p className="mt-0.5 text-sm text-white/40">
+                        How your time was distributed across activity types
+                      </p>
+                    </div>
+                    <div className="space-y-2.5 px-6 py-5 sm:px-8">
+                      {categoryStats.map((cat) => {
+                        const pct = Math.round((cat.seconds / totalSeconds) * 100);
+                        return (
+                          <div key={cat.id} className="flex items-center gap-3">
+                            <div className="flex w-28 shrink-0 items-center gap-2">
+                              <span
+                                className="h-2.5 w-2.5 shrink-0 rounded-full"
+                                style={{ backgroundColor: cat.color }}
+                              />
+                              <span className="truncate text-xs font-medium text-white/65">
+                                {cat.label}
+                              </span>
+                            </div>
+                            <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/[0.06]">
+                              <motion.div
+                                initial={{ width: 0 }}
+                                animate={{ width: `${pct}%` }}
+                                transition={{ duration: 0.65, ease: "easeOut" }}
+                                className="h-full rounded-full"
+                                style={{ backgroundColor: cat.color + "CC" }}
+                              />
+                            </div>
+                            <span className="w-16 shrink-0 text-right text-sm font-bold tabular-nums text-white/80">
+                              {formatTime(cat.seconds)}
+                            </span>
+                            <span className="w-9 shrink-0 text-right text-xs tabular-nums text-white/30">
+                              {pct}%
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* ── Domain table ──────────────────────── */}
                 <ReportsDomainTable
                   data={reportData?.by_domain ?? []}
                   onDomainClick={(domain, totalSeconds) =>
                     setDrilldown({ domain, totalSeconds })
                   }
+                  categoryOverrides={categoryOverrides}
+                  onCategoryChange={(root, cat) => { void handleCategoryChange(root, cat); }}
                 />
               </>
             )}
@@ -1104,7 +1164,7 @@ export default function ReportsPage() {
         )}
       </AnimatePresence>
 
-      {/* ── Drilldown modal ───────────────────────────────────────── */}
+      {/* ── Drilldown modal ───────────────────────────────────── */}
       {drilldown && (
         <DomainDrilldownModal
           domain={drilldown.domain}

@@ -1,3 +1,5 @@
+import type { CategoryId } from "./categories";
+
 export interface KlokrsNotificationPrefs {
   dayStart: boolean;
   dayComplete: boolean;
@@ -19,6 +21,8 @@ export interface KlokrsPrefs {
   autoCompleteThreshold: number;
   /** Minimum unscheduled gap (minutes) that surfaces as a red Background-activity block. */
   redBlockMinGapMinutes: number;
+  /** User overrides for domain→category mapping. Keyed by root domain. */
+  categoryOverrides: Record<string, CategoryId>;
 }
 
 export const DEFAULT_PREFS: KlokrsPrefs = {
@@ -36,6 +40,7 @@ export const DEFAULT_PREFS: KlokrsPrefs = {
   autoCompleteEnabled: true,
   autoCompleteThreshold: 80,
   redBlockMinGapMinutes: 15,
+  categoryOverrides: {},
 };
 
 /** Resolves the user's effective time zone: stored override or browser default. */
@@ -82,6 +87,7 @@ export function loadPrefs(): KlokrsPrefs {
         ...DEFAULT_PREFS,
         ...parsed,
         notifications: { ...DEFAULT_PREFS.notifications, ...(parsed.notifications ?? {}) },
+        categoryOverrides: { ...(parsed.categoryOverrides ?? {}) },
       };
     }
   } catch { /* ignore */ }

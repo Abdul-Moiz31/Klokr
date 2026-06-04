@@ -1,8 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { getSiteName, groupByRootDomain } from "@/lib/domain";
+import {
+  CATEGORIES,
+  CATEGORY_IDS,
+  getCategoryForDomain,
+  type CategoryId,
+} from "@/lib/categories";
 
 export interface ReportsDomainRow {
   domain: string;
@@ -20,6 +26,100 @@ function formatTime(s: number): string {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
+// ── Category badge + dropdown ─────────────────────────────────────
+
+function CategoryBadge({
+  domain,
+  categoryOverrides,
+  onCategoryChange,
+}: {
+  domain: string;
+  categoryOverrides: Record<string, CategoryId>;
+  onCategoryChange: (rootDomain: string, cat: CategoryId) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const cat = getCategoryForDomain(domain, categoryOverrides);
+  const def = CATEGORIES[cat];
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative shrink-0">
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((v) => !v);
+        }}
+        className={`rounded-full border px-2 py-0.5 text-[10px] font-medium transition-opacity
+          ${def.bgClass} ${def.textClass} ${def.borderClass}
+          ${cat === "other" ? "opacity-0 group-hover:opacity-40" : "opacity-70 hover:opacity-100"}`}
+        title={`Category: ${def.label} — click to change`}
+      >
+        {def.label}
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: -4 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: -4 }}
+            transition={{ duration: 0.12 }}
+            className="absolute left-0 top-full z-50 mt-1.5 w-40 overflow-hidden rounded-xl border border-white/[0.12] bg-[#0d0d14]/95 py-1 shadow-2xl backdrop-blur-xl"
+          >
+            {CATEGORY_IDS.map((id) => (
+              <button
+                key={id}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onCategoryChange(domain, id);
+                  setOpen(false);
+                }}
+                className={`flex w-full items-center gap-2.5 px-3 py-1.5 text-xs transition-colors hover:bg-white/[0.06] ${
+                  id === cat ? "text-white" : "text-white/50"
+                }`}
+              >
+                <span
+                  className="h-2 w-2 shrink-0 rounded-full"
+                  style={{ backgroundColor: CATEGORIES[id].color }}
+                />
+                <span className="flex-1 text-left">{CATEGORIES[id].label}</span>
+                {id === cat && (
+                  <svg
+                    width="10"
+                    height="10"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    className="shrink-0 text-violet-400"
+                  >
+                    <polyline points="20 6 9 17 4 12" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                )}
+              </button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ── Domain row ────────────────────────────────────────────────────
+
 function DomainRow({
   row,
   rank,
@@ -27,6 +127,8 @@ function DomainRow({
   maxSeconds,
   isClickable,
   onDomainClick,
+  categoryOverrides,
+  onCategoryChange,
 }: {
   row: ReportsDomainRow;
   rank: number;
@@ -34,6 +136,8 @@ function DomainRow({
   maxSeconds: number;
   isClickable: boolean;
   onDomainClick?: (domain: string, totalSeconds: number) => void;
+  categoryOverrides?: Record<string, CategoryId>;
+  onCategoryChange?: (rootDomain: string, cat: CategoryId) => void;
 }) {
   const barWidth = (row.total_seconds / maxSeconds) * 100;
   return (
@@ -67,11 +171,20 @@ function DomainRow({
         </div>
       </div>
 
-      {/* Domain + bar */}
+      {/* Domain name + category badge + bar */}
       <div className="min-w-0 flex-1">
-        <p className="mb-1.5 truncate text-sm font-medium text-white/85" title={row.domain}>
-          {getSiteName(row.domain)}
-        </p>
+        <div className="mb-1.5 flex items-center gap-2">
+          <p className="truncate text-sm font-medium text-white/85" title={row.domain}>
+            {getSiteName(row.domain)}
+          </p>
+          {categoryOverrides !== undefined && onCategoryChange && (
+            <CategoryBadge
+              domain={row.domain}
+              categoryOverrides={categoryOverrides}
+              onCategoryChange={onCategoryChange}
+            />
+          )}
+        </div>
         <div className="h-1 w-full overflow-hidden rounded-full bg-white/[0.06]">
           <motion.div
             initial={{ width: 0 }}
@@ -97,7 +210,16 @@ function DomainRow({
 
       {isClickable && (
         <div className="shrink-0 text-white/20 transition-colors group-hover:text-violet-400">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <path d="M9 18l6-6-6-6" />
           </svg>
         </div>
@@ -106,12 +228,18 @@ function DomainRow({
   );
 }
 
+// ── Public table component ────────────────────────────────────────
+
 export function ReportsDomainTable({
   data,
   onDomainClick,
+  categoryOverrides,
+  onCategoryChange,
 }: {
   data: ReportsDomainRow[];
   onDomainClick?: (domain: string, totalSeconds: number) => void;
+  categoryOverrides?: Record<string, CategoryId>;
+  onCategoryChange?: (rootDomain: string, cat: CategoryId) => void;
 }) {
   const [minorExpanded, setMinorExpanded] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
@@ -129,8 +257,12 @@ export function ReportsDomainTable({
     });
   };
 
-  // Adapt snake_case rows to the groupByRootDomain shape
-  const adapted = data.map((r) => ({ domain: r.domain, totalSeconds: r.total_seconds, visits: r.visit_count, percentage_of_total: r.percentage_of_total }));
+  const adapted = data.map((r) => ({
+    domain: r.domain,
+    totalSeconds: r.total_seconds,
+    visits: r.visit_count,
+    percentage_of_total: r.percentage_of_total,
+  }));
   const totalAllSeconds = adapted.reduce((s, r) => s + r.totalSeconds, 0) || 1;
   const grouped = groupByRootDomain(adapted).map((g) => ({
     ...g,
@@ -156,6 +288,9 @@ export function ReportsDomainTable({
         <h3 className="text-base font-semibold text-white/95">Time by domain</h3>
         <p className="mt-0.5 text-sm text-white/40">
           {data.length} domain{data.length !== 1 ? "s" : ""} · ranked by time spent
+          {categoryOverrides !== undefined && (
+            <span className="ml-2 text-white/25">· click a tag to recategorize</span>
+          )}
         </p>
       </div>
 
@@ -172,7 +307,12 @@ export function ReportsDomainTable({
       <ul className="divide-y divide-white/[0.05]">
         {/* Major rows */}
         {major.map((group, i) => {
-          const asRow: ReportsDomainRow = { domain: group.rootDomain, total_seconds: group.totalSeconds, visit_count: group.visits, percentage_of_total: group.percentage_of_total };
+          const asRow: ReportsDomainRow = {
+            domain: group.rootDomain,
+            total_seconds: group.totalSeconds,
+            visit_count: group.visits,
+            percentage_of_total: group.percentage_of_total,
+          };
           const hasSubdomains = group.subdomains.length > 1;
           const isExpanded = expandedGroups.has(group.rootDomain);
           return (
@@ -186,16 +326,26 @@ export function ReportsDomainTable({
                     maxSeconds={maxSeconds}
                     isClickable={isClickable}
                     onDomainClick={onDomainClick}
+                    categoryOverrides={categoryOverrides}
+                    onCategoryChange={onCategoryChange}
                   />
                 </div>
                 {hasSubdomains && (
                   <button
                     type="button"
                     onClick={() => toggleGroup(group.rootDomain)}
-                    className="absolute right-14 flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.05] px-1.5 py-0.5 text-[10px] text-white/35 hover:text-white/60 hover:bg-white/[0.08] transition-colors"
+                    className="absolute right-14 flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.05] px-1.5 py-0.5 text-[10px] text-white/35 hover:bg-white/[0.08] hover:text-white/60 transition-colors"
                   >
                     {group.subdomains.length}
-                    <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}>
+                    <svg
+                      width="8"
+                      height="8"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      className={`transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}
+                    >
                       <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   </button>
@@ -213,14 +363,30 @@ export function ReportsDomainTable({
                     {group.subdomains
                       .sort((a, b) => b.totalSeconds - a.totalSeconds)
                       .map((sub) => (
-                        <li key={sub.domain} className="flex items-center gap-3 px-8 py-2.5 sm:px-10">
+                        <li
+                          key={sub.domain}
+                          className="flex items-center gap-3 px-8 py-2.5 sm:px-10"
+                        >
                           <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded border border-white/[0.08] bg-white/[0.04]">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={`https://www.google.com/s2/favicons?domain=${sub.domain}&sz=16`} alt="" width={12} height={12} className="rounded-sm opacity-70" onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0.15"; }} />
+                            <img
+                              src={`https://www.google.com/s2/favicons?domain=${sub.domain}&sz=16`}
+                              alt=""
+                              width={12}
+                              height={12}
+                              className="rounded-sm opacity-70"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).style.opacity = "0.15";
+                              }}
+                            />
                           </div>
                           <span className="flex-1 truncate text-xs text-white/40">{sub.domain}</span>
-                          <span className="shrink-0 text-xs tabular-nums text-white/50">{formatTime(sub.totalSeconds)}</span>
-                          <span className="shrink-0 text-[10px] tabular-nums text-white/25">{sub.visits}v</span>
+                          <span className="shrink-0 text-xs tabular-nums text-white/50">
+                            {formatTime(sub.totalSeconds)}
+                          </span>
+                          <span className="shrink-0 text-[10px] tabular-nums text-white/25">
+                            {sub.visits}v
+                          </span>
                         </li>
                       ))}
                   </motion.ul>
@@ -244,8 +410,17 @@ export function ReportsDomainTable({
                     ···
                   </span>
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.04]">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-white/25">
-                      <circle cx="12" cy="12" r="10" /><path d="M12 8v4M12 16h.01" />
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      className="text-white/25"
+                    >
+                      <circle cx="12" cy="12" r="10" />
+                      <path d="M12 8v4M12 16h.01" />
                     </svg>
                   </div>
                 </div>
@@ -254,17 +429,34 @@ export function ReportsDomainTable({
                     Other — {minor.length} domain{minor.length !== 1 ? "s" : ""} under 5 min
                   </span>
                   <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-white/[0.06]">
-                    <div className="h-full rounded-full bg-white/20" style={{ width: `${Math.max(2, (minorSeconds / maxSeconds) * 100)}%` }} />
+                    <div
+                      className="h-full rounded-full bg-white/20"
+                      style={{
+                        width: `${Math.max(2, (minorSeconds / maxSeconds) * 100)}%`,
+                      }}
+                    />
                   </div>
                 </div>
                 <div className="flex w-20 shrink-0 justify-end">
-                  <span className="text-sm font-bold tabular-nums text-white/60">{formatTime(minorSeconds)}</span>
+                  <span className="text-sm font-bold tabular-nums text-white/60">
+                    {formatTime(minorSeconds)}
+                  </span>
                 </div>
                 <div className="hidden w-16 shrink-0 justify-end sm:flex">
                   <span className="text-xs tabular-nums text-white/30">{minorVisits}</span>
                 </div>
                 <div className="hidden w-16 shrink-0 justify-end sm:flex" />
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`shrink-0 text-white/25 transition-transform duration-200 ${minorExpanded ? "rotate-180" : ""}`}>
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  className={`shrink-0 text-white/25 transition-transform duration-200 ${
+                    minorExpanded ? "rotate-180" : ""
+                  }`}
+                >
                   <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </button>
@@ -282,12 +474,19 @@ export function ReportsDomainTable({
                     {minor.map((group, i) => (
                       <DomainRow
                         key={group.rootDomain}
-                        row={{ domain: group.rootDomain, total_seconds: group.totalSeconds, visit_count: group.visits, percentage_of_total: group.percentage_of_total }}
+                        row={{
+                          domain: group.rootDomain,
+                          total_seconds: group.totalSeconds,
+                          visit_count: group.visits,
+                          percentage_of_total: group.percentage_of_total,
+                        }}
                         rank={major.length + i + 1}
                         animDelay={i * 0.03}
                         maxSeconds={maxSeconds}
                         isClickable={isClickable}
                         onDomainClick={onDomainClick}
+                        categoryOverrides={categoryOverrides}
+                        onCategoryChange={onCategoryChange}
                       />
                     ))}
                   </ul>
