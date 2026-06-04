@@ -162,6 +162,25 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: Props) {
       ),
     },
     {
+      href: "/progress",
+      label: "Progress",
+      icon: (
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <circle cx="12" cy="8" r="6" />
+          <path d="M8.21 13.89L7 23l5-3 5 3-1.21-9.12" />
+        </svg>
+      ),
+    },
+    {
       href: "/ai",
       label: "AI Insights",
       icon: (
@@ -339,7 +358,9 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: Props) {
                 ? pathname === "/activity"
                 : item.href === "/reports"
                   ? pathname === "/reports"
-                  : pathname.startsWith(item.href);
+                  : item.href === "/progress"
+                    ? pathname === "/progress"
+                    : pathname.startsWith(item.href);
           return (
             <Link
               key={item.href}
