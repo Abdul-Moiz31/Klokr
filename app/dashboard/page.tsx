@@ -17,6 +17,7 @@ import { WorkDayCompleteBanner } from "@/components/dashboard/WorkDayCompleteBan
 import { ActivationChecklist } from "@/components/dashboard/ActivationChecklist";
 import { PlanVsActualCard } from "@/components/dashboard/PlanVsActualCard";
 import { StreakStrip } from "@/components/dashboard/StreakStrip";
+import { AccountabilityCard } from "@/components/dashboard/AccountabilityCard";
 import { WeeklyReviewCard } from "@/components/dashboard/WeeklyReviewCard";
 import { FocusScoreCard } from "@/components/dashboard/FocusScoreCard";
 import { getSiteName } from "@/lib/domain";
@@ -213,6 +214,9 @@ export default function DashboardPage() {
       />
 
             <WorkDayCompleteBanner totalSecondsToday={totalSeconds} />
+
+            {/* Gamification headline — accountability score, level, streak */}
+            <AccountabilityCard userId={userId} />
 
             {/* Insight cards — two-up on wide screens so they don't dominate the page */}
             <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-2 [&>*]:mb-0">
