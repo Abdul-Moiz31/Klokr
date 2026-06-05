@@ -67,6 +67,9 @@ export function Navbar() {
           <Link href="#features" className="text-white/60 hover:text-white text-sm transition-colors">
             Features
           </Link>
+          <Link href="#comparison" className="text-white/60 hover:text-white text-sm transition-colors">
+            Compare
+          </Link>
           <Link href="#pricing" className="text-white/60 hover:text-white text-sm transition-colors">
             Pricing
           </Link>
