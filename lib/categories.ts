@@ -1,4 +1,4 @@
-import { getRootDomain } from "./domain";
+import { getRootDomain, getDomainFamily } from "./domain";
 
 export type CategoryId =
   | "focus"
@@ -169,18 +169,26 @@ const DEFAULT_MAP: Record<string, CategoryId> = {
 
 /**
  * Returns the CategoryId for a given domain.
- * Lookup order: user override (by root) → default for specific subdomain →
- * default for root domain → "other".
+ * Lookup order: user override (by root, then by family canonical) → default
+ * for specific subdomain → default for root domain → default for family
+ * canonical → "other".
+ *
+ * The family-canonical fallbacks keep a brand consistent across its sibling
+ * domains: recategorising "GitHub" also covers raw.githubusercontent.com, and
+ * the GitHub default flows to githubusercontent.com automatically.
  */
 export function getCategoryForDomain(
   domain: string,
   overrides: Record<string, CategoryId> = {}
 ): CategoryId {
   const root = getRootDomain(domain);
+  const canonical = getDomainFamily(domain).canonical;
   return (
     overrides[root] ??
+    overrides[canonical] ??
     DEFAULT_MAP[domain] ??
     DEFAULT_MAP[root] ??
+    DEFAULT_MAP[canonical] ??
     "other"
   );
 }
