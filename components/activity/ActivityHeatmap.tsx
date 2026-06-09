@@ -13,8 +13,6 @@ interface Props {
   stats: DayStat[];
   productiveThresholdSeconds: number;
   todayStr: string;
-  streak: number;
-  productiveDays: number;
   bestDayStr: string | null;
   onDayClick: (date: string, totalSeconds: number) => void;
 }
@@ -114,7 +112,7 @@ function formatFull(dateStr: string): string {
   });
 }
 
-export function ActivityHeatmap({ stats, productiveThresholdSeconds, todayStr, streak, productiveDays, bestDayStr, onDayClick }: Props) {
+export function ActivityHeatmap({ stats, productiveThresholdSeconds, todayStr, bestDayStr, onDayClick }: Props) {
   const [hovered, setHovered] = useState<string | null>(null);
 
   const statMap = new Map(stats.map((s) => [s.date, s.totalSeconds]));
@@ -132,29 +130,11 @@ export function ActivityHeatmap({ stats, productiveThresholdSeconds, todayStr, s
     >
       {/* Header */}
       <div className="border-b border-white/[0.07] px-5 py-4 sm:px-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-1.5">
-              <h3 className="text-sm font-semibold text-white/95">Browsing activity</h3>
-              <InfoTooltip text="Each square is one day. Color shows how close you came to your productive-hours goal — set your threshold in Settings → Preferences. Click any square to see that day's domain breakdown." side="bottom" />
-            </div>
-            <p className="mt-0.5 text-xs text-white/40">Last {NUM_WEEKS} weeks — each square is one day</p>
-          </div>
-          <div className="flex items-center gap-3 shrink-0">
-            <div className="flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-1.5">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-orange-400">
-                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-              </svg>
-              <span className="text-xs font-semibold text-white/80 tabular-nums">{streak}d</span>
-              <span className="text-[10px] text-white/35">streak</span>
-            </div>
-            <div className="flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-1.5">
-              <div className="h-2.5 w-2.5 rounded-sm bg-gradient-to-br from-violet-500 to-cyan-400" />
-              <span className="text-xs font-semibold text-white/80 tabular-nums">{productiveDays}</span>
-              <span className="text-[10px] text-white/35">productive days</span>
-            </div>
-          </div>
+        <div className="flex items-center gap-1.5">
+          <h3 className="text-sm font-semibold text-white/95">Browsing activity</h3>
+          <InfoTooltip text="Each square is one day. Color shows how close you came to your productive-hours goal — set your threshold in Settings → Preferences. Click any square to see that day's domain breakdown." side="bottom" />
         </div>
+        <p className="mt-0.5 text-xs text-white/40">Last {NUM_WEEKS} weeks · each square is one day · click to open report</p>
       </div>
 
       <div className="overflow-x-auto px-4 py-5 sm:px-6">
@@ -240,7 +220,7 @@ export function ActivityHeatmap({ stats, productiveThresholdSeconds, todayStr, s
               )}
             </div>
           ) : (
-            <p className="text-xs text-white/20">Hover a square to preview · click to open report</p>
+            <p className="text-xs text-white/20">Hover a square to preview</p>
           )}
         </div>
 

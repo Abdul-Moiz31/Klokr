@@ -1,93 +1,64 @@
 "use client";
 
 import { useState } from "react";
+import { AnimatePresence } from "framer-motion";
 import { DayDataEditor } from "./DayDataEditor";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
-import type { DailyPlannerV5, DayData, RoutineTemplateKind } from "@/lib/daily-planner/types";
+import { TemplateImportModal, type ParsedTask } from "./TemplateImportModal";
+import type { DailyPlannerV5, DayData, PlannerTask, RoutineTemplateKind } from "@/lib/daily-planner/types";
 import { createEmptyDayData } from "@/lib/daily-planner/storage";
 
-type MainRoutineTab = "weekdays" | "weekend" | "fallback";
-type WeekendSubTab = "saturday" | "sunday";
-
-const MAIN_TABS: {
-  id: MainRoutineTab;
+const TEMPLATE_TABS: {
+  kind: RoutineTemplateKind;
   label: string;
+  sub: string;
   tooltip: string;
   icon: React.ReactNode;
 }[] = [
   {
-    id: "weekdays",
-    label: "Weekdays",
-    tooltip: "Suggested Mon–Fri in the daily planner. Edit groups and tasks here to fit your typical workday.",
+    kind: "weekdays",
+    label: "Work day",
+    sub: "Mon–Fri",
+    tooltip: "Loaded automatically on weekdays. Edit the task blocks here to match your typical workday.",
     icon: (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="2" y="3" width="20" height="14" rx="2" />
-        <path d="M8 21h8M12 17v4" />
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" />
       </svg>
     ),
   },
   {
-    id: "weekend",
-    label: "Weekend",
-    tooltip: "Weekend templates let you configure Saturday and Sunday separately for a more flexible plan.",
-    icon: (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M4 7h16M4 12h16M4 17h16" />
-      </svg>
-    ),
-  },
-  {
-    id: "fallback",
-    label: "Fallback",
-    tooltip: "A generic starter you can copy to any day when the weekday or weekend preset doesn't fit.",
-    icon: (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 2L2 7l10 5 10-5-10-5z" />
-        <path d="M2 17l10 5 10-5" />
-        <path d="M2 12l10 5 10-5" />
-      </svg>
-    ),
-  },
-];
-
-const WEEKEND_SUB_TABS: {
-  id: WeekendSubTab;
-  label: string;
-  tooltip: string;
-  icon: React.ReactNode;
-}[] = [
-  {
-    id: "saturday",
+    kind: "saturday",
     label: "Saturday",
-    tooltip: "Plan a separate Saturday routine for errands, hobbies, or prep work.",
+    sub: "Weekend",
+    tooltip: "Loaded on Saturdays. Great for errands, hobbies, or personal projects.",
     icon: (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 3a6 6 0 009 9 9 9 0 11-9-9z" />
       </svg>
     ),
   },
   {
-    id: "sunday",
+    kind: "sunday",
     label: "Sunday",
-    tooltip: "Plan a separate Sunday routine for rest, review, and reset.",
+    sub: "Weekend",
+    tooltip: "Loaded on Sundays. Ideal for rest, weekly review, and planning the week ahead.",
     icon: (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="12" cy="12" r="5" />
-        <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="5" /><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
       </svg>
     ),
   },
-];
-
-const ROUTINE_TEMPLATE_KINDS: {
-  id: RoutineTemplateKind;
-  label: string;
-  tooltip: string;
-  icon: React.ReactNode;
-}[] = [
-  { ...MAIN_TABS.find((t) => t.id === "weekdays")!, id: "weekdays" },
-  { ...MAIN_TABS.find((t) => t.id === "fallback")!, id: "fallback" },
-  ...WEEKEND_SUB_TABS,
+  {
+    kind: "fallback",
+    label: "Recovery day",
+    sub: "Light schedule",
+    tooltip: "For when you're busy or overwhelmed — a lighter, more manageable set of tasks to fall back on instead of skipping your routine entirely.",
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+      </svg>
+    ),
+  },
 ];
 
 type Props = {
@@ -97,92 +68,99 @@ type Props = {
 };
 
 export function RoutineTemplatesEditor({ state, setRoutineTemplate, newIdFn }: Props) {
-  const [mainTab, setMainTab] = useState<MainRoutineTab>("weekdays");
-  const [weekendTab, setWeekendTab] = useState<WeekendSubTab>("saturday");
+  const [selectedKind, setSelectedKind] = useState<RoutineTemplateKind>("weekdays");
+  const [showImport, setShowImport] = useState(false);
 
-  const selectedKind: RoutineTemplateKind = mainTab === "weekend" ? weekendTab : mainTab;
+  const activeTab = TEMPLATE_TABS.find((t) => t.kind === selectedKind)!;
   const data = state.routineTemplates[selectedKind] ?? createEmptyDayData();
-  const activeKind = ROUTINE_TEMPLATE_KINDS.find((k) => k.id === selectedKind)!;
+
+  const handleImport = (parsed: ParsedTask[]) => {
+    if (parsed.length === 0) return;
+
+    // Replace the entire template with the imported tasks (fresh day data)
+    const base = createEmptyDayData();
+    const groupId = base.groups[0]!.id;
+
+    const newTasks: PlannerTask[] = parsed.map((p, i) => ({
+      id: newIdFn(),
+      groupId,
+      title: p.title,
+      description: "",
+      done: false,
+      domainTags: [],
+      order: i,
+      startMinutes: p.startMinutes,
+      endMinutes: p.endMinutes,
+    }));
+
+    setRoutineTemplate(selectedKind, { ...base, tasks: newTasks });
+  };
 
   return (
     <div className="w-full max-w-7xl">
-      <div className="mb-6 rounded-3xl border border-white/[0.07] bg-white/[0.03] p-6">
-        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/30">Routine templates</p>
-        <h2 className="mt-3 text-2xl font-semibold text-white">Reusable day starters for your planner</h2>
-        <p className="mt-3 text-sm leading-6 text-white/60">
-          Keep your most common daily setups here and apply them quickly to any day. Use Weekdays, Weekend, and Fallback templates to match workdays, Saturday/Sunday, and last-minute days.
+      {/* Header */}
+      <div className="mb-6 rounded-2xl border border-white/[0.07] bg-white/[0.03] px-5 py-4">
+        <p className="text-sm font-semibold text-white/80">Day templates</p>
+        <p className="mt-1 text-xs leading-relaxed text-white/40">
+          Set up reusable task lists for your most common day types. Load any template onto today (or any week day) with a single click from the Today and Week tabs.
         </p>
       </div>
 
-      <div className="mb-6 rounded-2xl border border-white/[0.07] bg-white/[0.03] p-1">
-        <div className="flex items-center gap-1">
-          {MAIN_TABS.map((tabOption) => {
-            const isActive = mainTab === tabOption.id;
-            return (
-              <button
-                key={tabOption.id}
-                type="button"
-                onClick={() => setMainTab(tabOption.id)}
-                className={`relative flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-all duration-150 ${
-                  isActive
-                    ? "bg-cyan-600/20 text-cyan-200 shadow-sm"
-                    : "text-white/40 hover:text-white/65 hover:bg-white/[0.04]"
-                }`}
-              >
-                <span className={isActive ? "text-cyan-300/80" : "text-white/30"}>
-                  {tabOption.icon}
-                </span>
-                {tabOption.label}
-                {isActive && (
-                  <div className="absolute inset-0 rounded-xl border border-cyan-500/20" />
-                )}
-              </button>
-            );
-          })}
-        </div>
+      {/* Flat template selector — 4 equal cards */}
+      <div className="mb-6 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {TEMPLATE_TABS.map((t) => {
+          const isActive = selectedKind === t.kind;
+          return (
+            <button
+              key={t.kind}
+              type="button"
+              onClick={() => setSelectedKind(t.kind)}
+              className={`flex flex-col items-start gap-1.5 rounded-2xl border px-4 py-3.5 text-left transition-all duration-150 ${
+                isActive
+                  ? "border-cyan-500/25 bg-cyan-600/10 shadow-sm"
+                  : "border-white/[0.07] bg-white/[0.02] hover:bg-white/[0.04] hover:border-white/10"
+              }`}
+            >
+              <span className={isActive ? "text-cyan-300/80" : "text-white/30"}>{t.icon}</span>
+              <span className={`text-sm font-semibold ${isActive ? "text-cyan-200" : "text-white/65"}`}>{t.label}</span>
+              <span className={`text-[10px] ${isActive ? "text-cyan-300/40" : "text-white/20"}`}>{t.sub}</span>
+            </button>
+          );
+        })}
       </div>
 
-      {mainTab === "weekend" && (
-        <div className="mb-6 rounded-2xl border border-white/[0.07] bg-white/[0.03] p-3">
-          <div className="grid grid-cols-2 gap-2">
-            {WEEKEND_SUB_TABS.map((subTab) => {
-              const isActive = weekendTab === subTab.id;
-              return (
-                <button
-                  key={subTab.id}
-                  type="button"
-                  onClick={() => setWeekendTab(subTab.id)}
-                  className={`rounded-xl px-4 py-3 text-sm text-left transition ${
-                    isActive
-                      ? "bg-cyan-600/20 text-cyan-200 shadow-sm"
-                      : "text-white/40 hover:text-white/65 hover:bg-white/[0.04]"
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className={isActive ? "text-cyan-300/80" : "text-white/30"}>{subTab.icon}</span>
-                    <span>{subTab.label}</span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+      {/* Active template label + actions */}
+      <div className="mb-4 flex items-center gap-2">
+        <div className="flex h-6 w-6 items-center justify-center rounded-lg border border-cyan-500/20 bg-cyan-600/10 text-cyan-300/70">
+          {activeTab.icon}
         </div>
-      )}
+        <p className="text-sm font-semibold text-white/75">{activeTab.label} template</p>
+        <InfoTooltip text={activeTab.tooltip} side="bottom" />
 
-      <div className="mb-4 flex items-center gap-1.5">
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-white/30">
-          {activeKind.label} template
-        </p>
-        <InfoTooltip text={activeKind.tooltip} side="bottom" />
-        <span className="rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1 text-xs text-white/50">
-          {selectedKind === "weekdays"
-            ? "Mon–Fri starter"
-            : selectedKind === "saturday"
-            ? "Saturday routine"
-            : selectedKind === "sunday"
-            ? "Sunday routine"
-            : "Fallback starter"}
-        </span>
+        <div className="ml-auto flex items-center gap-2">
+          {data.tasks.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setRoutineTemplate(selectedKind, createEmptyDayData())}
+              className="flex items-center gap-1.5 rounded-xl border border-red-500/15 bg-white/[0.02] px-3 py-1.5 text-xs font-medium text-red-400/60 transition hover:border-red-500/25 hover:bg-red-500/[0.06] hover:text-red-300"
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" /><path d="M10 11v6M14 11v6" />
+              </svg>
+              Clear
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setShowImport(true)}
+            className="flex items-center gap-1.5 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-white/55 transition hover:border-violet-500/20 hover:bg-violet-500/[0.06] hover:text-violet-300"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+            Import schedule
+          </button>
+        </div>
       </div>
 
       <DayDataEditor
@@ -191,6 +169,16 @@ export function RoutineTemplatesEditor({ state, setRoutineTemplate, newIdFn }: P
         newIdFn={newIdFn}
         isTemplate
       />
+
+      {/* Import modal */}
+      <AnimatePresence>
+        {showImport && (
+          <TemplateImportModal
+            onImport={handleImport}
+            onClose={() => setShowImport(false)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

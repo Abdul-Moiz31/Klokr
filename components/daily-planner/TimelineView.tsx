@@ -12,6 +12,7 @@ import type {
 } from "@fullcalendar/core";
 import type { EventResizeDoneArg } from "@fullcalendar/interaction";
 import type { IdleRange, PlannerTask } from "@/lib/daily-planner/types";
+import { getTaskColor } from "@/lib/daily-planner/taskColor";
 import type { TabSession } from "@/lib/supabase";
 import {
   computeOnTaskStats,
@@ -117,6 +118,7 @@ export function TimelineView({
 
   const calendarRef = useRef<FullCalendar | null>(null);
   const dragRef = useRef<Draggable | null>(null);
+  const hasScrolledRef = useRef(false);
 
   // Reattach external draggable when the source container changes.
   useEffect(() => {
@@ -153,7 +155,21 @@ export function TimelineView({
     const api = calendarRef.current?.getApi();
     if (!api) return;
     api.gotoDate(startOfLocalDay(forDate));
+    hasScrolledRef.current = false; // reset scroll-to-now on date change
   }, [forDate]);
+
+  // Scroll to 1h before the current time once per mount (or date change).
+  useEffect(() => {
+    if (hasScrolledRef.current) return;
+    if (nowMinutes == null) return;
+    const api = calendarRef.current?.getApi();
+    if (!api) return;
+    const target = Math.max(0, nowMinutes - 60);
+    const h = String(Math.floor(target / 60)).padStart(2, "0");
+    const m = String(target % 60).padStart(2, "0");
+    api.scrollToTime(`${h}:${m}:00`);
+    hasScrolledRef.current = true;
+  }, [nowMinutes]);
 
   const events: EventInput[] = useMemo(() => {
     const taskEvents: EventInput[] = tasks
@@ -161,6 +177,10 @@ export function TimelineView({
       .map((t) => {
         const start = minutesToDate(forDate, t.startMinutes!);
         const end = minutesToDate(forDate, t.endMinutes!);
+        const isActive = !t.done && nowMinutes != null &&
+          t.startMinutes! <= nowMinutes && t.endMinutes! > nowMinutes;
+        const isMissed = !t.done && !t.skipped && nowMinutes != null &&
+          (t.endMinutes as number) <= nowMinutes;
         return {
           id: t.id,
           title: t.title || "(untitled)",
@@ -169,7 +189,10 @@ export function TimelineView({
           editable: !readOnly && !t.done,
           classNames: [
             "klokrs-event",
+            `klokrs-event--${getTaskColor(t.title || "")}`,
             t.done ? "klokrs-event--done" : "",
+            isActive ? "klokrs-event--active" : "",
+            isMissed ? "klokrs-event--missed" : "",
           ].filter(Boolean),
           extendedProps: { kind: "task", task: t },
         } satisfies EventInput;
@@ -196,7 +219,7 @@ export function TimelineView({
     }));
 
     return [...taskEvents, ...gapEvents, ...idleEvents];
-  }, [tasks, forDate, readOnly, unscheduledGaps, idleRanges]);
+  }, [tasks, forDate, readOnly, unscheduledGaps, idleRanges, nowMinutes]);
 
   const handleDrop = (info: EventDropArg) => {
     const ev = info.event;
@@ -269,6 +292,7 @@ export function TimelineView({
           const kind = (arg.event.extendedProps?.kind as string | undefined) ?? "task";
           const start = arg.event.start ? dateToMinutes(arg.event.start) : 0;
           const end = arg.event.end ? dateToMinutes(arg.event.end) : start;
+          const dur = end - start;
           if (kind === "gap") {
             const gap = arg.event.extendedProps?.gap as UnscheduledGap | undefined;
             const activity = gap?.activityMinutes ?? end - start;
@@ -328,10 +352,9 @@ export function TimelineView({
             noActivityInWindow &&
             onMarkOfflineComplete != null &&
             onMarkSkipped != null;
-          // The checkbox swallows mouse/pointer events so it doesn't trigger
-          // FullCalendar's eventClick (which opens the edit modal) or start a
-          // drag on the block. `mouseDownCapture` is the early hook FullCalendar
-          // uses to begin drag tracking.
+          const isActive = !done && nowMinutes != null &&
+            task != null && task.startMinutes != null && task.endMinutes != null &&
+            task.startMinutes <= nowMinutes && task.endMinutes > nowMinutes;
           return (
             <div className="klokrs-event-body">
               <div className="klokrs-event-row">
@@ -373,6 +396,11 @@ export function TimelineView({
                 <div className={`klokrs-event-title ${done ? "klokrs-event-title--done" : ""}`}>
                   {arg.event.title}
                 </div>
+                {isActive ? (
+                  <span className="klokrs-event-live" aria-hidden />
+                ) : (
+                  <span className="klokrs-event-dur">{fmtMinutes(dur)}</span>
+                )}
                 {showCheck && (
                   <span
                     className="klokrs-event-corner-check"
@@ -391,36 +419,33 @@ export function TimelineView({
                   </span>
                 )}
               </div>
-              <div className="klokrs-event-meta">{formatRange(start, end)}</div>
-              {showOfflinePrompt && task && (
-                <div className="klokrs-event-offline">
-                  <span className="klokrs-event-offline-text">Done offline?</span>
-                  <button
-                    type="button"
-                    className="klokrs-event-offline-btn klokrs-event-offline-btn--yes"
-                    onMouseDownCapture={(e) => e.stopPropagation()}
-                    onPointerDownCapture={(e) => e.stopPropagation()}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onMarkOfflineComplete!(task.id);
-                    }}
-                  >
-                    Done
-                  </button>
-                  <button
-                    type="button"
-                    className="klokrs-event-offline-btn"
-                    onMouseDownCapture={(e) => e.stopPropagation()}
-                    onPointerDownCapture={(e) => e.stopPropagation()}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onMarkSkipped!(task.id);
-                    }}
-                  >
-                    Skip
-                  </button>
-                </div>
-              )}
+              <div className="klokrs-event-meta">
+                {formatRange(start, end)}
+                {showOfflinePrompt && task && (
+                  <>
+                    <span className="klokrs-event-offline-sep"> · </span>
+                    <button
+                      type="button"
+                      className="klokrs-event-offline-btn klokrs-event-offline-btn--yes"
+                      onMouseDownCapture={(e) => e.stopPropagation()}
+                      onPointerDownCapture={(e) => e.stopPropagation()}
+                      onClick={(e) => { e.stopPropagation(); onMarkOfflineComplete!(task.id); }}
+                    >
+                      Done
+                    </button>
+                    <span className="klokrs-event-offline-sep"> / </span>
+                    <button
+                      type="button"
+                      className="klokrs-event-offline-btn"
+                      onMouseDownCapture={(e) => e.stopPropagation()}
+                      onPointerDownCapture={(e) => e.stopPropagation()}
+                      onClick={(e) => { e.stopPropagation(); onMarkSkipped!(task.id); }}
+                    >
+                      Skip
+                    </button>
+                  </>
+                )}
+              </div>
               {stats && stats.totalWindowMinutes > 0 && (
                 <div className="klokrs-event-fill-track" aria-hidden>
                   <div

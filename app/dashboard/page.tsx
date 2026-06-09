@@ -344,18 +344,14 @@ export default function DashboardPage() {
             ) : (
               <div className="space-y-6">
                 <TodayActivityChart sessions={sessions} />
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-5 lg:gap-6">
-                  <div className="lg:col-span-3">
-                    <DomainChart data={domainStats} totalSeconds={totalSeconds} />
-                  </div>
-                  <div className="lg:col-span-2">
-                    <TopDomains
-                      data={domainStats}
-                      onDomainClick={(domain, totalSeconds) =>
-                        setDrilldown({ domain, totalSeconds })
-                      }
-                    />
-                  </div>
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                  <DomainChart data={domainStats} totalSeconds={totalSeconds} />
+                  <TopDomains
+                    data={domainStats}
+                    onDomainClick={(domain, totalSeconds) =>
+                      setDrilldown({ domain, totalSeconds })
+                    }
+                  />
                 </div>
               </div>
             )}
