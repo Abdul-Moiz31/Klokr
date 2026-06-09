@@ -69,63 +69,53 @@ export function StreakStrip({ userId }: Props) {
 
   if (!data) return null;
 
-  const hot = data.streak >= 7;
+  const productivePct = data.totalDays > 0 ? Math.round((data.productiveDays / data.totalDays) * 100) : 0;
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25 }}
-      className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-white/[0.08] bg-white/[0.03] px-5 py-4"
+      className="mb-6 flex flex-col justify-between gap-4 rounded-2xl border border-white/[0.08] bg-white/[0.03] px-5 py-4"
     >
-      <div className="flex items-center gap-5">
-        {/* Streak */}
-        <div className="flex items-center gap-3">
-          <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${hot ? "bg-orange-500/15 text-orange-300" : "bg-violet-500/15 text-violet-300"}`}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-500/15 text-violet-300">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
             </svg>
           </span>
-          <div>
-            <p className="text-lg font-bold leading-none text-white tabular-nums">
-              {data.streak}<span className="ml-0.5 text-sm font-medium text-white/40">day{data.streak === 1 ? "" : "s"}</span>
-            </p>
-            <p className={`mt-1 text-xs ${data.atRisk ? "text-amber-300/80" : "text-white/40"}`}>
-              {data.streak === 0
-                ? "start your streak today"
-                : data.atRisk
-                  ? "browse today to keep it alive"
-                  : data.graceUsed
-                    ? "current streak · 1 day forgiven"
-                    : "current streak"}
-            </p>
-          </div>
+          <h3 className="text-sm font-semibold text-white/85">Activity</h3>
         </div>
-
-        <div className="h-9 w-px bg-white/[0.08]" />
-
-        {/* Productive days */}
-        <div>
-          <p className="text-lg font-bold leading-none text-white tabular-nums">
-            {data.productiveDays}<span className="ml-0.5 text-sm font-medium text-white/40">/{data.totalDays}</span>
-          </p>
-          <p className="mt-1 text-xs text-white/40">productive days (90d)</p>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-3">
-        {data.todayMetGoal && (
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-300">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-            {data.goalHours}h goal hit today
-          </span>
-        )}
         <Link href="/activity" className="text-xs text-white/35 transition hover:text-white/65">
           View activity →
         </Link>
       </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        {/* Productive days */}
+        <div>
+          <p className="text-xl font-bold leading-none text-white tabular-nums">
+            {data.productiveDays}<span className="ml-1 text-sm font-medium text-white/40">/{data.totalDays}</span>
+          </p>
+          <p className="mt-1 text-xs text-white/40">productive days (90d)</p>
+        </div>
+
+        {/* Productive % */}
+        <div>
+          <p className="text-xl font-bold leading-none text-emerald-300 tabular-nums">{productivePct}%</p>
+          <p className="mt-1 text-xs text-white/40">of days productive</p>
+        </div>
+      </div>
+
+      {data.todayMetGoal && (
+        <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-300">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+          {data.goalHours}h goal hit today
+        </span>
+      )}
     </motion.div>
   );
 }

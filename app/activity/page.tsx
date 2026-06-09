@@ -216,15 +216,21 @@ export default function ActivityPage() {
         stats={stats}
         productiveThresholdSeconds={thresholdS}
         todayStr={todayStr}
-        streak={streak}
-        productiveDays={productiveDays}
         bestDayStr={bestDay?.date ?? null}
         onDayClick={handleDayClick}
       />
 
       {/* Today's full domain breakdown */}
       {todayDomains.length > 0 && (
-        <div className="mt-6 sm:mt-8">
+        <div className="mt-8 sm:mt-10">
+          <div className="mb-3 flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-white/90">Today&apos;s breakdown</h2>
+              <p className="mt-0.5 text-xs text-white/40">
+                {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+              </p>
+            </div>
+          </div>
           <DomainTable
             data={todayDomains}
             onDomainClick={(domain, totalSeconds) => setDrilldown({ domain, totalSeconds })}

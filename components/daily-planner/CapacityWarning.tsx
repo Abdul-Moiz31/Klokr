@@ -40,17 +40,14 @@ export function CapacityWarning({ userId, plannedMinutes }: Props) {
           animate={{ opacity: 1, height: "auto" }}
           exit={{ opacity: 0, height: 0 }}
           transition={{ duration: 0.2 }}
-          className="mb-4 flex items-start gap-3 rounded-xl border border-amber-500/20 bg-amber-500/[0.07] px-4 py-3"
+          className="mb-3 flex items-center gap-2.5 rounded-xl border border-amber-500/15 bg-amber-500/[0.05] px-3.5 py-2"
         >
-          <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-500/20 text-amber-300">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
-            </svg>
-          </span>
-          <p className="text-xs leading-relaxed text-amber-200/80">
-            You&apos;ve planned <b className="text-amber-100">{fmt(plannedMinutes)}</b> today, but your
-            recent daily average is <b className="text-amber-100">{fmt(avgMinutes)}</b> of tracked focus.
-            That&apos;s ambitious — consider trimming a block or two so the plan stays realistic.
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-amber-400/70">
+            <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+          </svg>
+          <p className="text-[11px] text-amber-200/65">
+            <b className="text-amber-100/90">{fmt(plannedMinutes)}</b> planned today vs your{" "}
+            <b className="text-amber-100/90">{fmt(avgMinutes)}</b> daily average — that&apos;s ambitious.
           </p>
         </motion.div>
       )}
