@@ -4,6 +4,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useAuthCta } from "@/lib/useAuthCta";
+import { buttonClasses } from "@/components/ui/Button";
 
 function CheckIcon() {
   return (
@@ -69,7 +70,7 @@ function ComingSoonModal({ plan, onClose }: { plan: "Standard" | "Pro"; onClose:
 
           <button
             onClick={onClose}
-            className="w-full rounded-xl bg-violet-600 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-500 hover:shadow-[0_0_20px_rgba(124,58,237,0.5)]"
+            className={buttonClasses("primary", "md", "w-full")}
           >
             Got it, I&apos;ll keep using it free
           </button>
@@ -159,8 +160,7 @@ export function Pricing() {
                 <span className="text-4xl font-bold text-white">$0</span>
                 <span className="mb-1 text-sm text-white/35">/ month</span>
               </div>
-              <p className="mt-2 text-xs text-white/40">No credit card required. No catch.</p>
-              <p className="mt-2 text-xs text-white/40">LIMITED TIME OFFER.</p>
+              <p className="mt-2 text-xs text-white/40">No credit card required. Free while we build the paid plans.</p>
             </div>
 
             <ul className="mb-8 flex-1 space-y-3">
@@ -172,10 +172,7 @@ export function Pricing() {
               ))}
             </ul>
 
-            <Link
-              href={ctaHref}
-              className="block rounded-xl border border-white/10 bg-white/[0.05] py-2.5 text-center text-sm font-semibold text-white/80 transition hover:bg-white/10 hover:text-white"
-            >
+            <Link href={ctaHref} className={buttonClasses("secondary", "md", "w-full")}>
               Get started free
             </Link>
           </motion.div>
@@ -215,7 +212,7 @@ export function Pricing() {
 
             <button
               onClick={() => setModal("Standard")}
-              className="block w-full rounded-xl bg-violet-600 py-2.5 text-center text-sm font-semibold text-white transition hover:bg-violet-500 hover:shadow-[0_0_20px_rgba(124,58,237,0.5)]"
+              className={buttonClasses("primary", "md", "w-full")}
             >
               Get Standard
             </button>
@@ -227,8 +224,15 @@ export function Pricing() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.5, delay: 0.2 }}
-            className="flex flex-col rounded-2xl border border-white/[0.08] bg-white/[0.03] p-7"
+            className="relative flex flex-col rounded-2xl border border-white/[0.08] bg-white/[0.03] p-7"
           >
+            {/* Coming soon badge */}
+            <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
+              <span className="rounded-full bg-cyan-500/90 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white shadow-md">
+                Coming Soon
+              </span>
+            </div>
+
             <div className="mb-6">
               <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-cyan-400/80">Pro</p>
               <div className="flex items-end gap-1">
@@ -249,7 +253,7 @@ export function Pricing() {
 
             <button
               onClick={() => setModal("Pro")}
-              className="block w-full rounded-xl border border-cyan-500/30 bg-cyan-500/[0.08] py-2.5 text-center text-sm font-semibold text-cyan-400 transition hover:bg-cyan-500/20 hover:text-cyan-300"
+              className={buttonClasses("accent", "md", "w-full")}
             >
               Get Pro
             </button>
