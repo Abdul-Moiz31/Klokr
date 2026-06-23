@@ -133,7 +133,7 @@ export function AppShell({
 
           <main className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain [padding-bottom:max(1rem,env(safe-area-inset-bottom))] sm:px-0 sm:pt-0 touch-pan-y">
             <div
-              className={`mx-auto w-full px-4 pb-4 pt-2 sm:px-5 sm:pb-6 sm:pt-3 lg:px-6 lg:pb-8 lg:pt-4 lg:pr-16 ${contentMaxClassName}`}
+              className={`mx-auto w-full px-5 pb-8 pt-4 sm:px-8 sm:pb-10 sm:pt-6 lg:px-10 lg:pb-12 lg:pt-8 lg:pr-20 ${contentMaxClassName}`}
             >
               {children}
             </div>

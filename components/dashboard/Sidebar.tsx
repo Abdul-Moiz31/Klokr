@@ -262,7 +262,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: Props) {
   ];
 
   const linkClass = (active: boolean) =>
-    `flex min-h-[2.75rem] items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
+    `flex min-h-[2.75rem] items-center gap-3 rounded-xl px-3.5 py-3 text-sm font-medium transition-all duration-200 ${
       collapsed ? "lg:justify-center lg:px-2" : ""
     } ${
       active
@@ -349,7 +349,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: Props) {
         </button>
       )}
 
-      <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto p-3 sm:p-4">
+      <nav className="min-h-0 flex-1 space-y-1.5 overflow-y-auto p-4 sm:p-5">
         {navItems.map((item) => {
           const active =
             item.href === "/dashboard"
@@ -376,7 +376,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: Props) {
         })}
       </nav>
 
-      <div className="mt-auto border-t border-white/10 p-3 sm:p-4" ref={profileRef}>
+      <div className="mt-auto border-t border-white/10 p-4 sm:p-5" ref={profileRef}>
         <div className="relative">
           <button
             type="button"

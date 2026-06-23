@@ -28,7 +28,7 @@ export function PageHeader({
       initial={{ opacity: 0, y: -10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] }}
-      className="mb-7 sm:mb-9"
+      className="mb-9 sm:mb-12"
     >
       {/* Top rule */}
       <div className="mb-5 h-px w-full bg-gradient-to-r from-violet-500/20 via-white/[0.06] to-transparent" />
