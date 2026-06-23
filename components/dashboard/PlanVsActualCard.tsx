@@ -66,7 +66,7 @@ export function PlanVsActualCard({ sessions, autoCompleteThreshold = 80 }: Props
   // No plan today → gentle nudge to plan (reinforces the core loop).
   if (!summary) {
     return (
-      <div className="mb-6 flex flex-col gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.03] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex h-full flex-col gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.03] px-6 py-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-sm font-medium text-white/80">No plan for today yet</p>
           <p className="mt-0.5 text-sm text-white/45">
@@ -90,9 +90,9 @@ export function PlanVsActualCard({ sessions, autoCompleteThreshold = 80 }: Props
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25 }}
-      className="mb-6 rounded-2xl border border-white/[0.08] bg-white/[0.03] px-5 py-4"
+      className="flex h-full flex-col rounded-2xl border border-white/[0.08] bg-white/[0.03] px-6 py-6"
     >
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-5 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className={`flex h-7 w-7 items-center justify-center rounded-lg ${onTrack ? "bg-emerald-500/15 text-emerald-300" : "bg-violet-500/15 text-violet-300"}`}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -106,7 +106,7 @@ export function PlanVsActualCard({ sessions, autoCompleteThreshold = 80 }: Props
         </Link>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
         <Stat label="Tasks done" value={`${summary.completed}/${summary.total}`} accent={summary.completionPct >= 50 ? "emerald" : "violet"} />
         <Stat label="Completion" value={`${summary.completionPct}%`} accent={summary.completionPct >= 50 ? "emerald" : "violet"} />
         <Stat label="Planned time" value={fmtMinutes(summary.plannedMinutes)} accent="violet" />
@@ -114,7 +114,7 @@ export function PlanVsActualCard({ sessions, autoCompleteThreshold = 80 }: Props
       </div>
 
       {/* Adherence bar */}
-      <div className="mt-4">
+      <div className="mt-6">
         <div className="mb-1.5 flex items-center justify-between text-xs">
           <span className="text-white/40">Plan adherence</span>
           <span className={`font-semibold tabular-nums ${onTrack ? "text-emerald-300" : "text-amber-300"}`}>

@@ -49,9 +49,9 @@ export function FocusScoreCard({ domains, goalHours }: Props) {
   };
 
   return (
-    <div className="mb-6 rounded-2xl border border-white/[0.08] bg-white/[0.03] px-5 py-4">
+    <div className="flex h-full flex-col rounded-2xl border border-white/[0.08] bg-white/[0.03] px-6 py-6">
       <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-5">
           {/* Gauge */}
           <div className="relative h-[84px] w-[84px] shrink-0">
             <svg width="84" height="84" viewBox="0 0 84 84" className="-rotate-90">

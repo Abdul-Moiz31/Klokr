@@ -213,17 +213,18 @@ export default function DashboardPage() {
         }
       />
 
+      <div className="space-y-8 sm:space-y-10">
             <WorkDayCompleteBanner totalSecondsToday={totalSeconds} />
 
             {/* Gamification headline — accountability score, level, streak */}
             <AccountabilityCard userId={userId} />
 
             {/* Insight cards — two-up on wide screens so they don't dominate the page */}
-            <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-2 [&>*]:mb-0">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               <StreakStrip userId={userId} />
               <WeeklyReviewCard userId={userId} />
             </div>
-            <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-2 [&>*]:mb-0">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               <PlanVsActualCard sessions={sessions} autoCompleteThreshold={loadPrefs().autoCompleteThreshold} />
               <FocusScoreCard
                 domains={domainStats.map((d) => ({ domain: d.domain, totalSeconds: d.totalSeconds }))}
@@ -233,7 +234,7 @@ export default function DashboardPage() {
 
             {/* Fetch error banner */}
             {fetchError && (
-              <div className="mb-6 flex items-center justify-between gap-3 rounded-xl border border-red-500/20 bg-red-500/8 px-4 py-3">
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-red-500/20 bg-red-500/8 px-4 py-3">
                 <p className="text-sm text-red-400/90">Failed to load session data. Check your connection and try again.</p>
                 <button
                   type="button"
@@ -246,7 +247,7 @@ export default function DashboardPage() {
             )}
 
             {/* KPI row */}
-            <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:mb-10 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
               <StatsCard
                 title="Total time today"
                 value={totalSeconds > 0 ? formatTotalTime(totalSeconds) : "0s"}
@@ -342,7 +343,7 @@ export default function DashboardPage() {
             {sessions.length === 0 ? (
               <ActivationChecklist />
             ) : (
-              <div className="space-y-6">
+              <div className="space-y-8">
                 <TodayActivityChart sessions={sessions} />
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                   <DomainChart data={domainStats} totalSeconds={totalSeconds} />
@@ -355,6 +356,7 @@ export default function DashboardPage() {
                 </div>
               </div>
             )}
+      </div>
       {drilldown && (
         <DomainDrilldownModal
           domain={drilldown.domain}
