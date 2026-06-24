@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { Toaster } from "sonner";
+import { Analytics } from "@vercel/analytics/next";
 import { ExtensionAuthSync } from "@/components/ExtensionAuthSync";
 import "./globals.css";
 
@@ -36,6 +37,7 @@ export default function RootLayout({
         <ExtensionAuthSync />
         {children}
         <Toaster theme="dark" position="bottom-center" richColors />
+        <Analytics />
       </body>
     </html>
   );
