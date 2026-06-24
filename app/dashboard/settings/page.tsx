@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuthSession } from "@/lib/useAuthSession";
 import { AnimatePresence, motion } from "framer-motion";
@@ -590,6 +590,14 @@ type TabId = (typeof TABS)[number]["id"];
 /* ─── Page ───────────────────────────────────────────────── */
 
 export default function SettingsPage() {
+  return (
+    <Suspense fallback={<AppShell title="Settings"><Loader /></AppShell>}>
+      <SettingsPageInner />
+    </Suspense>
+  );
+}
+
+function SettingsPageInner() {
   const searchParams = useSearchParams();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
