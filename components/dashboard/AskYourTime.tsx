@@ -102,7 +102,7 @@ export function AskYourTime() {
   };
 
   return (
-    <div className="mb-6 rounded-2xl border border-white/[0.08] bg-gradient-to-br from-violet-500/[0.06] to-cyan-500/[0.04] px-5 py-4">
+    <div className="mb-6 rounded-xl border border-white/[0.08] bg-gradient-to-br from-violet-500/[0.06] to-cyan-500/[0.04] px-5 py-4">
       {/* Header */}
       <div className="mb-3 flex items-center gap-2">
         <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-500/15 text-violet-300">

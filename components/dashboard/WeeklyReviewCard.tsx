@@ -128,7 +128,7 @@ export function WeeklyReviewCard({ userId }: Props) {
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25 }}
-      className="flex h-full flex-col rounded-2xl border border-white/[0.08] bg-gradient-to-br from-violet-500/[0.06] to-cyan-500/[0.04] px-6 py-6"
+      className="flex h-full flex-col rounded-xl border border-white/[0.08] bg-gradient-to-br from-violet-500/[0.06] to-cyan-500/[0.04] px-4 py-4"
     >
       <div className="mb-5 flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -144,7 +144,7 @@ export function WeeklyReviewCard({ userId }: Props) {
         </Link>
       </div>
 
-      <div className="grid grid-cols-2 gap-6 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         <div>
           <p className="text-xl font-bold tabular-nums text-white">{fmt(review.thisWeekSeconds)}</p>
           <p className="mt-0.5 text-xs text-white/40">tracked this week</p>

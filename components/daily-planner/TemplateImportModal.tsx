@@ -278,7 +278,7 @@ export function TemplateImportModal({ onImport, onClose }: Props) {
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.97 }}
         transition={{ duration: 0.18 }}
-        className="w-full max-w-lg max-h-[92vh] overflow-y-auto rounded-2xl border border-white/10 bg-[#12121a] shadow-2xl"
+        className="w-full max-w-lg max-h-[92vh] overflow-y-auto rounded-xl border border-white/10 bg-[#12121a] shadow-2xl"
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-white/[0.06] px-6 py-4">

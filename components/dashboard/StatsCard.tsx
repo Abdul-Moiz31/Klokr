@@ -52,22 +52,22 @@ export function StatsCard({
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.45, delay, ease: [0.25, 0.46, 0.45, 0.94] }}
-      className="group relative flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] p-6 shadow-lg shadow-black/25 backdrop-blur-md transition-all duration-300 hover:border-white/[0.16] hover:bg-white/[0.06]"
+      className="group relative flex flex-col overflow-hidden rounded-xl border border-white/10 bg-white/[0.04] p-4 shadow-sm shadow-black/20 backdrop-blur-md transition-all duration-300 hover:border-white/[0.16] hover:bg-white/[0.06]"
     >
       {/* Hover glow blob */}
       <div
-        className={`pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full ${s.glow} opacity-0 blur-2xl transition-opacity duration-500 group-hover:opacity-100`}
+        className={`pointer-events-none absolute -right-4 -top-4 h-14 w-14 rounded-full ${s.glow} opacity-0 blur-2xl transition-opacity duration-500 group-hover:opacity-100`}
         aria-hidden
       />
 
       {/* Top row: icon + badge */}
-      <div className="relative mb-5 flex items-start justify-between gap-2">
-        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border bg-gradient-to-br ${s.icon}`}>
+      <div className="relative mb-3 flex items-start justify-between gap-2">
+        <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border bg-gradient-to-br ${s.icon}`}>
           {icon}
         </div>
         {badge && (
           <span
-            className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold tracking-wide ${
+            className={`shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold tracking-wide ${
               badge.color === "green"
                 ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-400"
                 : badge.color === "yellow"
@@ -82,19 +82,19 @@ export function StatsCard({
 
       {/* Label */}
       <div className="relative mb-1 flex items-center gap-1.5">
-        <p className="text-[11px] font-semibold uppercase tracking-widest text-white/35">{title}</p>
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-white/35">{title}</p>
         {tooltip && <InfoTooltip text={tooltip} side="bottom" />}
       </div>
 
       {/* Value */}
       <p
-        className={`relative break-all text-[1.75rem] font-bold leading-none tracking-tight bg-gradient-to-br bg-clip-text text-transparent ${s.value}`}
+        className={`relative break-all text-xl font-bold leading-none tracking-tight bg-gradient-to-br bg-clip-text text-transparent ${s.value}`}
       >
         {value}
       </p>
 
       {subtitle && (
-        <p className="relative mt-1.5 text-xs text-white/35">{subtitle}</p>
+        <p className="relative mt-1 text-[11px] text-white/35">{subtitle}</p>
       )}
 
       {/* Bottom accent stripe */}

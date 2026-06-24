@@ -447,7 +447,7 @@ export function DailyPlannerApp({ accountCreatedAt = null, userId = null }: Dail
       <ExtensionPlannerSync rules={rules} />
 
       {/* ── Tab bar ── */}
-      <div className="mb-7 flex items-center gap-1 rounded-2xl border border-white/[0.07] bg-white/[0.03] p-1">
+      <div className="mb-7 flex items-center gap-1 rounded-xl border border-white/[0.07] bg-white/[0.03] p-1">
         {TABS.map((t) => {
           const isActive = tab === t.id;
           return (
@@ -485,7 +485,7 @@ export function DailyPlannerApp({ accountCreatedAt = null, userId = null }: Dail
 
               {/* ── Hero header ── */}
               <div
-                className="mb-5 overflow-hidden rounded-2xl border border-white/[0.07]"
+                className="mb-5 overflow-hidden rounded-xl border border-white/[0.07]"
                 style={{ background: "linear-gradient(135deg, rgba(124,58,237,0.09) 0%, rgba(10,10,15,0.96) 55%, rgba(6,78,59,0.05) 100%)" }}
               >
                 {/* Row 1: date nav */}
@@ -660,7 +660,7 @@ export function DailyPlannerApp({ accountCreatedAt = null, userId = null }: Dail
 
                       {/* Active now / Up next */}
                       {(activeTask ?? nextTask) && (
-                        <div className="overflow-hidden rounded-2xl border border-white/[0.07] bg-white/[0.02]">
+                        <div className="overflow-hidden rounded-xl border border-white/[0.07] bg-white/[0.02]">
                           <div className="flex items-center gap-2 border-b border-white/[0.05] px-4 py-2.5">
                             {activeTask ? (
                               <>
@@ -811,7 +811,7 @@ export function DailyPlannerApp({ accountCreatedAt = null, userId = null }: Dail
           {/* ════ ROUTINES ════ */}
           {tab === "routines" && (
             <div>
-              <div className="mb-5 rounded-2xl border border-white/[0.07] bg-white/[0.03] px-5 py-4">
+              <div className="mb-5 rounded-xl border border-white/[0.07] bg-white/[0.03] px-5 py-4">
                 <p className="text-sm font-semibold text-white/80">Recurring routines</p>
                 <p className="mt-1 text-xs leading-relaxed text-white/40">
                   Build a library of tasks you do regularly — morning review, deep work blocks, email check. Once saved, add them to a template or drop them straight onto today.
@@ -857,7 +857,7 @@ export function DailyPlannerApp({ accountCreatedAt = null, userId = null }: Dail
       {/* ── Duplicate routine modal ── */}
       {confirmDuplicateRule !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#0f0f16] p-7 shadow-2xl">
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="w-full max-w-sm rounded-xl border border-white/10 bg-[#0f0f16] p-7 shadow-2xl">
             <h3 className="mb-2 text-base font-semibold text-white">Already in today&apos;s plan</h3>
             <p className="mb-6 text-sm leading-relaxed text-white/50">
               <span className="font-medium text-white/75">&ldquo;{confirmDuplicateRule.title}&rdquo;</span> is already here. Add another copy?
@@ -915,7 +915,7 @@ export function DailyPlannerApp({ accountCreatedAt = null, userId = null }: Dail
       {/* ── Confirm replace today's tasks ── */}
       {confirmTemplate !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#0f0f16] p-7 shadow-2xl">
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="w-full max-w-sm rounded-xl border border-white/10 bg-[#0f0f16] p-7 shadow-2xl">
             <h3 className="mb-2 text-base font-semibold text-white">Replace today&apos;s tasks?</h3>
             <p className="mb-6 text-sm leading-relaxed text-white/50">
               Your current tasks for today will be replaced with the <span className="font-medium text-white/75">{TEMPLATE_DISPLAY[confirmTemplate].label}</span> template.
@@ -936,7 +936,7 @@ export function DailyPlannerApp({ accountCreatedAt = null, userId = null }: Dail
       {/* ── Confirm load template into a week day ── */}
       {confirmWeekTemplate !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#0f0f16] p-7 shadow-2xl">
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="w-full max-w-sm rounded-xl border border-white/10 bg-[#0f0f16] p-7 shadow-2xl">
             <h3 className="mb-2 text-base font-semibold text-white">
               Load {TEMPLATE_DISPLAY[confirmWeekTemplate.kind].label} into {confirmWeekTemplate.label}?
             </h3>

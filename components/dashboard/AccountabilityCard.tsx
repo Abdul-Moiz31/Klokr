@@ -65,9 +65,9 @@ export function AccountabilityCard({ userId }: Props) {
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className="overflow-hidden rounded-2xl border border-white/[0.08] bg-gradient-to-r from-violet-500/[0.07] via-white/[0.02] to-cyan-500/[0.04]"
+      className="overflow-hidden rounded-xl border border-white/[0.08] bg-gradient-to-r from-violet-500/[0.07] via-white/[0.02] to-cyan-500/[0.04]"
     >
-      <div className="flex flex-col gap-5 px-6 py-6 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-x-8 gap-y-5">
           {/* Score gauge */}
           <div className="flex items-center gap-3">
@@ -113,7 +113,7 @@ export function AccountabilityCard({ userId }: Props) {
 
           {/* Streak */}
           <div className="flex items-center gap-2.5">
-            <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${hotStreak ? "bg-orange-500/15 text-orange-300" : "bg-violet-500/15 text-violet-300"}`}>
+            <span className={`flex h-7 w-7 items-center justify-center rounded-xl ${hotStreak ? "bg-orange-500/15 text-orange-300" : "bg-violet-500/15 text-violet-300"}`}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
               </svg>

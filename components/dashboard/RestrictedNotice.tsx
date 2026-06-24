@@ -41,7 +41,7 @@ export function RestrictedNotice() {
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
-      <div className="w-full max-w-sm rounded-2xl border border-red-500/20 bg-[#0f0f16] p-8 shadow-2xl shadow-black/60 text-center">
+      <div className="w-full max-w-sm rounded-xl border border-red-500/20 bg-[#0f0f16] p-8 shadow-2xl shadow-black/60 text-center">
         {/* Icon */}
         <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-red-500/10 ring-1 ring-red-500/20">
           <svg

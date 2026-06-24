@@ -155,7 +155,7 @@ export function PomodoroApp() {
         <span className="tabular-nums font-semibold text-white/70">{formatClock(now)}</span>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-6 lg:gap-10">
+      <div className="flex flex-col lg:flex-row gap-4 lg:gap-6">
         {/* ── Timer column ── */}
         <div className="flex-1 flex flex-col items-center">
           {/* Mode selector */}
@@ -226,7 +226,7 @@ export function PomodoroApp() {
           <button
             type="button"
             onClick={() => setIsRunning((r) => !r)}
-            className={`px-12 py-3 rounded-2xl text-base font-semibold transition-all ${
+            className={`px-12 py-3 rounded-xl text-base font-semibold transition-all ${
               isRunning
                 ? "bg-white/[0.08] text-white border border-white/15 hover:bg-white/[0.12]"
                 : "bg-violet-600 text-white hover:bg-violet-500 shadow-[0_0_28px_rgba(124,58,237,0.4)]"
@@ -247,7 +247,7 @@ export function PomodoroApp() {
 
         {/* ── Task panel ── */}
         <div className="w-full lg:w-72 shrink-0">
-          <div className="h-full rounded-2xl border border-white/10 bg-white/[0.03] p-4 flex flex-col gap-3">
+          <div className="h-full rounded-xl border border-white/10 bg-white/[0.03] p-4 flex flex-col gap-3">
             {/* Header */}
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-widest text-white/40">

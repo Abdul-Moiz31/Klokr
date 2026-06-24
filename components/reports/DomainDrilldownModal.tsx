@@ -169,7 +169,7 @@ export function DomainDrilldownModal({
           animate={{ scale: 1, opacity: 1, y: 0 }}
           exit={{ scale: 0.94, opacity: 0, y: 8 }}
           transition={{ duration: 0.22, ease: [0.25, 0.46, 0.45, 0.94] }}
-          className="relative w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl border border-white/10 bg-[#0f0f16] shadow-2xl shadow-black/70"
+          className="relative w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-xl border border-white/10 bg-[#0f0f16] shadow-2xl shadow-black/70"
         >
           {/* Sticky header */}
           <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-white/10 bg-[#0f0f16]/98 px-6 py-4 backdrop-blur-sm">
