@@ -52,7 +52,7 @@ export function StatsCard({
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.45, delay, ease: [0.25, 0.46, 0.45, 0.94] }}
-      className="group relative flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] p-5 shadow-lg shadow-black/25 backdrop-blur-md transition-all duration-300 hover:border-white/[0.16] hover:bg-white/[0.06]"
+      className="group relative flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] p-6 shadow-lg shadow-black/25 backdrop-blur-md transition-all duration-300 hover:border-white/[0.16] hover:bg-white/[0.06]"
     >
       {/* Hover glow blob */}
       <div
@@ -61,7 +61,7 @@ export function StatsCard({
       />
 
       {/* Top row: icon + badge */}
-      <div className="relative mb-4 flex items-start justify-between gap-2">
+      <div className="relative mb-5 flex items-start justify-between gap-2">
         <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border bg-gradient-to-br ${s.icon}`}>
           {icon}
         </div>

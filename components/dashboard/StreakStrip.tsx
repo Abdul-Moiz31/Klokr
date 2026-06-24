@@ -76,7 +76,7 @@ export function StreakStrip({ userId }: Props) {
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25 }}
-      className="mb-6 flex flex-col justify-between gap-4 rounded-2xl border border-white/[0.08] bg-white/[0.03] px-5 py-4"
+      className="flex h-full flex-col justify-between gap-5 rounded-2xl border border-white/[0.08] bg-white/[0.03] px-6 py-6"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2">
@@ -92,7 +92,7 @@ export function StreakStrip({ userId }: Props) {
         </Link>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-6">
         {/* Productive days */}
         <div>
           <p className="text-xl font-bold leading-none text-white tabular-nums">
