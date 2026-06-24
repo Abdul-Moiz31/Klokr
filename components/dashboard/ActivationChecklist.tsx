@@ -32,7 +32,7 @@ export function ActivationChecklist() {
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-6 sm:p-8"
+      className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-6 sm:p-8"
     >
       <div className="mx-auto max-w-xl">
         <div className="mb-1 flex items-center gap-2">

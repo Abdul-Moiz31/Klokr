@@ -7,6 +7,8 @@ import { ExtensionAuthSync } from "@/components/ExtensionAuthSync";
 import { Sidebar } from "./Sidebar";
 import { RestrictedNotice } from "./RestrictedNotice";
 import { NotificationBell } from "./NotificationBell";
+import { HeaderSearch } from "./HeaderSearch";
+import { Tour } from "./Tour";
 import { createClient } from "@/lib/supabase";
 import type { Session } from "@supabase/supabase-js";
 
@@ -112,13 +114,6 @@ export function AppShell({
           </div>
         </header>
 
-        {/* Desktop notification bell — top-right, single fixed instance */}
-        <div className="pointer-events-none absolute right-5 top-4 z-30 hidden lg:block">
-          <div className="pointer-events-auto">
-            <NotificationBell userId={userId} />
-          </div>
-        </div>
-
         <div className="flex w-full min-h-0 min-w-0 flex-1 items-stretch overflow-hidden">
           {open && (
             <button
@@ -131,15 +126,48 @@ export function AppShell({
 
           <Sidebar mobileOpen={open} onMobileClose={() => setOpen(false)} />
 
-          <main className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain [padding-bottom:max(1rem,env(safe-area-inset-bottom))] sm:px-0 sm:pt-0 touch-pan-y">
-            <div
-              className={`mx-auto w-full px-5 pb-8 pt-4 sm:px-8 sm:pb-10 sm:pt-6 lg:px-10 lg:pb-12 lg:pt-8 lg:pr-20 ${contentMaxClassName}`}
-            >
-              {children}
-            </div>
-          </main>
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+            {/* Desktop header bar */}
+            <header className="hidden h-12 shrink-0 items-center gap-3 border-b border-white/10 bg-[#0A0A0F]/85 px-5 backdrop-blur-xl lg:flex">
+              <HeaderSearch />
+              <div className="ml-auto flex shrink-0 items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => window.dispatchEvent(new CustomEvent("klokrs:start-tour"))}
+                  title="Replay product tour"
+                  aria-label="Replay product tour"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-white/35 transition hover:bg-white/5 hover:text-white/80"
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 1 1 5.83 1c0 2-3 2-3 4" /><line x1="12" y1="17" x2="12" y2="17.01" />
+                  </svg>
+                </button>
+                <Link
+                  href="/dashboard/settings"
+                  title="Settings"
+                  aria-label="Settings"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-white/35 transition hover:bg-white/5 hover:text-white/80"
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="3" />
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                  </svg>
+                </Link>
+                <NotificationBell userId={userId} />
+              </div>
+            </header>
+
+            <main className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain [padding-bottom:max(1rem,env(safe-area-inset-bottom))] sm:px-0 sm:pt-0 touch-pan-y">
+              <div
+                className={`mx-auto w-full px-4 pb-6 pt-4 sm:px-6 sm:pb-7 sm:pt-5 lg:px-7 lg:pb-8 lg:pt-6 ${contentMaxClassName}`}
+              >
+                {children}
+              </div>
+            </main>
+          </div>
         </div>
       </div>
+      <Tour />
     </div>
   );
 }

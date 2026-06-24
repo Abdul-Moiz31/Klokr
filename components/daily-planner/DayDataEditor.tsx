@@ -199,7 +199,7 @@ export function DayDataEditor({ data, onChange, newIdFn, isTemplate = false }: P
         return (
           <div
             key={g.id}
-            className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] shadow-sm"
+            className="overflow-hidden rounded-xl border border-white/10 bg-white/[0.03] shadow-sm"
           >
             {/* Group header */}
             <div className="flex flex-wrap items-center gap-2 border-b border-white/[0.06] bg-white/[0.02] px-4 py-3">

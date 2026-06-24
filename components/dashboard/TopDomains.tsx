@@ -51,10 +51,10 @@ export function TopDomains({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: 0.2 }}
-      className="flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] shadow-lg shadow-black/25 backdrop-blur-md"
+      className="flex flex-col overflow-hidden rounded-xl border border-white/10 bg-white/[0.04] shadow-lg shadow-black/25 backdrop-blur-md"
     >
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-white/[0.07] px-6 py-5">
+      <div className="flex items-center justify-between border-b border-white/[0.07] px-4 py-3.5">
         <div>
           <div className="flex items-center gap-1.5">
             <h3 className="text-base font-semibold text-white/95">Top sites today</h3>
@@ -81,7 +81,7 @@ export function TopDomains({
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.25 + i * 0.05, duration: 0.35 }}
               onClick={() => onDomainClick?.(group.rootDomain, group.totalSeconds)}
-              className={`group flex items-center gap-4 px-6 py-3.5 transition-colors duration-200 ${onDomainClick ? "cursor-pointer hover:bg-white/[0.04]" : "cursor-default"}`}
+              className={`group flex items-center gap-3 px-4 py-3 transition-colors duration-200 ${onDomainClick ? "cursor-pointer hover:bg-white/[0.04]" : "cursor-default"}`}
             >
               <span className="w-3 shrink-0 text-center text-xs font-bold tabular-nums text-white/30">
                 {i + 1}
@@ -126,7 +126,7 @@ export function TopDomains({
       {/* Footer link to the full list on Activity */}
       <Link
         href="/activity"
-        className="flex items-center justify-center gap-1.5 border-t border-white/[0.07] px-6 py-3.5 text-xs font-medium text-white/45 transition-colors hover:bg-white/[0.03] hover:text-white/80"
+        className="flex items-center justify-center gap-1.5 border-t border-white/[0.07] px-4 py-3 text-xs font-medium text-white/45 transition-colors hover:bg-white/[0.03] hover:text-white/80"
       >
         {remaining > 0 ? `See all ${grouped.length} domains in Activity` : "Open Activity"}
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

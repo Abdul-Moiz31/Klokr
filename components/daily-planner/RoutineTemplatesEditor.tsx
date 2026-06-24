@@ -99,7 +99,7 @@ export function RoutineTemplatesEditor({ state, setRoutineTemplate, newIdFn }: P
   return (
     <div className="w-full max-w-7xl">
       {/* Header */}
-      <div className="mb-6 rounded-2xl border border-white/[0.07] bg-white/[0.03] px-5 py-4">
+      <div className="mb-4 rounded-xl border border-white/[0.07] bg-white/[0.03] px-4 py-3">
         <p className="text-sm font-semibold text-white/80">Day templates</p>
         <p className="mt-1 text-xs leading-relaxed text-white/40">
           Set up reusable task lists for your most common day types. Load any template onto today (or any week day) with a single click from the Today and Week tabs.
@@ -115,7 +115,7 @@ export function RoutineTemplatesEditor({ state, setRoutineTemplate, newIdFn }: P
               key={t.kind}
               type="button"
               onClick={() => setSelectedKind(t.kind)}
-              className={`flex flex-col items-start gap-1.5 rounded-2xl border px-4 py-3.5 text-left transition-all duration-150 ${
+              className={`flex flex-col items-start gap-1.5 rounded-xl border px-4 py-3.5 text-left transition-all duration-150 ${
                 isActive
                   ? "border-cyan-500/25 bg-cyan-600/10 shadow-sm"
                   : "border-white/[0.07] bg-white/[0.02] hover:bg-white/[0.04] hover:border-white/10"

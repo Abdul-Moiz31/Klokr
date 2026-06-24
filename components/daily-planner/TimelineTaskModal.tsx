@@ -142,7 +142,7 @@ export function TimelineTaskModal({ initial, initialRange, onSave, onDelete, onC
       <motion.div
         initial={{ opacity: 0, scale: 0.96 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="w-full max-w-md rounded-2xl border border-white/10 bg-[#0f0f16] p-6 shadow-2xl"
+        className="w-full max-w-md rounded-xl border border-white/10 bg-[#0f0f16] p-6 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <h3 className="mb-4 text-base font-semibold text-white">
@@ -303,7 +303,7 @@ export function TimelineTaskModal({ initial, initialRange, onSave, onDelete, onC
           <motion.div
             initial={{ opacity: 0, scale: 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#0f0f16] p-6 shadow-2xl"
+            className="w-full max-w-sm rounded-xl border border-white/10 bg-[#0f0f16] p-6 shadow-2xl"
           >
             <h3 className="mb-2 text-base font-semibold text-white">Domain tags changed</h3>
             <p className="mb-5 text-sm leading-relaxed text-white/55">

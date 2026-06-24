@@ -76,12 +76,12 @@ export function StreakStrip({ userId }: Props) {
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25 }}
-      className="flex h-full flex-col justify-between gap-5 rounded-2xl border border-white/[0.08] bg-white/[0.03] px-6 py-6"
+      className="flex h-full flex-col justify-between gap-3 rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-4"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-500/15 text-violet-300">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-violet-500/15 text-violet-300">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
             </svg>
           </span>
@@ -92,10 +92,10 @@ export function StreakStrip({ userId }: Props) {
         </Link>
       </div>
 
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-2 gap-4">
         {/* Productive days */}
         <div>
-          <p className="text-xl font-bold leading-none text-white tabular-nums">
+          <p className="text-lg font-bold leading-none text-white tabular-nums">
             {data.productiveDays}<span className="ml-1 text-sm font-medium text-white/40">/{data.totalDays}</span>
           </p>
           <p className="mt-1 text-xs text-white/40">productive days (90d)</p>
@@ -103,13 +103,13 @@ export function StreakStrip({ userId }: Props) {
 
         {/* Productive % */}
         <div>
-          <p className="text-xl font-bold leading-none text-emerald-300 tabular-nums">{productivePct}%</p>
+          <p className="text-lg font-bold leading-none text-emerald-300 tabular-nums">{productivePct}%</p>
           <p className="mt-1 text-xs text-white/40">of days productive</p>
         </div>
       </div>
 
       {data.todayMetGoal && (
-        <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-300">
+        <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-300">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="20 6 9 17 4 12" />
           </svg>

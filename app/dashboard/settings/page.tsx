@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useSearchParams } from "next/navigation";
 import { useAuthSession } from "@/lib/useAuthSession";
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
@@ -72,8 +73,8 @@ function PrefRow({ label, hint, children }: { label: string; hint?: string; chil
 
 function Card({ children }: { children: ReactNode }) {
   return (
-    <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.03] shadow-lg shadow-black/20">
-      <div className="px-5 py-1 sm:px-6">{children}</div>
+    <div className="overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.03] shadow-lg shadow-black/20">
+      <div className="px-4 py-1 sm:px-5">{children}</div>
     </div>
   );
 }
@@ -589,9 +590,17 @@ type TabId = (typeof TABS)[number]["id"];
 /* ─── Page ───────────────────────────────────────────────── */
 
 export default function SettingsPage() {
+  const searchParams = useSearchParams();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabId>("general");
+
+  // Deep-link support, e.g. /dashboard/settings?tab=preferences (used by
+  // the AI "Configure key" link and the onboarding tour).
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab && TABS.some((t) => t.id === tab)) setActiveTab(tab as TabId);
+  }, [searchParams]);
 
   const [displayName, setDisplayName] = useState("");
   const [nameSaving, setNameSaving] = useState(false);
@@ -899,7 +908,7 @@ export default function SettingsPage() {
       <PageHeader eyebrow="Account" title="Settings" />
 
       {/* Tab bar — two rows on mobile (4+3), single row on lg */}
-      <div className="mb-7 grid grid-cols-4 gap-1 rounded-2xl border border-white/[0.07] bg-white/[0.03] p-1 lg:grid-cols-7">
+      <div className="mb-4 grid grid-cols-4 gap-1 rounded-xl border border-white/[0.07] bg-white/[0.03] p-1 lg:grid-cols-7">
         {TABS.map((t) => {
           const isActive = activeTab === t.id;
           return (
@@ -1078,7 +1087,7 @@ export default function SettingsPage() {
           {/* ── Preferences ── */}
           {activeTab === "preferences" && (
             <>
-              <div>
+              <div data-tour="productivity-threshold">
                 <SectionTitle tooltip="Define what a productive day looks like — used to colour the Activity heatmap and calculate your streak.">Productivity</SectionTitle>
                 <Card>
                   <PrefRow

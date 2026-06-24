@@ -138,8 +138,8 @@ export function RecurringRoutinesPanel({ rules, newId, onAdd, onReplace, onRemov
     <div className="space-y-3">
       {/* Rule list */}
       {rules.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-white/10 px-6 py-12 text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-white/[0.07] bg-white/[0.03] text-white/20">
+        <div className="rounded-xl border border-dashed border-white/10 px-6 py-12 text-center">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-white/[0.07] bg-white/[0.03] text-white/20">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M17 2l4 4-4 4" /><path d="M3 11V9a4 4 0 014-4h14" /><path d="M7 22l-4-4 4-4" /><path d="M21 13v2a4 4 0 01-4 4H3" />
             </svg>
@@ -162,7 +162,7 @@ export function RecurringRoutinesPanel({ rules, newId, onAdd, onReplace, onRemov
         <>
           <div className="space-y-2">
             {rules.slice().sort((a, b) => a.order - b.order).map((r) => (
-              <div key={r.id} className="group relative flex items-center gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.02] px-4 py-3.5 transition hover:border-white/10 hover:bg-white/[0.04]">
+              <div key={r.id} className="group relative flex items-center gap-3 rounded-xl border border-white/[0.07] bg-white/[0.02] px-4 py-3.5 transition hover:border-white/10 hover:bg-white/[0.04]">
                 {/* Recurrence icon */}
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/[0.07] bg-white/[0.03] text-white/30">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -232,7 +232,7 @@ export function RecurringRoutinesPanel({ rules, newId, onAdd, onReplace, onRemov
           <button
             type="button"
             onClick={() => setEditing("new")}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-white/10 py-3.5 text-sm text-white/40 transition hover:border-violet-500/20 hover:bg-violet-500/[0.04] hover:text-violet-300"
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-white/10 py-3.5 text-sm text-white/40 transition hover:border-violet-500/20 hover:bg-violet-500/[0.04] hover:text-violet-300"
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg>
             Add routine
@@ -255,7 +255,7 @@ export function RecurringRoutinesPanel({ rules, newId, onAdd, onReplace, onRemov
       {/* Confirm remove */}
       {confirmRemoveId !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#0f0f16] p-7 shadow-2xl">
+          <div className="w-full max-w-sm rounded-xl border border-white/10 bg-[#0f0f16] p-7 shadow-2xl">
             <h3 className="mb-2 text-base font-semibold text-white">Remove routine?</h3>
             <p className="mb-6 text-sm text-white/50">
               This will also remove it from today&apos;s plan if it&apos;s there.
@@ -325,7 +325,7 @@ function RecurringRuleModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-4 backdrop-blur-sm sm:items-center" role="dialog">
-      <div className="w-full max-w-md max-h-[92vh] overflow-y-auto rounded-2xl border border-white/10 bg-[#12121a] shadow-2xl">
+      <div className="w-full max-w-md max-h-[92vh] overflow-y-auto rounded-xl border border-white/10 bg-[#12121a] shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-white/[0.06] px-6 py-4">
           <h3 className="text-base font-semibold text-white">{initial ? "Edit routine" : "New routine"}</h3>

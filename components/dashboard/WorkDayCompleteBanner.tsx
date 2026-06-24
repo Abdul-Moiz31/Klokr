@@ -65,7 +65,7 @@ export function WorkDayCompleteBanner({ totalSecondsToday }: Props) {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -8 }}
           transition={{ duration: 0.25 }}
-          className={`mb-6 flex items-start justify-between gap-4 rounded-2xl border px-5 py-4 ${
+          className={`mb-6 flex items-start justify-between gap-4 rounded-xl border px-5 py-4 ${
             productive
               ? "border-emerald-500/25 bg-emerald-500/[0.06]"
               : "border-amber-500/25 bg-amber-500/[0.06]"

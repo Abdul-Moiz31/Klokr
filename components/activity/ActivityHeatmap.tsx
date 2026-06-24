@@ -126,10 +126,10 @@ export function ActivityHeatmap({ stats, productiveThresholdSeconds, todayStr, b
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay: 0.1 }}
-      className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] shadow-lg shadow-black/25 backdrop-blur-md"
+      className="overflow-hidden rounded-xl border border-white/10 bg-white/[0.04] shadow-lg shadow-black/25 backdrop-blur-md"
     >
       {/* Header */}
-      <div className="border-b border-white/[0.07] px-5 py-4 sm:px-6">
+      <div className="border-b border-white/[0.07] px-4 py-3 sm:px-5">
         <div className="flex items-center gap-1.5">
           <h3 className="text-sm font-semibold text-white/95">Browsing activity</h3>
           <InfoTooltip text="Each square is one day. Color shows how close you came to your productive-hours goal — set your threshold in Settings → Preferences. Click any square to see that day's domain breakdown." side="bottom" />
@@ -137,7 +137,7 @@ export function ActivityHeatmap({ stats, productiveThresholdSeconds, todayStr, b
         <p className="mt-0.5 text-xs text-white/40">Last {NUM_WEEKS} weeks · each square is one day · click to open report</p>
       </div>
 
-      <div className="overflow-x-auto px-4 py-5 sm:px-6">
+      <div className="overflow-x-auto px-4 py-4 sm:px-5">
         {/* Month labels */}
         <div className="mb-1.5 flex" style={{ paddingLeft: "2.25rem" }}>
           {weeks.map((_, wi) => {

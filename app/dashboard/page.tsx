@@ -213,24 +213,11 @@ export default function DashboardPage() {
         }
       />
 
-      <div className="space-y-8 sm:space-y-10">
+      <div className="space-y-5">
             <WorkDayCompleteBanner totalSecondsToday={totalSeconds} />
 
             {/* Gamification headline — accountability score, level, streak */}
             <AccountabilityCard userId={userId} />
-
-            {/* Insight cards — two-up on wide screens so they don't dominate the page */}
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              <StreakStrip userId={userId} />
-              <WeeklyReviewCard userId={userId} />
-            </div>
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              <PlanVsActualCard sessions={sessions} autoCompleteThreshold={loadPrefs().autoCompleteThreshold} />
-              <FocusScoreCard
-                domains={domainStats.map((d) => ({ domain: d.domain, totalSeconds: d.totalSeconds }))}
-                goalHours={loadPrefs().productiveHoursThreshold}
-              />
-            </div>
 
             {/* Fetch error banner */}
             {fetchError && (
@@ -247,7 +234,9 @@ export default function DashboardPage() {
             )}
 
             {/* KPI row */}
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            <section>
+              <h2 className="mb-2 text-xs font-semibold uppercase tracking-widest text-white/35">Today</h2>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <StatsCard
                 title="Total time today"
                 value={totalSeconds > 0 ? formatTotalTime(totalSeconds) : "0s"}
@@ -256,8 +245,8 @@ export default function DashboardPage() {
                 accent="violet"
                 icon={
                   <svg
-                    width="20"
-                    height="20"
+                    width="16"
+                    height="16"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
@@ -278,8 +267,8 @@ export default function DashboardPage() {
                 accent="cyan"
                 icon={
                   <svg
-                    width="20"
-                    height="20"
+                    width="16"
+                    height="16"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
@@ -301,8 +290,8 @@ export default function DashboardPage() {
                 accent="neutral"
                 icon={
                   <svg
-                    width="20"
-                    height="20"
+                    width="16"
+                    height="16"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
@@ -325,8 +314,8 @@ export default function DashboardPage() {
                 badge={lastSynced ? { label: "● Live", color: "green" } : undefined}
                 icon={
                   <svg
-                    width="20"
-                    height="20"
+                    width="16"
+                    height="16"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
@@ -338,23 +327,41 @@ export default function DashboardPage() {
                   </svg>
                 }
               />
-            </div>
+              </div>
+            </section>
+
+            {/* Insight cards — compact 2x2 grid grouped under one label */}
+            <section>
+              <h2 className="mb-2 text-xs font-semibold uppercase tracking-widest text-white/35">Insights</h2>
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                <StreakStrip userId={userId} />
+                <WeeklyReviewCard userId={userId} />
+                <PlanVsActualCard sessions={sessions} autoCompleteThreshold={loadPrefs().autoCompleteThreshold} />
+                <FocusScoreCard
+                  domains={domainStats.map((d) => ({ domain: d.domain, totalSeconds: d.totalSeconds }))}
+                  goalHours={loadPrefs().productiveHoursThreshold}
+                />
+              </div>
+            </section>
 
             {sessions.length === 0 ? (
               <ActivationChecklist />
             ) : (
-              <div className="space-y-8">
-                <TodayActivityChart sessions={sessions} />
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                  <DomainChart data={domainStats} totalSeconds={totalSeconds} />
-                  <TopDomains
-                    data={domainStats}
-                    onDomainClick={(domain, totalSeconds) =>
-                      setDrilldown({ domain, totalSeconds })
-                    }
-                  />
+              <section>
+                <h2 className="mb-2 text-xs font-semibold uppercase tracking-widest text-white/35">Activity</h2>
+                <div className="space-y-5">
+                  <TodayActivityChart sessions={sessions} />
+                  <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                    <DomainChart data={domainStats} totalSeconds={totalSeconds} />
+                    <TopDomains
+                      data={domainStats}
+                      onDomainClick={(domain, totalSeconds) =>
+                        setDrilldown({ domain, totalSeconds })
+                      }
+                    />
+                  </div>
                 </div>
-              </div>
+              </section>
             )}
       </div>
       {drilldown && (
