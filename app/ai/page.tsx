@@ -157,14 +157,14 @@ export default function AiInsightsPage() {
         </Link>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3 xl:gap-8">
+      <div className="grid grid-cols-1 gap-3 xl:grid-cols-3 xl:gap-4">
 
         {/* ── Left: Chat area ─────────────────── */}
         <div className="xl:col-span-2">
-          <div className="rounded-2xl border border-white/[0.08] bg-gradient-to-b from-white/[0.04] to-transparent">
+          <div className="rounded-xl border border-white/[0.08] bg-gradient-to-b from-white/[0.04] to-transparent">
 
             {/* Input */}
-            <div className="p-5 sm:p-6">
+            <div className="p-4 sm:p-5">
               <form
                 onSubmit={(e) => { e.preventDefault(); void ask(question); }}
                 className="flex gap-3"
@@ -223,7 +223,7 @@ export default function AiInsightsPage() {
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.25 }}
                   ref={answerRef}
-                  className="border-t border-white/[0.06] px-5 py-5 sm:px-6"
+                  className="border-t border-white/[0.06] px-4 py-4 sm:px-5"
                 >
                   {loading ? (
                     <div className="flex items-center gap-3 text-sm text-white/40">
@@ -265,7 +265,7 @@ export default function AiInsightsPage() {
 
             {/* Ask another / clear */}
             {(answer || error) && !loading && (
-              <div className="border-t border-white/[0.05] px-5 py-3 sm:px-6">
+              <div className="border-t border-white/[0.05] px-4 py-2.5 sm:px-5">
                 <button
                   type="button"
                   onClick={() => { setAnswer(null); setError(null); setQuestion(""); inputRef.current?.focus(); }}
@@ -280,8 +280,8 @@ export default function AiInsightsPage() {
 
         {/* ── Right: History sidebar ───────────── */}
         <div className="xl:col-span-1">
-          <div className="rounded-2xl border border-white/[0.08] bg-white/[0.02]">
-            <div className="flex items-center justify-between border-b border-white/[0.06] px-5 py-4">
+          <div className="rounded-xl border border-white/[0.08] bg-white/[0.02]">
+            <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3">
               <div className="flex items-center gap-2">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white/30">
                   <circle cx="12" cy="12" r="10"/><path d="M12 8v4l2 2"/>
@@ -296,7 +296,7 @@ export default function AiInsightsPage() {
             </div>
 
             {history.length === 0 ? (
-              <div className="px-5 py-10 text-center">
+              <div className="px-4 py-8 text-center">
                 <p className="text-xs text-white/25">Your questions will appear here.</p>
               </div>
             ) : (
@@ -307,7 +307,7 @@ export default function AiInsightsPage() {
                     initial={{ opacity: 0, x: 8 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.25 }}
-                    className="group px-5 py-4"
+                    className="group px-4 py-3"
                   >
                     <div className="mb-1.5 flex items-start justify-between gap-2">
                       <button

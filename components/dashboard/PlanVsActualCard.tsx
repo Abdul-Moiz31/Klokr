@@ -66,7 +66,7 @@ export function PlanVsActualCard({ sessions, autoCompleteThreshold = 80 }: Props
   // No plan today → gentle nudge to plan (reinforces the core loop).
   if (!summary) {
     return (
-      <div className="flex h-full flex-col gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.03] px-6 py-6 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex h-full flex-col gap-3 rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-sm font-medium text-white/80">No plan for today yet</p>
           <p className="mt-0.5 text-sm text-white/45">
@@ -90,7 +90,7 @@ export function PlanVsActualCard({ sessions, autoCompleteThreshold = 80 }: Props
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25 }}
-      className="flex h-full flex-col rounded-2xl border border-white/[0.08] bg-white/[0.03] px-6 py-6"
+      className="flex h-full flex-col rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-4"
     >
       <div className="mb-5 flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -106,7 +106,7 @@ export function PlanVsActualCard({ sessions, autoCompleteThreshold = 80 }: Props
         </Link>
       </div>
 
-      <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <Stat label="Tasks done" value={`${summary.completed}/${summary.total}`} accent={summary.completionPct >= 50 ? "emerald" : "violet"} />
         <Stat label="Completion" value={`${summary.completionPct}%`} accent={summary.completionPct >= 50 ? "emerald" : "violet"} />
         <Stat label="Planned time" value={fmtMinutes(summary.plannedMinutes)} accent="violet" />

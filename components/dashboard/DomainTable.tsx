@@ -73,7 +73,7 @@ export function DomainTable({
         animate={{ opacity: 1, x: 0 }}
         transition={{ delay: 0.22 + i * 0.04, duration: 0.35 }}
         onClick={() => onDomainClick?.(group.rootDomain, group.totalSeconds)}
-        className={`group relative flex items-center gap-4 px-6 py-4 transition-colors duration-200 sm:gap-5 sm:px-8 ${style.row} ${onDomainClick ? "cursor-pointer" : "cursor-default"}`}
+        className={`group relative flex items-center gap-3 px-4 py-3 transition-colors duration-200 sm:gap-4 sm:px-5 ${style.row} ${onDomainClick ? "cursor-pointer" : "cursor-default"}`}
       >
         {/* Rank badge + favicon */}
         <div className="flex shrink-0 items-center gap-3">
@@ -129,10 +129,10 @@ export function DomainTable({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: 0.25 }}
-      className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] shadow-lg shadow-black/25 backdrop-blur-md"
+      className="overflow-hidden rounded-xl border border-white/10 bg-white/[0.04] shadow-lg shadow-black/25 backdrop-blur-md"
     >
       {/* Header */}
-      <div className="flex flex-col gap-1 border-b border-white/[0.07] px-6 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8">
+      <div className="flex flex-col gap-1 border-b border-white/[0.07] px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-5">
         <div>
           <div className="flex items-center gap-1.5">
             <h3 className="text-base font-semibold text-white/95">All domains today</h3>
@@ -157,7 +157,7 @@ export function DomainTable({
               <button
                 type="button"
                 onClick={() => setMinorExpanded((v) => !v)}
-                className="group flex w-full items-center gap-4 px-6 py-3.5 text-left transition-colors hover:bg-white/[0.03] sm:gap-5 sm:px-8"
+                className="group flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-white/[0.03] sm:gap-4 sm:px-5"
               >
                 <div className="flex shrink-0 items-center gap-3">
                   <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/5 text-[10px] font-bold text-white/30">

@@ -90,10 +90,10 @@ export function TodayActivityChart({ sessions }: { sessions: TabSession[] }) {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: 0.1 }}
-      className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] shadow-lg shadow-black/25 backdrop-blur-md"
+      className="overflow-hidden rounded-xl border border-white/10 bg-white/[0.04] shadow-lg shadow-black/25 backdrop-blur-md"
     >
       {/* Header */}
-      <div className="flex flex-col gap-4 border-b border-white/[0.07] px-6 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8">
+      <div className="flex flex-col gap-3 border-b border-white/[0.07] px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-5">
         <div>
           <div className="flex items-center gap-1.5">
             <h3 className="text-base font-semibold text-white/95">Active hours today</h3>
@@ -117,7 +117,7 @@ export function TodayActivityChart({ sessions }: { sessions: TabSession[] }) {
       </div>
 
       {/* Chart */}
-      <div className="px-2 pb-6 pt-4 sm:px-4 sm:pb-8 sm:pt-6">
+      <div className="px-2 pb-4 pt-3 sm:px-3 sm:pb-5 sm:pt-4">
         <div className="h-56 w-full sm:h-64">
           {mounted && (
             <ResponsiveContainer width="100%" height="100%">

@@ -180,7 +180,7 @@ export function DayReportModal({ date, userId, productiveThresholdSeconds, strea
             role="dialog"
           >
             <div
-              className="w-full max-w-lg max-h-[90vh] overflow-y-auto overflow-x-hidden rounded-2xl border border-white/10 bg-[#0f0f17] shadow-2xl shadow-black/60"
+              className="w-full max-w-lg max-h-[90vh] overflow-y-auto overflow-x-hidden rounded-xl border border-white/10 bg-[#0f0f17] shadow-2xl shadow-black/60"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Modal header */}

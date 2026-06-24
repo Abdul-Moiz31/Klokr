@@ -260,7 +260,7 @@ export function TimelineView({
   };
 
   return (
-    <div className="klokrs-timeline rounded-2xl border border-white/[0.07] bg-white/[0.02] p-2 sm:p-4">
+    <div className="klokrs-timeline rounded-xl border border-white/[0.07] bg-white/[0.02] p-2 sm:p-4">
       <FullCalendar
         ref={calendarRef as unknown as React.Ref<FullCalendar>}
         plugins={[timeGridPlugin, interactionPlugin]}

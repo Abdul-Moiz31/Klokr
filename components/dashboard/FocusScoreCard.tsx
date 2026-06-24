@@ -49,7 +49,7 @@ export function FocusScoreCard({ domains, goalHours }: Props) {
   };
 
   return (
-    <div className="flex h-full flex-col rounded-2xl border border-white/[0.08] bg-white/[0.03] px-6 py-6">
+    <div className="flex h-full flex-col rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-4">
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-5">
           {/* Gauge */}
@@ -95,7 +95,7 @@ export function FocusScoreCard({ domains, goalHours }: Props) {
             className="overflow-hidden"
           >
             {/* The screenshot-friendly "Wrapped" card */}
-            <div className="mt-4 overflow-hidden rounded-2xl border border-violet-500/20 bg-gradient-to-br from-[#1a0b33] via-[#0f0a1e] to-[#04141a] p-6 text-center">
+            <div className="mt-4 overflow-hidden rounded-xl border border-violet-500/20 bg-gradient-to-br from-[#1a0b33] via-[#0f0a1e] to-[#04141a] p-4 text-center">
               <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-violet-300/70">My focus today</p>
               <p className="mt-3 text-6xl font-black tabular-nums" style={{ color }}>{fs.score}</p>
               <p className="mt-1 text-sm font-semibold text-white/80">{fs.label}</p>
