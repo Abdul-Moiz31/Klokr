@@ -35,7 +35,7 @@ export const UnscheduledRail = forwardRef<HTMLDivElement, Props>(function Unsche
   return (
     <div
       ref={ref}
-      className="flex flex-col gap-2 rounded-2xl border border-white/[0.07] bg-white/[0.02] p-3"
+      className="flex flex-col gap-2 rounded-xl border border-white/[0.07] bg-white/[0.02] p-3"
     >
       <div className="flex items-center justify-between px-1 pt-1">
         <h3 className="text-xs font-semibold uppercase tracking-widest text-white/40">

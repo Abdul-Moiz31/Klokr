@@ -163,7 +163,7 @@ export function AiSettingsTab() {
       {/* Usage meter */}
       <div>
         <SectionTitle>AI Usage</SectionTitle>
-        <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.03] px-5 py-1">
+        <div className="overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.03] px-5 py-1">
           {hasOwnKey ? (
             <div className="flex items-center justify-between gap-4 py-3.5">
               <div>
@@ -216,7 +216,7 @@ export function AiSettingsTab() {
                 type="button"
                 onClick={() => { if (!hasOwnKey) { setSelected(p.value); setShowInput(true); setKeyInput(""); } }}
                 disabled={hasOwnKey}
-                className={`group relative flex items-start gap-3 rounded-2xl border p-4 text-left transition-all duration-200 ${
+                className={`group relative flex items-start gap-3 rounded-xl border p-4 text-left transition-all duration-200 ${
                   isActive
                     ? `bg-gradient-to-br ${p.color} shadow-sm`
                     : isChosen
@@ -281,7 +281,7 @@ export function AiSettingsTab() {
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-5">
+            <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-5">
               <p className="mb-3 text-sm font-medium text-white/80">
                 Add {PROVIDERS.find(p => p.value === selected)?.label} API key
               </p>
@@ -319,7 +319,7 @@ export function AiSettingsTab() {
       </AnimatePresence>
 
       {/* How it works note */}
-      <div className="rounded-2xl border border-white/[0.05] bg-white/[0.02] px-5 py-4">
+      <div className="rounded-xl border border-white/[0.05] bg-white/[0.02] px-5 py-4">
         <p className="text-[11px] font-semibold uppercase tracking-wider text-white/25 mb-2">How BYOK works</p>
         <ul className="space-y-1.5 text-xs text-white/35 leading-relaxed">
           <li>• Your key is encrypted (AES-256) and stored in our database — never logged or returned.</li>

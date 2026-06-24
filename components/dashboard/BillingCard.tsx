@@ -82,7 +82,7 @@ export function BillingCard() {
       </div>
 
       {sub?.isPaid && (
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.06] px-5 py-4">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.06] px-5 py-4">
           <div>
             <p className="text-sm font-semibold text-emerald-200">
               You&apos;re on {currentPlan === "pro" ? "Pro" : "Standard"}
@@ -112,7 +112,7 @@ export function BillingCard() {
           return (
             <div
               key={p.id}
-              className={`flex flex-col rounded-2xl border p-5 ${
+              className={`flex flex-col rounded-xl border p-5 ${
                 isCurrent ? "border-violet-500/40 bg-violet-500/[0.06]" : "border-white/[0.08] bg-white/[0.03]"
               }`}
             >

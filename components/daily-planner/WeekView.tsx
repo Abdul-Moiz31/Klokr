@@ -262,7 +262,7 @@ export function WeekView({
       </div>
 
       {/* ── Calendar grid ── */}
-      <div className="klokrs-timeline klokrs-week rounded-2xl border border-white/[0.07] bg-white/[0.02] p-2 sm:p-3">
+      <div className="klokrs-timeline klokrs-week rounded-xl border border-white/[0.07] bg-white/[0.02] p-2 sm:p-3">
         <FullCalendar
           ref={calendarRef as unknown as React.Ref<FullCalendar>}
           plugins={[timeGridPlugin, interactionPlugin]}

@@ -37,6 +37,7 @@ function sendToExtension(message: ExtMessage) {
 export function ExtensionAuthSync() {
   useEffect(() => {
     const supabase = createClient();
+    let recovering = false;
 
     // Push current session immediately on mount.
     void supabase.auth.getSession().then(({ data: { session } }: { data: { session: Session | null } }) => {
@@ -65,7 +66,34 @@ export function ExtensionAuthSync() {
       }
     });
 
-    return () => subscription.unsubscribe();
+    // Recovery path: the extension refreshes its Supabase tokens independently
+    // of this tab. Since refresh tokens are single-use, whichever side
+    // refreshes last invalidates the other's copy — if that happened while
+    // this tab was closed, our localStorage session is now dead and a normal
+    // refresh attempt will fail with "already used" and sign us out. The
+    // content script (content.js) hands us the extension's last-known-good
+    // token on page load; if our own session is missing, adopt it instead of
+    // bouncing the user to /login.
+    const onExtAuthState = (event: MessageEvent) => {
+      if (event.source !== window || event.origin !== window.location.origin) return;
+      if (event.data?.type !== "Klokrs_EXT_AUTH_STATE") return;
+      const { token, refreshToken } = event.data as { token?: string; refreshToken?: string };
+      if (!token || !refreshToken || recovering) return;
+
+      void supabase.auth.getSession().then(({ data: { session } }: { data: { session: Session | null } }) => {
+        if (session?.access_token) return; // We already have a live session — don't clobber it.
+        recovering = true;
+        void supabase.auth
+          .setSession({ access_token: token, refresh_token: refreshToken })
+          .finally(() => { recovering = false; });
+      });
+    };
+    window.addEventListener("message", onExtAuthState);
+
+    return () => {
+      subscription.unsubscribe();
+      window.removeEventListener("message", onExtAuthState);
+    };
   }, []);
 
   return null;

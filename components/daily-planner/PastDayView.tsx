@@ -65,7 +65,7 @@ export function PastDayView({ state, forDate, sessions, autoCompleteThreshold }:
       day: "numeric",
     });
     return (
-      <div className="rounded-2xl border border-dashed border-white/10 px-4 py-14 text-center">
+      <div className="rounded-xl border border-dashed border-white/10 px-4 py-14 text-center">
         <svg
           aria-hidden
           width="32"
@@ -118,7 +118,7 @@ export function PastDayView({ state, forDate, sessions, autoCompleteThreshold }:
           <h3 className="mb-3 text-xs font-semibold uppercase tracking-widest text-white/40">
             Unscheduled
           </h3>
-          <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
+          <div className="overflow-hidden rounded-xl border border-white/10 bg-white/[0.03]">
             <div className="space-y-1 px-3 py-2">
               {unscheduled.map((t) => (
                 <ReadOnlyTask key={t.id} task={t} />

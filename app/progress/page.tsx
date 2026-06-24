@@ -80,9 +80,9 @@ function ScoreHero({ p, goalHours, todayStr }: { p: ProgressResult; goalHours: n
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
-      className="overflow-hidden rounded-2xl border border-white/[0.08] bg-gradient-to-br from-violet-500/[0.07] via-white/[0.02] to-cyan-500/[0.04] p-6 sm:p-7"
+      className="overflow-hidden rounded-xl border border-white/[0.08] bg-gradient-to-br from-violet-500/[0.07] via-white/[0.02] to-cyan-500/[0.04] p-4 sm:p-5"
     >
-      <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-start sm:gap-8">
+      <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start sm:gap-5">
         {/* Gauge */}
         <div className="relative h-[140px] w-[140px] shrink-0">
           <svg width="140" height="140" viewBox="0 0 140 140" className="-rotate-90">
@@ -215,9 +215,9 @@ function ScoreTrend({ p, todayStr, chartMounted }: { p: ProgressResult; todayStr
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay: 0.08 }}
-      className="overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.03]"
+      className="overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.03]"
     >
-      <div className="border-b border-white/[0.07] px-6 py-4 sm:px-7">
+      <div className="border-b border-white/[0.07] px-4 py-3 sm:px-5">
         <div className="flex items-center justify-between gap-4">
           <div>
             <h3 className="text-sm font-semibold text-white/90">Score trend</h3>
@@ -296,12 +296,12 @@ function LevelCard({ p }: { p: ProgressResult }) {
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay: 0.12 }}
-      className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-6"
+      className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-4"
     >
       <p className="mb-4 text-[11px] font-semibold uppercase tracking-widest text-white/30">Level &amp; XP</p>
 
       <div className="mb-5 flex items-center gap-4">
-        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-violet-500/30 bg-gradient-to-br from-violet-600/30 to-cyan-600/20 text-2xl font-black text-white shadow-lg shadow-violet-900/30">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-violet-500/30 bg-gradient-to-br from-violet-600/30 to-cyan-600/20 text-2xl font-black text-white shadow-lg shadow-violet-900/30">
           {level.level}
         </div>
         <div className="flex-1 min-w-0">
@@ -376,12 +376,12 @@ function StreakCard({ p, todayStr }: { p: ProgressResult; todayStr: string }) {
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay: 0.16 }}
-      className={`rounded-2xl border p-6 ${p.streakAtRisk ? "border-amber-500/25 bg-amber-500/[0.05]" : "border-white/[0.08] bg-white/[0.03]"}`}
+      className={`rounded-xl border p-4 ${p.streakAtRisk ? "border-amber-500/25 bg-amber-500/[0.05]" : "border-white/[0.08] bg-white/[0.03]"}`}
     >
       <p className="mb-4 text-[11px] font-semibold uppercase tracking-widest text-white/30">Streak</p>
 
       <div className="mb-5 flex items-center gap-4">
-        <span className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl ${hot ? "bg-orange-500/15 text-orange-300" : "bg-violet-500/15 text-violet-300"}`}>
+        <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${hot ? "bg-orange-500/15 text-orange-300" : "bg-violet-500/15 text-violet-300"}`}>
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
           </svg>
@@ -465,7 +465,7 @@ function RecordsCard({ p }: { p: ProgressResult }) {
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay: 0.2 }}
-      className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-6"
+      className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-4"
     >
       <p className="mb-4 text-[11px] font-semibold uppercase tracking-widest text-white/30">Personal records</p>
       <div className="grid grid-cols-2 gap-3">
@@ -496,7 +496,7 @@ function CategoryCard({ p }: { p: ProgressResult }) {
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay: 0.24 }}
-      className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-6"
+      className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-4"
     >
       <p className="mb-4 text-[11px] font-semibold uppercase tracking-widest text-white/30">Time by category (90d)</p>
 
@@ -575,7 +575,7 @@ function BadgeTile({ b, i }: { b: Badge; i: number }) {
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.3, delay: 0.28 + i * 0.04 }}
-      className={`relative rounded-2xl border p-4 ${b.earned ? `${style.ring} ${style.bg}` : "border-white/[0.06] bg-white/[0.02]"}`}
+      className={`relative rounded-xl border p-4 ${b.earned ? `${style.ring} ${style.bg}` : "border-white/[0.06] bg-white/[0.02]"}`}
     >
       <div className="mb-3 flex items-start justify-between gap-2">
         <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border ${
@@ -728,16 +728,16 @@ export default function ProgressPage() {
         subtitle="Accountability score, level, streak, and achievements — earned from your own tracked time."
       />
 
-      <div className="space-y-6">
+      <div className="space-y-4">
         <ScoreHero p={result} goalHours={prefs.productiveHoursThreshold} todayStr={todayStr} />
         <ScoreTrend p={result} todayStr={todayStr} chartMounted={chartMounted} />
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           <LevelCard p={result} />
           <StreakCard p={result} todayStr={todayStr} />
         </div>
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           <RecordsCard p={result} />
           <CategoryCard p={result} />
         </div>

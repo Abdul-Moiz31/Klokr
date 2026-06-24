@@ -28,20 +28,20 @@ export function PageHeader({
       initial={{ opacity: 0, y: -10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] }}
-      className="mb-9 sm:mb-12"
+      className="mb-5 sm:mb-6"
     >
       {/* Top rule */}
-      <div className="mb-5 h-px w-full bg-gradient-to-r from-violet-500/20 via-white/[0.06] to-transparent" />
+      <div className="mb-3 h-px w-full bg-gradient-to-r from-violet-500/20 via-white/[0.06] to-transparent" />
 
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           {/* Eyebrow */}
-          <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-violet-400/80">
+          <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-violet-400/80">
             {eyebrow}
           </p>
 
           {/* Title */}
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl lg:text-[2rem]">
+          <h1 className="text-xl font-bold tracking-tight sm:text-[1.375rem]">
             {titleHighlight ? (
               <>
                 <span className="text-white/95">{title}</span>
@@ -56,7 +56,7 @@ export function PageHeader({
 
           {/* Subtitle */}
           {subtitle && (
-            <p className="mt-1.5 text-sm text-white/35 tracking-wide">{subtitle}</p>
+            <p className="mt-1 text-xs text-white/35 tracking-wide">{subtitle}</p>
           )}
         </div>
 

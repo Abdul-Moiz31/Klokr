@@ -156,7 +156,7 @@ export default function ActivityPage() {
       <PageHeader eyebrow="Overview · Last 90 days" title="Activity" />
 
       {/* KPI cards */}
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:mb-8 lg:grid-cols-4 lg:gap-4">
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:mb-5 lg:grid-cols-4">
         <StatsCard
           title="Total tracked"
           value={totalTrackedSeconds > 0 ? formatTime(totalTrackedSeconds) : "0s"}
@@ -165,7 +165,7 @@ export default function ActivityPage() {
           accent="violet"
           delay={0}
           icon={
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" />
             </svg>
           }
@@ -178,7 +178,7 @@ export default function ActivityPage() {
           accent="cyan"
           delay={0.05}
           icon={
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" /><polyline points="16 7 22 7 22 13" />
             </svg>
           }
@@ -191,7 +191,7 @@ export default function ActivityPage() {
           accent={streak >= 7 ? "violet" : "neutral"}
           delay={0.1}
           icon={
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
             </svg>
           }
@@ -204,7 +204,7 @@ export default function ActivityPage() {
           accent="neutral"
           delay={0.15}
           icon={
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
             </svg>
           }
@@ -222,7 +222,7 @@ export default function ActivityPage() {
 
       {/* Today's full domain breakdown */}
       {todayDomains.length > 0 && (
-        <div className="mt-8 sm:mt-10">
+        <div className="mt-5 sm:mt-6">
           <div className="mb-3 flex items-center justify-between">
             <div>
               <h2 className="text-base font-semibold text-white/90">Today&apos;s breakdown</h2>

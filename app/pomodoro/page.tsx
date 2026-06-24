@@ -23,15 +23,15 @@ export default function PomodoroPage() {
       <motion.div
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mb-6 sm:mb-8"
+        className="mb-4 sm:mb-5"
       >
-        <p className="text-xs font-semibold uppercase tracking-widest text-violet-400/90">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-violet-400/80">
           Focus
         </p>
-        <h1 className="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">
+        <h1 className="mt-1 text-xl font-bold tracking-tight text-white sm:text-[1.375rem]">
           Pomodoro
         </h1>
-        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-white/45">
+        <p className="mt-1 max-w-2xl text-xs leading-relaxed text-white/45">
           Sessions, breaks, and a local task list in this browser.
           {user?.email && (
             <span className="text-white/25"> · {user.email}</span>

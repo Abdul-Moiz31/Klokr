@@ -922,7 +922,7 @@ export default function ReportsPage() {
       {/* ── Control bar ───────────────────────────────────────── */}
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         {/* Tab switcher */}
-        <div className="relative flex gap-1 rounded-2xl border border-white/[0.07] bg-white/[0.03] p-1">
+        <div className="relative flex gap-1 rounded-xl border border-white/[0.07] bg-white/[0.03] p-1">
           {TABS.map((t) => (
             <button
               key={t.id}
@@ -1039,48 +1039,48 @@ export default function ReportsPage() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
             transition={{ duration: 0.28 }}
-            className="space-y-6 lg:space-y-8"
+            className="space-y-4 lg:space-y-5"
           >
             {!hasData ? (
               <ReportsEmpty />
             ) : (
               <>
                 {/* ── KPI cards ──────────────────────────── */}
-                <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+                <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                   {tab === "daily" && (
                     <>
                       <StatsCard title="Total Time" value={formatTime(totalSeconds)} subtitle={dateRange.label} accent="violet" delay={0}
-                        icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>} />
+                        icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>} />
                       <StatsCard title="Top Domain" value={topDomain} subtitle="Most time spent" accent="cyan" delay={0.05}
-                        icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>} />
+                        icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>} />
                       <StatsCard title="Domains Visited" value={String(domainCount)} subtitle="Unique sites" accent="neutral" delay={0.1}
-                        icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" /></svg>} />
+                        icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" /></svg>} />
                       <StatsCard title="Peak Hour" value={peakHour} subtitle="Most active time" accent="neutral" delay={0.15}
-                        icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2" /></svg>} />
+                        icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2" /></svg>} />
                     </>
                   )}
                   {tab === "weekly" && (
                     <>
                       <StatsCard title="Total This Week" value={formatTime(totalSeconds)} subtitle={dateRange.label} accent="violet" delay={0}
-                        icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>} />
+                        icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>} />
                       <StatsCard title="Daily Average" value={dailyAverage} subtitle="Across active days" accent="cyan" delay={0.05}
-                        icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17" /><polyline points="16 7 22 7 22 13" /></svg>} />
+                        icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17" /><polyline points="16 7 22 7 22 13" /></svg>} />
                       <StatsCard title="Best Day" value={mostProductiveDay} subtitle="Highest single-day total" accent="neutral" delay={0.1}
-                        icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" /></svg>} />
+                        icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" /></svg>} />
                       <StatsCard title="Top Domain" value={topDomain} subtitle="Most visited site" accent="neutral" delay={0.15}
-                        icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>} />
+                        icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>} />
                     </>
                   )}
                   {tab === "monthly" && (
                     <>
                       <StatsCard title="Total Hours" value={formatTime(totalSeconds)} subtitle={dateRange.label} accent="violet" delay={0}
-                        icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>} />
+                        icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>} />
                       <StatsCard title="Daily Average" value={dailyAverage} subtitle="Across tracked days" accent="cyan" delay={0.05}
-                        icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17" /><polyline points="16 7 22 7 22 13" /></svg>} />
+                        icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17" /><polyline points="16 7 22 7 22 13" /></svg>} />
                       <StatsCard title="Active Days" value={`${activeTrackedDays}/${daysInMonth}`} subtitle="Days with tracking" accent="neutral" delay={0.1}
-                        icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>} />
+                        icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="16" height="16" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>} />
                       <StatsCard title="Top Domain" value={topDomain} subtitle="Most visited site" accent="neutral" delay={0.15}
-                        icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>} />
+                        icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>} />
                     </>
                   )}
                 </div>
@@ -1092,9 +1092,9 @@ export default function ReportsPage() {
                   initial={{ opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.45, delay: 0.1 }}
-                  className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] shadow-lg shadow-black/25 backdrop-blur-md"
+                  className="overflow-hidden rounded-xl border border-white/10 bg-white/[0.04] shadow-lg shadow-black/25 backdrop-blur-md"
                 >
-                  <div className="border-b border-white/[0.07] px-6 py-5 sm:px-8">
+                  <div className="border-b border-white/[0.07] px-4 py-3.5 sm:px-5">
                     <h3 className="text-base font-semibold text-white/95">
                       {tab === "daily" ? "Time by hour" : tab === "weekly" ? "Daily breakdown" : "Daily trend"}
                     </h3>
@@ -1104,7 +1104,7 @@ export default function ReportsPage() {
                         : `Hours tracked per day · ${formatTime(totalSeconds)} total`}
                     </p>
                   </div>
-                  <div className="px-2 pb-6 pt-4 sm:px-4 sm:pb-8 sm:pt-6">
+                  <div className="px-2 pb-4 pt-3 sm:px-3 sm:pb-5 sm:pt-4">
                     <div className="h-64 w-full">
                       {chartMounted && (
                         <ResponsiveContainer width="100%" height="100%">
@@ -1160,15 +1160,15 @@ export default function ReportsPage() {
                     initial={{ opacity: 0, y: 16 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.45, delay: 0.18 }}
-                    className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] shadow-lg shadow-black/25 backdrop-blur-md"
+                    className="overflow-hidden rounded-xl border border-white/10 bg-white/[0.04] shadow-lg shadow-black/25 backdrop-blur-md"
                   >
-                    <div className="border-b border-white/[0.07] px-6 py-5 sm:px-8">
+                    <div className="border-b border-white/[0.07] px-4 py-3.5 sm:px-5">
                       <h3 className="text-base font-semibold text-white/95">By category</h3>
                       <p className="mt-0.5 text-sm text-white/40">
                         How your time broke down across activity types · click a tag to recategorize
                       </p>
                     </div>
-                    <div className="space-y-3 px-6 py-5 sm:px-8">
+                    <div className="space-y-2.5 px-4 py-4 sm:px-5">
                       {categoryStats.map((cat) => {
                         const pct = Math.round((cat.seconds / totalSeconds) * 100);
                         return (
