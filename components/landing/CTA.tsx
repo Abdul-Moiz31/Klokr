@@ -23,7 +23,7 @@ export function CTA() {
     <section className="py-24 relative overflow-hidden">
       {/* Animated gradient background */}
       <div className="absolute inset-0">
-        <div className="absolute inset-0 bg-gradient-to-r from-violet-950/40 via-[#0A0A0F] to-cyan-950/20" />
+        <div className="absolute inset-0 bg-gradient-to-r from-violet-950/15 via-transparent to-cyan-950/10 pointer-events-none" />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] bg-violet-600/10 rounded-full blur-3xl" />
       </div>
 

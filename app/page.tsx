@@ -1,7 +1,7 @@
+import { LandingBackground } from "@/components/landing/LandingBackground";
 import { LandingShell } from "@/components/landing/LandingShell";
 import { Navbar } from "@/components/landing/Navbar";
 import { Hero } from "@/components/landing/Hero";
-import { PostHero } from "@/components/landing/PostHero";
 import { Problem } from "@/components/landing/Problem";
 import { HowItWorks } from "@/components/landing/HowItWorks";
 import { BenefitsClock } from "@/components/landing/BenefitsClock";
@@ -16,10 +16,10 @@ import { Footer } from "@/components/landing/Footer";
 export default function LandingPage() {
   return (
     <LandingShell>
-      <main className="min-h-screen bg-[#0A0A0F] overflow-x-hidden">
+      <LandingBackground />
+      <main className="relative min-h-screen overflow-x-hidden">
         <Navbar />
         <Hero />
-        <PostHero />
         <Problem />
         <HowItWorks />
         <BenefitsClock />

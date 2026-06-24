@@ -128,9 +128,9 @@ export function WeeklyReviewCard({ userId }: Props) {
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25 }}
-      className="mb-6 rounded-2xl border border-white/[0.08] bg-gradient-to-br from-violet-500/[0.06] to-cyan-500/[0.04] px-5 py-4"
+      className="flex h-full flex-col rounded-2xl border border-white/[0.08] bg-gradient-to-br from-violet-500/[0.06] to-cyan-500/[0.04] px-6 py-6"
     >
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-5 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-500/15 text-violet-300">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -144,7 +144,7 @@ export function WeeklyReviewCard({ userId }: Props) {
         </Link>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-6 sm:grid-cols-3">
         <div>
           <p className="text-xl font-bold tabular-nums text-white">{fmt(review.thisWeekSeconds)}</p>
           <p className="mt-0.5 text-xs text-white/40">tracked this week</p>
@@ -159,7 +159,7 @@ export function WeeklyReviewCard({ userId }: Props) {
         </div>
       </div>
 
-      <p className="mt-3 text-xs leading-relaxed text-white/50">
+      <p className="mt-5 text-xs leading-relaxed text-white/50">
         {review.deltaPct == null ? (
           <>First full week of tracking — next week you&apos;ll see how you compare.</>
         ) : up ? (

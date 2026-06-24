@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
+import { AutoRefresh } from "@/components/admin/AutoRefresh";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
       </div>
 
       <div className="relative flex h-screen min-h-0">
+        <AutoRefresh />
         <AdminSidebar adminEmail={process.env.ADMIN_EMAIL ?? ""} />
         <main className="min-h-0 flex-1 overflow-y-auto">
           {children}

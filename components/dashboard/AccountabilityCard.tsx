@@ -65,10 +65,10 @@ export function AccountabilityCard({ userId }: Props) {
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className="mb-4 overflow-hidden rounded-2xl border border-white/[0.08] bg-gradient-to-r from-violet-500/[0.07] via-white/[0.02] to-cyan-500/[0.04]"
+      className="overflow-hidden rounded-2xl border border-white/[0.08] bg-gradient-to-r from-violet-500/[0.07] via-white/[0.02] to-cyan-500/[0.04]"
     >
-      <div className="flex flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
+      <div className="flex flex-col gap-5 px-6 py-6 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-x-8 gap-y-5">
           {/* Score gauge */}
           <div className="flex items-center gap-3">
             <div className="relative h-[68px] w-[68px] shrink-0">
