@@ -86,8 +86,8 @@ function PostHeroDashboard({ scrollProgress }: { scrollProgress: MotionValue<num
             <Image
               src="/landing/dashboard-screenshot.png"
               alt="Klokrs dashboard showing accountability score, focus score, activity heatmap, and plan vs actual tracking"
-              width={1920}
-              height={1080}
+              width={3012}
+              height={1716}
               className="block h-auto w-full"
               priority
             />
