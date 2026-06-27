@@ -36,6 +36,10 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   // Desktop collapse to an icon-only rail. Persisted so it survives reloads.
   const [collapsed, setCollapsed] = useState(false);
+  // Transient hover state — temporarily flies the rail out to full width.
+  const [hovered, setHovered] = useState(false);
+  // Visually expanded, either because the user pinned it open or is hovering the collapsed rail.
+  const expanded = !collapsed || hovered;
   const profileRef = useRef<HTMLDivElement>(null);
   const gradId = `sbgrad-${useId().replace(/:/g, "")}`;
 
@@ -199,7 +203,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: Props) {
 
   const linkClass = (active: boolean) =>
     `flex min-h-[2.25rem] items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-all duration-200 ${
-      collapsed ? "lg:justify-center lg:px-2" : ""
+      !expanded ? "lg:justify-center lg:px-2" : ""
     } ${
       active
         ? "border border-violet-500/20 bg-violet-600/20 text-violet-300"
@@ -209,13 +213,26 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: Props) {
   return (
     <aside
       id="app-sidebar"
-      className={`flex w-56 shrink-0 flex-col border-r border-white/10 bg-white/3 backdrop-blur-xl transition-all duration-200 ease-out min-h-0 max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:z-50 max-lg:h-[100dvh] max-lg:min-h-0 max-lg:w-[min(16rem,100vw-3rem)] max-lg:max-w-sm max-lg:bg-[#0c0c12]/95 lg:static lg:z-auto lg:h-full lg:max-w-none lg:translate-x-0 ${
+      onMouseEnter={() => { if (collapsed) setHovered(true); }}
+      onMouseLeave={() => setHovered(false)}
+      className={`flex w-56 shrink-0 flex-col min-h-0 transition-all duration-200 ease-out max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:z-50 max-lg:h-[100dvh] max-lg:min-h-0 max-lg:w-[min(16rem,100vw-3rem)] max-lg:max-w-sm max-lg:translate-x-0 lg:relative lg:z-auto lg:h-full lg:max-w-none ${
         collapsed ? "lg:w-16" : "lg:w-56"
       } ${
         mobileOpen ? "max-lg:translate-x-0" : "max-lg:-translate-x-full"
       }`}
     >
-      <div className={`flex h-12 shrink-0 items-center justify-between border-b border-white/10 px-3.5 ${collapsed ? "lg:justify-center lg:px-2" : ""}`}>
+      <div
+        className={`flex h-full min-h-0 w-full flex-col border-r border-white/10 bg-white/3 backdrop-blur-xl transition-[width] duration-200 ease-out max-lg:bg-[#0c0c12]/95 ${
+          collapsed
+            ? `lg:absolute lg:inset-y-0 lg:left-0 ${
+                hovered
+                  ? "lg:z-40 lg:w-56 lg:bg-[#0c0c12]/98 lg:shadow-2xl lg:shadow-black/60"
+                  : "lg:z-0 lg:w-16"
+              }`
+            : "lg:relative lg:w-56"
+        }`}
+      >
+      <div className={`flex h-12 shrink-0 items-center justify-between border-b border-white/10 px-3.5 ${!expanded ? "lg:justify-center lg:px-2" : ""}`}>
         <Link
           href="/"
           onClick={closeIfMobile}
@@ -256,14 +273,14 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: Props) {
               </linearGradient>
             </defs>
           </svg>
-          <span className={`text-sm font-bold text-white ${collapsed ? "lg:hidden" : ""}`}>Klokrs</span>
+          <span className={`text-sm font-bold text-white ${!expanded ? "lg:hidden" : ""}`}>Klokrs</span>
         </Link>
         {/* Desktop collapse toggle */}
         <button
           type="button"
           onClick={toggleCollapsed}
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          className={`hidden h-7 w-7 items-center justify-center rounded-lg border border-white/10 text-white/40 transition hover:border-white/20 hover:text-white/80 lg:flex ${collapsed ? "lg:hidden" : ""}`}
+          className={`hidden h-7 w-7 items-center justify-center rounded-lg border border-white/10 text-white/40 transition hover:border-white/20 hover:text-white/80 lg:flex ${!expanded ? "lg:hidden" : ""}`}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
             <rect x="3" y="3" width="18" height="18" rx="2" /><line x1="9" y1="3" x2="9" y2="21" />
@@ -271,8 +288,8 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: Props) {
         </button>
       </div>
 
-      {/* Expand button — only visible (desktop) when collapsed */}
-      {collapsed && (
+      {/* Expand button — only visible (desktop) while collapsed and not hover-flown-out */}
+      {collapsed && !hovered && (
         <button
           type="button"
           onClick={toggleCollapsed}
@@ -288,7 +305,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: Props) {
       <nav className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
         {navGroups.map((group) => (
           <div key={group.label}>
-            <p className={`mb-1 px-2.5 text-[10px] font-semibold uppercase tracking-widest text-white/25 ${collapsed ? "lg:hidden" : ""}`}>
+            <p className={`mb-1 px-2.5 text-[10px] font-semibold uppercase tracking-widest text-white/25 ${!expanded ? "lg:hidden" : ""}`}>
               {group.label}
             </p>
             <div className="space-y-0.5">
@@ -309,11 +326,11 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: Props) {
                     href={item.href}
                     data-tour={item.tour}
                     onClick={closeIfMobile}
-                    title={collapsed ? item.label : undefined}
+                    title={!expanded ? item.label : undefined}
                     className={linkClass(active)}
                   >
                     {item.icon}
-                    <span className={`leading-tight ${collapsed ? "lg:hidden" : ""}`}>{item.label}</span>
+                    <span className={`leading-tight ${!expanded ? "lg:hidden" : ""}`}>{item.label}</span>
                   </Link>
                 );
               })}
@@ -331,8 +348,8 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: Props) {
             aria-expanded={menuOpen}
             aria-controls={menuOpen ? `profile-menu-${menuId}` : undefined}
             onClick={() => setMenuOpen((o) => !o)}
-            title={collapsed ? (user?.email ?? "Account") : undefined}
-            className={`flex w-full min-w-0 items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-sm transition-colors hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/50 ${collapsed ? "lg:justify-center" : ""}`}
+            title={!expanded ? (user?.email ?? "Account") : undefined}
+            className={`flex w-full min-w-0 items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-sm transition-colors hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/50 ${!expanded ? "lg:justify-center" : ""}`}
           >
             <span
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-cyan-600 text-xs font-semibold text-white shadow-lg shadow-violet-900/30"
@@ -340,7 +357,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: Props) {
             >
               {initialsFromUser(user)}
             </span>
-            <span className={`min-w-0 flex-1 ${collapsed ? "lg:hidden" : ""}`}>
+            <span className={`min-w-0 flex-1 ${!expanded ? "lg:hidden" : ""}`}>
               <span className="block truncate text-xs text-white/90">Account</span>
               <span className="block truncate text-[11px] text-white/40">
                 {user?.email ?? "…"}
@@ -349,7 +366,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: Props) {
             <svg
               className={`h-4 w-4 shrink-0 text-white/35 transition-transform ${
                 menuOpen ? "rotate-180" : ""
-              } ${collapsed ? "lg:hidden" : ""}`}
+              } ${!expanded ? "lg:hidden" : ""}`}
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -414,6 +431,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: Props) {
             </div>
           )}
         </div>
+      </div>
       </div>
     </aside>
   );
