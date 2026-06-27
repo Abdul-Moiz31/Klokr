@@ -382,7 +382,9 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: Props) {
               id={`profile-menu-${menuId}`}
               role="menu"
               aria-labelledby={`profile-trigger-${menuId}`}
-              className="absolute bottom-full left-0 right-0 z-50 mb-2 max-h-[min(20rem,50vh)] overflow-y-auto overflow-x-hidden rounded-xl border border-white/10 bg-[#12121a] py-1 shadow-xl shadow-black/50"
+              className={`absolute bottom-full z-50 mb-2 w-56 max-h-[min(20rem,50vh)] overflow-y-auto overflow-x-hidden rounded-xl border border-white/10 bg-[#12121a] py-1 shadow-xl shadow-black/50 ${
+                expanded ? "left-0 right-0 w-auto" : "left-0"
+              }`}
             >
               <div className="border-b border-white/10 px-3 py-2">
                 <p className="text-xs text-white/35">Signed in as</p>
