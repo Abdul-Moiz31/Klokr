@@ -128,7 +128,7 @@ export function AppShell({
 
           <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
             {/* Desktop header bar */}
-            <header className="hidden h-12 shrink-0 items-center gap-3 border-b border-white/10 bg-[#0A0A0F]/85 px-5 backdrop-blur-xl lg:flex">
+            <header className="relative z-30 hidden h-12 shrink-0 items-center gap-3 border-b border-white/10 bg-[#0A0A0F]/85 px-5 backdrop-blur-xl lg:flex">
               <HeaderSearch />
               <div className="ml-auto flex shrink-0 items-center gap-1.5">
                 <button
