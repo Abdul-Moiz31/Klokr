@@ -21,9 +21,11 @@ import { createClient } from "@/lib/supabase";
  *   3. Only redirect to /login if the wait expires with no session OR the user
  *      explicitly signed out (SIGNED_OUT event).
  *
- * After mount, listen for SIGNED_OUT to redirect cleanly if the SDK ever
- * dispatches it — which it only does on explicit signOut(), restricted accounts,
- * or refresh-token revocation (e.g. password changed elsewhere).
+ * After mount, listen for SIGNED_OUT. It fires on explicit signOut(),
+ * restricted accounts, or refresh-token revocation — but the last case also
+ * covers a recoverable race against the extension (see ExtensionAuthSync.tsx),
+ * so SIGNED_OUT gets a short grace window to recover a session before
+ * redirecting, instead of bouncing immediately.
  *
  * The session is kept fresh in state via onAuthStateChange, including
  * TOKEN_REFRESHED events.
@@ -50,6 +52,8 @@ export function useAuthSession(options?: {
       router.replace(redirectTo);
     };
 
+    let signedOutTimer: ReturnType<typeof setTimeout> | undefined;
+
     // Subscribe FIRST so we don't miss an event that fires between getSession()
     // resolving and the listener attaching.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, s: Session | null) => {
@@ -57,10 +61,32 @@ export function useAuthSession(options?: {
       if (event === "SIGNED_OUT") {
         setSession(null);
         setStatus("unauthenticated");
-        redirectOnce();
+        // Don't bounce instantly. SIGNED_OUT also fires when the extension and
+        // this tab raced on Supabase's single-use rotating refresh token (see
+        // ExtensionAuthSync.tsx) — the extension recovers by handing this tab
+        // its own last-known-good token, but that arrives via an async
+        // chrome.runtime round-trip a few hundred ms later. Give it a grace
+        // window before treating this as a real logout.
+        if (signedOutTimer) clearTimeout(signedOutTimer);
+        signedOutTimer = setTimeout(() => {
+          if (cancelled) return;
+          void supabase.auth.getSession().then(({ data: { session: recovered } }: { data: { session: Session | null } }) => {
+            if (cancelled) return;
+            if (recovered) {
+              setSession(recovered);
+              setStatus("authenticated");
+            } else {
+              redirectOnce();
+            }
+          });
+        }, 1500);
         return;
       }
       if (s) {
+        if (signedOutTimer) {
+          clearTimeout(signedOutTimer);
+          signedOutTimer = undefined;
+        }
         setSession(s);
         setStatus("authenticated");
       }
@@ -102,6 +128,7 @@ export function useAuthSession(options?: {
     return () => {
       cancelled = true;
       if (waitTimer) clearTimeout(waitTimer);
+      if (signedOutTimer) clearTimeout(signedOutTimer);
       subscription.unsubscribe();
     };
   }, [router, redirectTo, waitMs]);
