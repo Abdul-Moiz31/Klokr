@@ -55,6 +55,19 @@ export function AppShell({
     return () => document.removeEventListener("keydown", onKey);
   }, [open]);
 
+  // Drop the mobile drawer state on any resize past the lg breakpoint, so
+  // resizing back down doesn't resurface a stale "open" drawer that blocks
+  // the page underneath.
+  useEffect(() => {
+    if (!open) return;
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const onChange = (e: MediaQueryListEvent) => {
+      if (e.matches) setOpen(false);
+    };
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, [open]);
+
   useEffect(() => {
     if (open) {
       document.body.style.overflow = "hidden";
