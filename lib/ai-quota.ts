@@ -5,7 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 export type PlanTier = "free" | "standard" | "pro";
 
 export const AI_MONTHLY_LIMIT: Record<PlanTier, number> = {
-  free: 2,
+  free: 5,
   standard: 30,
   pro: 1000, // effectively unlimited; a guardrail against runaway loops
 };
