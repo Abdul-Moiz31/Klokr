@@ -7,7 +7,6 @@ import { useAuthSession } from "@/lib/useAuthSession";
 import { loadPrefs, resolveTimezone } from "@/lib/prefs";
 import { AppShell } from "@/components/dashboard/AppShell";
 import { PageHeader } from "@/components/dashboard/PageHeader";
-import { StatsCard } from "@/components/dashboard/StatsCard";
 import { DomainChart } from "@/components/dashboard/DomainChart";
 import { TopDomains } from "@/components/dashboard/TopDomains";
 import { TodayActivityChart } from "@/components/dashboard/TodayActivityChart";
@@ -15,6 +14,7 @@ import { DomainDrilldownModal } from "@/components/reports/DomainDrilldownModal"
 import { Loader } from "@/components/ui/Loader";
 import { WorkDayCompleteBanner } from "@/components/dashboard/WorkDayCompleteBanner";
 import { ActivationChecklist } from "@/components/dashboard/ActivationChecklist";
+import { NoActivityToday } from "@/components/dashboard/NoActivityToday";
 import { PlanVsActualCard } from "@/components/dashboard/PlanVsActualCard";
 import { StreakStrip } from "@/components/dashboard/StreakStrip";
 import { AccountabilityCard } from "@/components/dashboard/AccountabilityCard";
@@ -68,8 +68,13 @@ export default function DashboardPage() {
   const [sessions, setSessions] = useState<TabSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastSynced, setLastSynced] = useState<Date | null>(null);
+  // Distinguishes "brand new user, never tracked anything" from "returning
+  // user, just no data for today yet" — the two need very different empty
+  // states. null = not checked yet, so we don't flash the wrong one.
+  const [hasEverTracked, setHasEverTracked] = useState<boolean | null>(null);
   const [fetchError, setFetchError] = useState(false);
   const [drilldown, setDrilldown] = useState<{ domain: string; totalSeconds: number } | null>(null);
+  const [showInsights, setShowInsights] = useState(false);
 
   const fetchSessions = useCallback(async (uid: string) => {
     const supabase = createClient();
@@ -99,6 +104,17 @@ export default function DashboardPage() {
       await fetchSessions(userId);
       if (cancelled) return;
       setLoading(false);
+
+      // One-off, not date-filtered — just enough to know if this user has
+      // ever synced a session, so the empty state doesn't tell a long-time
+      // user to "add the extension" every single morning before today's
+      // first heartbeat lands.
+      const { count } = await supabase
+        .from("tab_sessions")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .limit(1);
+      if (!cancelled) setHasEverTracked((count ?? 0) > 0);
 
       // Listen to both INSERT (new domain first seen today) and UPDATE
       // (heartbeat incrementing duration on an existing row) so the dashboard
@@ -233,119 +249,78 @@ export default function DashboardPage() {
               </div>
             )}
 
-            {/* KPI row */}
-            <section>
-              <h2 className="mb-2 text-xs font-semibold uppercase tracking-widest text-white/35">Today</h2>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <StatsCard
-                title="Total time today"
-                value={totalSeconds > 0 ? formatTotalTime(totalSeconds) : "0s"}
-                tooltip="Sum of all tracked browsing time recorded by the extension today."
-                delay={0}
-                accent="violet"
-                icon={
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <circle cx="12" cy="12" r="10" />
-                    <path d="M12 6v6l4 2" />
-                  </svg>
-                }
-              />
-              <StatsCard
-                title="Top domain today"
-                value={topDomain}
-                tooltip="The domain you spent the most time on today."
-                delay={0.05}
-                accent="cyan"
-                icon={
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <circle cx="12" cy="12" r="10" />
-                    <line x1="2" y1="12" x2="22" y2="12" />
-                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-                  </svg>
-                }
-              />
-              <StatsCard
-                title="Domains visited"
-                value={domainCount.toString()}
-                tooltip="Number of unique domains tracked so far today."
-                delay={0.1}
-                accent="neutral"
-                icon={
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <rect x="2" y="3" width="20" height="14" rx="2" />
-                    <path d="M8 21h8M12 17v4" />
-                  </svg>
-                }
-              />
-              <StatsCard
-                title="Last synced"
-                value={lastSynced ? lastSynced.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}
-                subtitle={lastSynced ? "Extension connected" : "Install the extension to begin"}
-                tooltip="Time of the last successful data sync. The dashboard polls every 30s and also updates instantly when a new session is saved."
-                delay={0.15}
-                accent="cyan"
-                badge={lastSynced ? { label: "● Live", color: "green" } : undefined}
-                icon={
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-                  </svg>
-                }
-              />
+            {/* Hero stat strip — total time is the one number that matters most; everything
+                else is a smaller inline chip so the eye has a single anchor point. */}
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-xl border border-white/[0.07] bg-white/[0.02] px-5 py-4">
+              <div>
+                <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-widest text-white/30">Total time today</p>
+                <p className="bg-gradient-to-br from-violet-200 to-white bg-clip-text text-3xl font-bold leading-none tracking-tight text-transparent tabular-nums">
+                  {totalSeconds > 0 ? formatTotalTime(totalSeconds) : "0s"}
+                </p>
               </div>
-            </section>
 
-            {/* Insight cards — compact 2x2 grid grouped under one label */}
-            <section>
-              <h2 className="mb-2 text-xs font-semibold uppercase tracking-widest text-white/35">Insights</h2>
-              <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                <StreakStrip userId={userId} />
-                <WeeklyReviewCard userId={userId} />
-                <PlanVsActualCard sessions={sessions} autoCompleteThreshold={loadPrefs().autoCompleteThreshold} />
-                <FocusScoreCard
-                  domains={domainStats.map((d) => ({ domain: d.domain, totalSeconds: d.totalSeconds }))}
-                  goalHours={loadPrefs().productiveHoursThreshold}
-                />
+              <div className="hidden h-9 w-px bg-white/[0.08] sm:block" />
+
+              <div className="min-w-0">
+                <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-widest text-white/30">Top domain</p>
+                <p className="max-w-[10rem] truncate text-sm font-semibold text-white/80">{topDomain}</p>
               </div>
+
+              <div className="hidden h-9 w-px bg-white/[0.08] sm:block" />
+
+              <div>
+                <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-widest text-white/30">Domains</p>
+                <p className="text-sm font-semibold text-white/80 tabular-nums">{domainCount}</p>
+              </div>
+
+              <div className="hidden h-9 w-px bg-white/[0.08] sm:block" />
+
+              <div className="flex items-center gap-1.5">
+                {lastSynced && (
+                  <span className="relative flex h-1.5 w-1.5" aria-hidden>
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400/50 opacity-75" />
+                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                  </span>
+                )}
+                <div>
+                  <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-widest text-white/30">Last synced</p>
+                  <p className="text-sm font-semibold text-white/80 tabular-nums">
+                    {lastSynced ? lastSynced.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Insights — collapsed by default so the page opens on one focal point. */}
+            <section>
+              <button
+                type="button"
+                onClick={() => setShowInsights((v) => !v)}
+                className="flex w-full items-center gap-1.5 text-xs font-semibold uppercase tracking-widest text-white/35 transition hover:text-white/60"
+              >
+                <svg
+                  width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                  className={`transition-transform ${showInsights ? "rotate-90" : ""}`}
+                >
+                  <path d="M9 18l6-6-6-6" />
+                </svg>
+                More insights
+              </button>
+              {showInsights && (
+                <div className="mt-2 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                  <StreakStrip userId={userId} />
+                  <WeeklyReviewCard userId={userId} />
+                  <PlanVsActualCard sessions={sessions} autoCompleteThreshold={loadPrefs().autoCompleteThreshold} />
+                  <FocusScoreCard
+                    domains={domainStats.map((d) => ({ domain: d.domain, totalSeconds: d.totalSeconds }))}
+                    goalHours={loadPrefs().productiveHoursThreshold}
+                  />
+                </div>
+              )}
             </section>
 
             {sessions.length === 0 ? (
-              <ActivationChecklist />
+              hasEverTracked ? <NoActivityToday /> : hasEverTracked === false ? <ActivationChecklist /> : null
             ) : (
               <section>
                 <h2 className="mb-2 text-xs font-semibold uppercase tracking-widest text-white/35">Activity</h2>

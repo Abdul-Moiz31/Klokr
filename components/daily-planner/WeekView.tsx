@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import FullCalendar from "@fullcalendar/react";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
@@ -22,8 +22,28 @@ import {
   formatMinutes,
 } from "@/lib/daily-planner/timeline";
 import { getTaskColor } from "@/lib/daily-planner/taskColor";
+import { CategoryIcon } from "@/lib/daily-planner/taskIcon";
 
 const SNAP_DURATION = `00:${String(SNAP_MINUTES).padStart(2, "0")}:00`;
+
+const CATEGORY_COLORS: Record<string, string> = {
+  prayer: "rgba(52,211,153,0.85)",
+  sleep: "rgba(99,102,241,0.82)",
+  work: "rgba(192,132,252,0.85)",
+  exercise: "rgba(251,146,60,0.85)",
+  food: "rgba(251,191,36,0.8)",
+  family: "rgba(244,114,182,0.85)",
+  default: "rgba(167,139,250,0.75)",
+};
+const CATEGORY_LABELS: Record<string, string> = {
+  prayer: "Prayer / Quran",
+  sleep: "Sleep / Rest",
+  work: "Work / Study",
+  exercise: "Exercise",
+  food: "Food / Meals",
+  family: "Family / Social",
+  default: "Other",
+};
 
 function fmtTime(min: number): string {
   const total = Math.round(min);
@@ -73,6 +93,7 @@ export function WeekView({
 }: Props) {
   const calendarRef = useRef<FullCalendar | null>(null);
   const hasScrolledRef = useRef(false);
+  const [showLegend, setShowLegend] = useState(false);
 
   const weekStart = useMemo(() => startOfWeek(anchorDate), [anchorDate]);
 
@@ -105,7 +126,10 @@ export function WeekView({
 
   // Per-day stats: real tasks take priority, fall back to template for empty days
   const dayStats = useMemo(() => {
-    const map = new Map<string, { total: number; done: number; minutes: number; isTemplate: boolean }>();
+    const map = new Map<
+      string,
+      { total: number; done: number; minutes: number; isTemplate: boolean; categories: string[] }
+    >();
     for (let i = 0; i < 7; i++) {
       const date = addDays(weekStart, i);
       const key = dayKey(date);
@@ -118,6 +142,7 @@ export function WeekView({
           done: realTasks.filter((t) => t.done).length,
           minutes: realTasks.reduce((s, t) => s + (t.endMinutes! - t.startMinutes!), 0),
           isTemplate: false,
+          categories: [...new Set(realTasks.map((t) => getTaskColor(t.title || "")))].slice(0, 5),
         });
       } else {
         const kind = templateKindForDay(date);
@@ -129,6 +154,7 @@ export function WeekView({
           done: 0,
           minutes: tplTasks.reduce((s, t) => s + (t.endMinutes! - t.startMinutes!), 0),
           isTemplate: tplTasks.length > 0,
+          categories: [...new Set(tplTasks.map((t) => getTaskColor(t.title || "")))].slice(0, 5),
         });
       }
     }
@@ -220,46 +246,51 @@ export function WeekView({
   return (
     <div>
       {/* ── Week summary bar ── */}
-      <div className="mb-4 grid grid-cols-3 gap-3">
-        <div className="flex flex-col items-center justify-center gap-0.5 rounded-xl border border-white/[0.07] bg-white/[0.02] py-3">
-          <span className="text-2xl font-bold leading-none tabular-nums text-white/70">{weekTotals.total}</span>
-          <span className="text-[10px] text-white/30">tasks this week</span>
+      <div className="mb-3 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border border-white/[0.07] bg-white/[0.02] px-5 py-3">
+        <div>
+          <p className="text-[10px] uppercase tracking-widest text-white/30">This week</p>
+          <p className="text-xl font-bold leading-none tabular-nums text-white/85">{weekTotals.total} tasks</p>
         </div>
-        <div className="flex flex-col items-center justify-center gap-0.5 rounded-xl border border-white/[0.07] bg-white/[0.02] py-3">
-          <span className={`text-2xl font-bold leading-none tabular-nums ${weekTotals.done > 0 ? "text-emerald-300" : "text-white/20"}`}>
+        <div className="hidden h-8 w-px bg-white/[0.08] sm:block" />
+        <div>
+          <p className="text-[10px] uppercase tracking-widest text-white/30">Completed</p>
+          <p className={`text-xl font-bold leading-none tabular-nums ${weekTotals.done > 0 ? "text-emerald-300" : "text-white/25"}`}>
             {weekTotals.done}
-          </span>
-          <span className="text-[10px] text-white/30">completed</span>
+          </p>
         </div>
-        <div className="flex flex-col items-center justify-center gap-0.5 rounded-xl border border-white/[0.07] bg-white/[0.02] py-3">
-          <span className="text-2xl font-bold leading-none tabular-nums text-violet-300/70">
+        <div className="hidden h-8 w-px bg-white/[0.08] sm:block" />
+        <div>
+          <p className="text-[10px] uppercase tracking-widest text-white/30">Planned time</p>
+          <p className="text-xl font-bold leading-none tabular-nums text-violet-300/80">
             {weekTotals.minutes > 0 ? fmtTime(weekTotals.minutes) : "—"}
-          </span>
-          <span className="text-[10px] text-white/30">planned time</span>
+          </p>
         </div>
+
+        <button
+          type="button"
+          onClick={() => setShowLegend((v) => !v)}
+          className="ml-auto flex items-center gap-1 text-[11px] font-medium text-white/30 transition hover:text-white/60"
+        >
+          Legend
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform ${showLegend ? "rotate-180" : ""}`}><path d="M6 9l6 6 6-6" /></svg>
+        </button>
       </div>
 
-      {/* ── Legend ── */}
-      <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 px-1">
-        {([
-          ["prayer",   "rgba(52,211,153,0.75)",  "Prayer / Quran"],
-          ["sleep",    "rgba(99,102,241,0.72)",   "Sleep / Rest"],
-          ["work",     "rgba(192,132,252,0.78)",  "Work / Study"],
-          ["exercise", "rgba(251,146,60,0.78)",   "Exercise"],
-          ["food",     "rgba(251,191,36,0.68)",   "Food / Meals"],
-          ["family",   "rgba(244,114,182,0.75)",  "Family / Social"],
-          ["default",  "rgba(124,58,237,0.62)",   "Other"],
-        ] as const).map(([, color, label]) => (
-          <span key={label} className="flex items-center gap-1.5 text-[10px] text-white/35">
-            <span className="h-2.5 w-2.5 rounded-sm shrink-0" style={{ background: color }} />
-            {label}
+      {/* ── Legend (collapsed by default) ── */}
+      {showLegend && (
+        <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5">
+          {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
+            <span key={key} className="flex items-center gap-1.5 text-[10px] text-white/35">
+              <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: CATEGORY_COLORS[key] }} />
+              {label}
+            </span>
+          ))}
+          <span className="flex items-center gap-1.5 text-[10px] text-white/25">
+            <span className="h-2.5 w-2.5 rounded-sm shrink-0 border border-dashed border-white/25" />
+            Routine template (preview)
           </span>
-        ))}
-        <span className="flex items-center gap-1.5 text-[10px] text-white/25">
-          <span className="h-2.5 w-2.5 rounded-sm shrink-0 border border-dashed border-white/25" />
-          Routine template (preview)
-        </span>
-      </div>
+        </div>
+      )}
 
       {/* ── Calendar grid ── */}
       <div className="klokrs-timeline klokrs-week rounded-xl border border-white/[0.07] bg-white/[0.02] p-2 sm:p-3">
@@ -291,49 +322,51 @@ export function WeekView({
           eventClick={handleEventClick}
           dayHeaderContent={(arg) => {
             const key = dayKey(startOfLocalDay(arg.date));
-            const s = dayStats.get(key) ?? { total: 0, done: 0, minutes: 0, isTemplate: false };
+            const s = dayStats.get(key) ?? { total: 0, done: 0, minutes: 0, isTemplate: false, categories: [] };
             const weekday = arg.date
               .toLocaleDateString("en-US", { weekday: "short" })
               .toUpperCase();
             const dateNum = arg.date.getDate();
             const allDone = !s.isTemplate && s.total > 0 && s.done === s.total;
             return (
-              <div className="flex flex-col items-center gap-0.5 py-1.5 px-0.5">
+              <div className="flex flex-col items-center gap-1.5 py-2 px-0.5">
                 <span
                   className={`text-[9px] font-bold tracking-widest ${
-                    arg.isToday ? "text-violet-400" : "text-white/30"
+                    arg.isToday ? "text-violet-300" : "text-white/30"
                   }`}
                 >
                   {weekday}
                 </span>
                 <span
-                  className={`flex items-center justify-center text-[15px] font-bold leading-none tabular-nums ${
+                  className={`flex items-center justify-center text-[14px] font-bold leading-none tabular-nums ${
                     arg.isToday
-                      ? "h-7 w-7 rounded-full bg-violet-500/25 text-white/95"
-                      : "text-white/55"
+                      ? "h-7 w-7 rounded-full bg-violet-500 text-white shadow-[0_0_0_3px_rgba(124,58,237,0.18)]"
+                      : allDone
+                        ? "text-emerald-300/90"
+                        : "text-white/70"
                   }`}
                 >
                   {dateNum}
                 </span>
-                {s.total > 0 ? (
-                  s.isTemplate ? (
-                    <span className="rounded-full border border-dashed border-white/15 px-1.5 py-[1px] text-[8px] text-white/25">
-                      {s.total} planned
-                    </span>
+                {/* Overlapping dot cluster — one dot per task category present
+                    that day, standing in for the old numeric "x/y" badge. */}
+                <div className="flex h-2.5 items-center" aria-label={s.total > 0 ? `${s.total} tasks` : "No tasks"}>
+                  {s.categories.length > 0 ? (
+                    s.categories.map((cat, i) => (
+                      <span
+                        key={cat}
+                        className="h-2.5 w-2.5 rounded-full border-2 border-[#0A0A0F]"
+                        style={{
+                          background: CATEGORY_COLORS[cat] ?? CATEGORY_COLORS.default,
+                          opacity: s.isTemplate ? 0.4 : 1,
+                          marginLeft: i === 0 ? 0 : -5,
+                        }}
+                      />
+                    ))
                   ) : (
-                    <span
-                      className={`rounded-full px-1.5 py-[1px] text-[8px] font-semibold tabular-nums ${
-                        allDone
-                          ? "bg-emerald-500/15 text-emerald-300/80"
-                          : "bg-violet-500/10 text-violet-300/60"
-                      }`}
-                    >
-                      {s.done}/{s.total}
-                    </span>
-                  )
-                ) : (
-                  <span className="text-[8px] text-white/15">empty</span>
-                )}
+                    <span className="h-1 w-1 rounded-full bg-white/10" />
+                  )}
+                </div>
               </div>
             );
           }}
@@ -347,15 +380,21 @@ export function WeekView({
               ? arg.event.end.getHours() * 60 + arg.event.end.getMinutes()
               : startM;
             const dur = endM - startM;
+            const category = getTaskColor(task?.title ?? "");
+            const fullLabel = `${arg.event.title} · ${formatMinutes(startM)} (${fmtTime(dur)})`;
+            // Structured-style compressed week view: short blocks show just the
+            // category icon (time is already encoded by vertical position);
+            // blocks with enough room also get a single-line label.
             return (
-              <div className="klokrs-event-body klokrs-week-event-body">
-                <div className="klokrs-event-row">
+              <div className="klokrs-event-body klokrs-week-event-body" title={fullLabel}>
+                <div className="klokrs-week-event-icon">
+                  <CategoryIcon category={category} size={11} />
+                </div>
+                {dur >= 40 && (
                   <div className={`klokrs-event-title ${done ? "klokrs-event-title--done" : ""}`}>
                     {arg.event.title}
                   </div>
-                  <span className="klokrs-event-dur">{fmtTime(dur)}</span>
-                </div>
-                <div className="klokrs-event-meta">{formatMinutes(startM)}</div>
+                )}
               </div>
             );
           }}

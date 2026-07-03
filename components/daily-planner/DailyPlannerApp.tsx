@@ -158,6 +158,7 @@ export function DailyPlannerApp({ accountCreatedAt = null, userId = null }: Dail
   const [viewDate, setViewDate] = useState<Date>(() => new Date());
   const [weekAnchor, setWeekAnchor] = useState<Date>(() => new Date());
   const [prefs, setPrefs] = useState<KlokrsPrefs>(DEFAULT_PREFS);
+  const [tplMenuOpen, setTplMenuOpen] = useState(false);
 
   // Week-view template picker (two-step: choose template kind, then target day)
   const [weekTplKind, setWeekTplKind] = useState<RoutineTemplateKind>("weekdays");
@@ -483,146 +484,147 @@ export function DailyPlannerApp({ accountCreatedAt = null, userId = null }: Dail
           {tab === "today" && (
             <div>
 
-              {/* ── Hero header ── */}
-              <div
-                className="mb-5 overflow-hidden rounded-xl border border-white/[0.07]"
-                style={{ background: "linear-gradient(135deg, rgba(124,58,237,0.09) 0%, rgba(10,10,15,0.96) 55%, rgba(6,78,59,0.05) 100%)" }}
-              >
-                {/* Row 1: date nav */}
-                <div className="flex items-center gap-2 border-b border-white/[0.05] px-5 py-3.5">
-                  <button
-                    type="button"
-                    onClick={() => setViewDate((d) => addDays(d, -1))}
-                    disabled={atEarliestDay}
-                    title={atEarliestDay && minViewableDay ? `You joined on ${formatJoinedDate(minViewableDay)}` : undefined}
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/[0.08] text-white/35 transition hover:border-white/20 hover:text-white/65 disabled:cursor-not-allowed disabled:opacity-25"
-                    aria-label="Previous day"
-                  >
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
-                  </button>
+              {/* ── Slim date nav ── */}
+              <div className="mb-3 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setViewDate((d) => addDays(d, -1))}
+                  disabled={atEarliestDay}
+                  title={atEarliestDay && minViewableDay ? `You joined on ${formatJoinedDate(minViewableDay)}` : undefined}
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-white/30 transition hover:bg-white/[0.06] hover:text-white/70 disabled:cursor-not-allowed disabled:opacity-20"
+                  aria-label="Previous day"
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
+                </button>
 
-                  <div className="flex min-w-0 flex-1 items-center gap-2.5">
-                    <span className="text-base font-bold text-white/95">{isViewingToday ? "Today" : "Past day"}</span>
-                    <span className="text-sm text-white/40">{formatNavDate(viewDate)}</span>
-                    {!isViewingToday && (
-                      <span className="rounded-full border border-white/[0.08] bg-white/[0.04] px-2 py-0.5 text-[10px] text-white/35">Past</span>
-                    )}
-                    {atEarliestDay && minViewableDay && (
-                      <span className="hidden rounded-full border border-white/[0.07] px-2 py-0.5 text-[10px] text-white/25 sm:block">
-                        Joined {formatJoinedDate(minViewableDay)}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex shrink-0 items-center gap-1.5">
-                    {!isViewingToday && (
-                      <button
-                        type="button"
-                        onClick={() => setViewDate(new Date())}
-                        className="rounded-lg border border-violet-500/25 bg-violet-600/15 px-2.5 py-1.5 text-xs font-medium text-violet-300 transition hover:bg-violet-500/25"
-                      >
-                        Today
-                      </button>
-                    )}
-                    {hasAdHocToday && isViewingToday && (
-                      <button
-                        type="button"
-                        onClick={clearAdHocForToday}
-                        className="rounded-lg border border-red-500/15 px-2.5 py-1.5 text-[11px] font-medium text-red-400/50 transition hover:border-red-500/25 hover:bg-red-500/[0.06] hover:text-red-300"
-                      >
-                        Clear
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => setViewDate((d) => addDays(d, 1))}
-                      disabled={isViewingToday}
-                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/[0.08] text-white/35 transition hover:border-white/20 hover:text-white/65 disabled:cursor-not-allowed disabled:opacity-25"
-                      aria-label="Next day"
-                    >
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
-                    </button>
-                  </div>
+                <div className="flex min-w-0 flex-1 items-baseline gap-2">
+                  <span className="text-base font-bold text-white/95">{isViewingToday ? "Today" : "Past day"}</span>
+                  <span className="text-sm text-white/35">{formatNavDate(viewDate)}</span>
+                  {!isViewingToday && (
+                    <span className="rounded-full border border-white/[0.08] bg-white/[0.04] px-2 py-0.5 text-[10px] text-white/35">Past</span>
+                  )}
                 </div>
 
-                {/* Rows 2–3: stats block (today only) */}
-                {isViewingToday && (
-                  <>
-                    {/* Progress bar */}
-                    {scheduledTasks.length > 0 && (
-                      <div className="border-b border-white/[0.05] px-5 py-3">
-                        <div className="mb-2 flex items-center justify-between text-[11px]">
-                          <span className="text-white/40">
-                            {doneCount === scheduledTasks.length
-                              ? "All tasks complete ✓"
-                              : `${doneCount} of ${scheduledTasks.length} complete`}
-                          </span>
-                          <span className="tabular-nums text-white/30">
-                            {Math.round((doneCount / scheduledTasks.length) * 100)}%
-                          </span>
-                        </div>
-                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/[0.06]">
-                          <motion.div
-                            className="h-full rounded-full"
-                            animate={{ width: `${Math.max(doneCount > 0 ? 2 : 0, (doneCount / scheduledTasks.length) * 100)}%` }}
-                            transition={{ duration: 0.6, ease: "easeOut" }}
-                            style={{
-                              background:
-                                doneCount === scheduledTasks.length
-                                  ? "linear-gradient(90deg,#10b981,#06b6d4)"
-                                  : "linear-gradient(90deg,#7c3aed,#0891b2)",
-                            }}
+                <div className="flex shrink-0 items-center gap-1.5">
+                  {isViewingToday && (
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setTplMenuOpen((v) => !v)}
+                        className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-medium text-white/30 transition hover:bg-white/[0.06] hover:text-white/65"
+                      >
+                        Template
+                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>
+                      </button>
+                      {tplMenuOpen && (
+                        <>
+                          <button
+                            type="button"
+                            aria-label="Close menu"
+                            className="fixed inset-0 z-10 cursor-default"
+                            onClick={() => setTplMenuOpen(false)}
                           />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Stat tiles */}
-                    <div className="grid grid-cols-2 divide-x divide-white/[0.05] sm:grid-cols-4">
-                      <div className="flex flex-col gap-1 px-5 py-4">
-                        <span className={`text-3xl font-bold leading-none tabular-nums ${doneCount > 0 ? "text-emerald-300" : "text-white/20"}`}>
-                          {doneCount}
-                        </span>
-                        <span className="text-[11px] text-white/35">Done</span>
-                      </div>
-
-                      <div className="flex flex-col gap-1 px-5 py-4">
-                        <span className="text-3xl font-bold leading-none tabular-nums text-white/55">
-                          {scheduledTasks.length - doneCount}
-                        </span>
-                        <span className="text-[11px] text-white/35">Remaining</span>
-                      </div>
-
-                      <div className="flex flex-col gap-1 px-5 py-4">
-                        <span className="text-2xl font-bold leading-none tabular-nums text-violet-300/75">
-                          {plannedMinutesToday > 0 ? fmtTime(plannedMinutesToday) : "—"}
-                        </span>
-                        <span className="text-[11px] text-white/35">Planned</span>
-                      </div>
-
-                      <div className="flex flex-col gap-2 px-5 py-3.5">
-                        <span className="text-[10px] font-semibold uppercase tracking-widest text-white/25">Load template</span>
-                        <div className="flex flex-wrap gap-1">
-                          {(["weekdays", "saturday", "sunday", "fallback"] as RoutineTemplateKind[]).map((k) => (
-                            <button
-                              key={k}
-                              type="button"
-                              onClick={() => tryApplyTemplate(k)}
-                              className={`rounded-lg border px-2 py-0.5 text-[10px] font-medium transition-all ${
-                                k === suggestedKind
-                                  ? "border-violet-500/35 bg-violet-600/15 text-violet-200 hover:bg-violet-500/25"
-                                  : "border-white/[0.07] bg-transparent text-white/35 hover:border-white/15 hover:text-white/65"
-                              }`}
-                            >
-                              {TEMPLATE_DISPLAY[k].label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
+                          <div className="absolute right-0 top-full z-20 mt-1 flex flex-col gap-0.5 rounded-lg border border-white/10 bg-[#12121a] p-1 shadow-xl">
+                            {(["weekdays", "saturday", "sunday", "fallback"] as RoutineTemplateKind[]).map((k) => (
+                              <button
+                                key={k}
+                                type="button"
+                                onClick={() => { tryApplyTemplate(k); setTplMenuOpen(false); }}
+                                className={`whitespace-nowrap rounded-md px-2.5 py-1.5 text-left text-xs font-medium transition ${
+                                  k === suggestedKind
+                                    ? "text-violet-200 hover:bg-violet-500/15"
+                                    : "text-white/50 hover:bg-white/[0.06] hover:text-white/80"
+                                }`}
+                              >
+                                {TEMPLATE_DISPLAY[k].label}
+                                {k === suggestedKind && <span className="ml-1.5 text-[9px] text-violet-400/70">suggested</span>}
+                              </button>
+                            ))}
+                          </div>
+                        </>
+                      )}
                     </div>
-                  </>
-                )}
+                  )}
+                  {!isViewingToday && (
+                    <button
+                      type="button"
+                      onClick={() => setViewDate(new Date())}
+                      className="rounded-lg border border-violet-500/25 bg-violet-600/15 px-2.5 py-1.5 text-xs font-medium text-violet-300 transition hover:bg-violet-500/25"
+                    >
+                      Today
+                    </button>
+                  )}
+                  {hasAdHocToday && isViewingToday && (
+                    <button
+                      type="button"
+                      onClick={clearAdHocForToday}
+                      className="rounded-lg px-2 py-1 text-[11px] font-medium text-red-400/40 transition hover:bg-red-500/[0.06] hover:text-red-300"
+                    >
+                      Clear
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setViewDate((d) => addDays(d, 1))}
+                    disabled={isViewingToday}
+                    className="flex h-7 w-7 items-center justify-center rounded-lg text-white/30 transition hover:bg-white/[0.06] hover:text-white/70 disabled:cursor-not-allowed disabled:opacity-20"
+                    aria-label="Next day"
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
+                  </button>
+                </div>
               </div>
+
+              {/* ── Inline stats strip (today only) ── */}
+              {isViewingToday && scheduledTasks.length > 0 && (
+                <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2">
+                  <span className="text-xs text-white/55">
+                    <span className={`font-semibold tabular-nums ${doneCount > 0 ? "text-emerald-300" : "text-white/70"}`}>{doneCount}</span>
+                    <span className="text-white/30">/{scheduledTasks.length} done</span>
+                  </span>
+                  <span className="text-white/15">·</span>
+                  <span className="text-xs text-white/45 tabular-nums">
+                    {plannedMinutesToday > 0 ? fmtTime(plannedMinutesToday) : "—"} planned
+                  </span>
+                  <div className="ml-1 h-1 min-w-[64px] flex-1 max-w-[220px] overflow-hidden rounded-full bg-white/[0.06]">
+                    <motion.div
+                      className="h-full rounded-full"
+                      animate={{ width: `${Math.max(doneCount > 0 ? 2 : 0, (doneCount / scheduledTasks.length) * 100)}%` }}
+                      transition={{ duration: 0.6, ease: "easeOut" }}
+                      style={{
+                        background:
+                          doneCount === scheduledTasks.length
+                            ? "linear-gradient(90deg,#10b981,#06b6d4)"
+                            : "linear-gradient(90deg,#7c3aed,#0891b2)",
+                      }}
+                    />
+                  </div>
+                  <span className="text-[11px] tabular-nums text-white/30">
+                    {Math.round((doneCount / scheduledTasks.length) * 100)}%
+                  </span>
+                </div>
+              )}
+
+              {/* Empty-state template prompt (today only, nothing scheduled yet) */}
+              {isViewingToday && scheduledTasks.length === 0 && (
+                <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5">
+                  <span className="text-xs text-white/35">Nothing scheduled yet — load a template:</span>
+                  {(["weekdays", "saturday", "sunday", "fallback"] as RoutineTemplateKind[]).map((k) => (
+                    <button
+                      key={k}
+                      type="button"
+                      onClick={() => tryApplyTemplate(k)}
+                      className={`rounded-lg border px-2 py-0.5 text-[10px] font-medium transition-all ${
+                        k === suggestedKind
+                          ? "border-violet-500/35 bg-violet-600/15 text-violet-200 hover:bg-violet-500/25"
+                          : "border-white/[0.07] bg-transparent text-white/35 hover:border-white/15 hover:text-white/65"
+                      }`}
+                    >
+                      {TEMPLATE_DISPLAY[k].label}
+                    </button>
+                  ))}
+                </div>
+              )}
 
               {/* Past day: read-only */}
               {!isViewingToday ? (
@@ -728,23 +730,23 @@ export function DailyPlannerApp({ accountCreatedAt = null, userId = null }: Dail
               {/* Week navigation bar */}
               <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-white/[0.07] bg-white/[0.02] px-4 py-3">
                 {/* Prev / week range / next */}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
                   <button
                     type="button"
                     onClick={() => setWeekAnchor((d) => addDays(d, -7))}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 text-white/50 transition hover:border-white/20 hover:text-white/80"
+                    className="flex h-7 w-7 items-center justify-center rounded-lg text-white/40 transition hover:bg-white/[0.06] hover:text-white/80"
                     aria-label="Previous week"
                   >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
                   </button>
-                  <span className="min-w-[7.5rem] text-center text-sm font-medium text-white/75">{weekRangeLabel(weekAnchor)}</span>
+                  <span className="min-w-[8rem] text-center text-base font-bold text-white/90">{weekRangeLabel(weekAnchor)}</span>
                   <button
                     type="button"
                     onClick={() => setWeekAnchor((d) => addDays(d, 7))}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 text-white/50 transition hover:border-white/20 hover:text-white/80"
+                    className="flex h-7 w-7 items-center justify-center rounded-lg text-white/40 transition hover:bg-white/[0.06] hover:text-white/80"
                     aria-label="Next week"
                   >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
                   </button>
                   {startOfWeekLocal(weekAnchor).getTime() !== startOfWeekLocal(new Date()).getTime() && (
                     <button

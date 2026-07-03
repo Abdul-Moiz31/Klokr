@@ -13,6 +13,7 @@ import type {
 import type { EventResizeDoneArg } from "@fullcalendar/interaction";
 import type { IdleRange, PlannerTask } from "@/lib/daily-planner/types";
 import { getTaskColor } from "@/lib/daily-planner/taskColor";
+import { CategoryIcon } from "@/lib/daily-planner/taskIcon";
 import type { TabSession } from "@/lib/supabase";
 import {
   computeOnTaskStats,
@@ -355,9 +356,12 @@ export function TimelineView({
           const isActive = !done && nowMinutes != null &&
             task != null && task.startMinutes != null && task.endMinutes != null &&
             task.startMinutes <= nowMinutes && task.endMinutes > nowMinutes;
+          const category = getTaskColor(task?.title ?? "");
           return (
             <div className="klokrs-event-body">
               <div className="klokrs-event-row">
+                {/* Icon badge doubles as the done-toggle — Structured-style
+                    "island with an icon" that flips to a checkmark when done. */}
                 <button
                   type="button"
                   role="checkbox"
@@ -377,20 +381,16 @@ export function TimelineView({
                     e.stopPropagation();
                     onToggleDone(task!.id);
                   }}
-                  className={`klokrs-event-checkbox ${done ? "klokrs-event-checkbox--done" : ""} ${
-                    canToggle ? "" : "klokrs-event-checkbox--readonly"
+                  className={`klokrs-event-icon-badge klokrs-event-icon-badge--${category} ${done ? "klokrs-event-icon-badge--done" : ""} ${
+                    canToggle ? "" : "klokrs-event-icon-badge--readonly"
                   }`}
                 >
-                  {done && (
-                    <svg width="10" height="10" viewBox="0 0 8 8" fill="none" aria-hidden>
-                      <path
-                        d="M1.5 4L3 5.5L6.5 2"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
+                  {done ? (
+                    <svg width="10" height="10" viewBox="0 0 12 12" fill="none" aria-hidden>
+                      <path d="M2.5 6.5L5 9L9.5 3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
+                  ) : (
+                    <CategoryIcon category={category} size={11} />
                   )}
                 </button>
                 <div className={`klokrs-event-title ${done ? "klokrs-event-title--done" : ""}`}>
@@ -422,31 +422,33 @@ export function TimelineView({
               <div className="klokrs-event-meta">
                 {formatRange(start, end)}
                 {showOfflinePrompt && task && (
-                  <>
-                    <span className="klokrs-event-offline-sep"> · </span>
+                  <span className="klokrs-event-offline-group">
                     <button
                       type="button"
-                      className="klokrs-event-offline-btn klokrs-event-offline-btn--yes"
+                      title="Mark done"
+                      aria-label="Mark done"
+                      className="klokrs-event-offline-icon klokrs-event-offline-icon--yes"
                       onMouseDownCapture={(e) => e.stopPropagation()}
                       onPointerDownCapture={(e) => e.stopPropagation()}
                       onClick={(e) => { e.stopPropagation(); onMarkOfflineComplete!(task.id); }}
                     >
-                      Done
+                      <svg width="8" height="8" viewBox="0 0 12 12" fill="none" aria-hidden><path d="M2.5 6.5L5 9L9.5 3.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
                     </button>
-                    <span className="klokrs-event-offline-sep"> / </span>
                     <button
                       type="button"
-                      className="klokrs-event-offline-btn"
+                      title="Skip"
+                      aria-label="Skip"
+                      className="klokrs-event-offline-icon"
                       onMouseDownCapture={(e) => e.stopPropagation()}
                       onPointerDownCapture={(e) => e.stopPropagation()}
                       onClick={(e) => { e.stopPropagation(); onMarkSkipped!(task.id); }}
                     >
-                      Skip
+                      <svg width="8" height="8" viewBox="0 0 12 12" fill="none" aria-hidden><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
                     </button>
-                  </>
+                  </span>
                 )}
               </div>
-              {stats && stats.totalWindowMinutes > 0 && (
+              {stats && stats.totalWindowMinutes > 0 && (task?.domainTags?.length ?? 0) > 0 && (
                 <div className="klokrs-event-fill-track" aria-hidden>
                   <div
                     className={`klokrs-event-fill ${fillClass}`}

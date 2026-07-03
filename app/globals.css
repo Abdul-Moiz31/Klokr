@@ -66,7 +66,7 @@ html {
   --fc-page-bg-color: transparent;
   --fc-neutral-bg-color: transparent;
   --fc-neutral-text-color: rgba(255, 255, 255, 0.45);
-  --fc-today-bg-color: rgba(124, 58, 237, 0.04);
+  --fc-today-bg-color: rgba(124, 58, 237, 0.07);
   --fc-now-indicator-color: rgb(167, 139, 250);
   --fc-event-bg-color: rgba(124, 58, 237, 0.18);
   --fc-event-border-color: rgba(167, 139, 250, 0.32);
@@ -91,7 +91,7 @@ html {
   letter-spacing: 0.08em;
 }
 .klokrs-timeline .fc-timegrid-slot {
-  height: 24px;
+  height: 30px;
   border-color: rgba(255, 255, 255, 0.04);
 }
 .klokrs-timeline .fc-timegrid-slot-label {
@@ -110,16 +110,22 @@ html {
   border-color: rgba(167, 139, 250, 0.7);
   color: rgba(167, 139, 250, 0.7);
 }
+.klokrs-timeline .fc-timegrid-event-harness {
+  /* Inset every event within its time slot so back-to-back tasks read as
+     distinct rounded chips with a hairline of page background between them,
+     instead of fusing into one solid color mass. */
+  padding: 1.5px 3px;
+}
 .klokrs-timeline .fc-event {
-  border-radius: 10px;
-  padding: 6px 10px 5px 12px;
+  border-radius: 12px;
+  padding: 6px 10px 5px 9px;
   background: rgba(124, 58, 237, 0.22);
   border: none;
   border-left: 4px solid rgba(167, 139, 250, 0.95);
   color: rgb(237, 233, 254);
   cursor: grab;
   overflow: hidden;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(0, 0, 0, 0.25);
   transition: border-left-color 180ms ease, background 180ms ease, filter 180ms ease, transform 120ms ease;
 }
 .klokrs-timeline .fc-timegrid-event-harness:hover .fc-event {
@@ -241,36 +247,43 @@ html {
   text-decoration: line-through;
   text-decoration-color: rgba(237, 233, 254, 0.6);
 }
-.klokrs-timeline .klokrs-event-checkbox {
+/* Icon badge — Structured-style "island with an icon"; doubles as done-toggle. */
+.klokrs-timeline .klokrs-event-icon-badge {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 14px;
-  height: 14px;
-  border-radius: 3px;
-  border: 1px solid rgba(255, 255, 255, 0.45);
-  background: rgba(255, 255, 255, 0.04);
-  color: rgb(167, 139, 250);
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: none;
   cursor: pointer;
-  transition: background 120ms ease, border-color 120ms ease;
   padding: 0;
+  transition: background 120ms ease, color 120ms ease, transform 120ms ease;
 }
-.klokrs-timeline .klokrs-event-checkbox:hover {
-  border-color: rgba(167, 139, 250, 0.85);
-  background: rgba(167, 139, 250, 0.15);
+.klokrs-timeline .klokrs-event-icon-badge:hover {
+  transform: scale(1.08);
 }
-.klokrs-timeline .klokrs-event-checkbox--done {
-  border-color: rgba(167, 139, 250, 0.85);
-  background: rgba(167, 139, 250, 0.25);
-}
-.klokrs-timeline .klokrs-event-checkbox--readonly {
+.klokrs-timeline .klokrs-event-icon-badge--readonly {
   cursor: default;
-  opacity: 0.7;
 }
-.klokrs-timeline .klokrs-event-checkbox:focus-visible {
+.klokrs-timeline .klokrs-event-icon-badge--readonly:hover {
+  transform: none;
+}
+.klokrs-timeline .klokrs-event-icon-badge:focus-visible {
   outline: 2px solid rgba(167, 139, 250, 0.6);
   outline-offset: 1px;
+}
+.klokrs-timeline .klokrs-event-icon-badge--prayer { background: rgba(52, 211, 153, 0.22); color: rgb(110, 231, 183); }
+.klokrs-timeline .klokrs-event-icon-badge--sleep { background: rgba(99, 102, 241, 0.26); color: rgb(165, 180, 252); }
+.klokrs-timeline .klokrs-event-icon-badge--work { background: rgba(192, 132, 252, 0.24); color: rgb(216, 180, 254); }
+.klokrs-timeline .klokrs-event-icon-badge--exercise { background: rgba(251, 146, 60, 0.24); color: rgb(253, 186, 116); }
+.klokrs-timeline .klokrs-event-icon-badge--food { background: rgba(251, 191, 36, 0.22); color: rgb(253, 224, 71); }
+.klokrs-timeline .klokrs-event-icon-badge--family { background: rgba(244, 114, 182, 0.24); color: rgb(249, 168, 212); }
+.klokrs-timeline .klokrs-event-icon-badge--default { background: rgba(167, 139, 250, 0.2); color: rgb(196, 181, 253); }
+.klokrs-timeline .klokrs-event-icon-badge--done {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: rgba(255, 255, 255, 0.75) !important;
 }
 .klokrs-timeline .klokrs-event-meta {
   font-size: 10px;
@@ -361,31 +374,34 @@ html {
 .klokrs-timeline .klokrs-event-body--gap .klokrs-event-meta {
   color: rgba(254, 226, 226, 0.7);
 }
-/* Offline-detection prompt — inline with the time meta row, no extra height. */
-.klokrs-timeline .klokrs-event-offline-sep {
-  color: rgba(237, 233, 254, 0.3);
-  font-size: 10px;
+/* Offline-detection prompt — compact icon pair, inline with the time meta row. */
+.klokrs-timeline .klokrs-event-offline-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 5px;
 }
-.klokrs-timeline .klokrs-event-offline-btn {
-  font-size: 10px;
-  line-height: 1;
-  padding: 0 2px;
-  background: none;
+.klokrs-timeline .klokrs-event-offline-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.05);
   border: none;
-  color: rgba(237, 233, 254, 0.55);
+  color: rgba(237, 233, 254, 0.4);
   cursor: pointer;
-  transition: color 120ms ease;
-  text-decoration: underline;
-  text-decoration-color: rgba(237, 233, 254, 0.2);
+  transition: background 120ms ease, color 120ms ease;
+  padding: 0;
 }
-.klokrs-timeline .klokrs-event-offline-btn:hover {
+.klokrs-timeline .klokrs-event-offline-icon:hover {
+  background: rgba(255, 255, 255, 0.12);
   color: rgb(237, 233, 254);
 }
-.klokrs-timeline .klokrs-event-offline-btn--yes {
-  color: rgba(196, 181, 253, 0.8);
-}
-.klokrs-timeline .klokrs-event-offline-btn--yes:hover {
-  color: rgb(196, 181, 253);
+.klokrs-timeline .klokrs-event-offline-icon--yes:hover {
+  background: rgba(52, 211, 153, 0.22);
+  color: rgb(167, 243, 208);
 }
 /* Idle block — muted gray, non-interactive. */
 .klokrs-timeline .fc-event.klokrs-event--idle {
@@ -410,17 +426,40 @@ html {
 .klokrs-week .fc-timegrid-col {
   cursor: pointer;
 }
-/* Tighten event text for narrow 7-column layout. */
+/* Structured-style compressed week chip: centered icon, optional single-line
+   label only when the block is tall enough to fit one comfortably. */
+.klokrs-week .klokrs-week-event-body {
+  flex-direction: row;
+  align-items: center;
+  gap: 5px;
+  height: 100%;
+}
+.klokrs-week .klokrs-week-event-icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  color: inherit;
+}
 .klokrs-week .klokrs-week-event-body .klokrs-event-title {
   font-size: 10px;
   font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.klokrs-week .klokrs-week-event-body .klokrs-event-meta {
-  font-size: 9px;
+/* Narrower left accent + tighter, centered padding for the icon-first layout. */
+.klokrs-week .fc-event {
+  padding: 3px 6px;
+  border-left-width: 3px;
 }
-.klokrs-week .klokrs-week-event-body .klokrs-event-dur {
-  font-size: 8px;
-  padding: 0 3px;
+/* Slightly stronger column separators so 7 days don't blur together. */
+.klokrs-week .fc-timegrid-col.fc-day-today {
+  box-shadow: inset 1px 0 0 rgba(167, 139, 250, 0.18), inset -1px 0 0 rgba(167, 139, 250, 0.18);
 }
 /* Remove default FullCalendar header cell styling so our custom content shows cleanly. */
 .klokrs-week .fc-col-header-cell-cushion {

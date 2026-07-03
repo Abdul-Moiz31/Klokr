@@ -159,11 +159,16 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
 
     const ownKey    = keyRow?.encrypted_key ? decryptSecret(keyRow.encrypted_key as string) : null;
-    const provider  = (keyRow?.provider as Provider | undefined) ?? "anthropic";
+    // No BYOK row → default to Gemini so free users ride Klokr's server key.
+    const provider  = (keyRow?.provider as Provider | undefined) ?? "gemini";
     const hasOwnKey = Boolean(ownKey);
 
-    // Fall back to server Anthropic key only when no BYOK is set and provider would be anthropic.
-    const apiKey = ownKey ?? (provider === "anthropic" ? (process.env.ANTHROPIC_API_KEY ?? null) : null);
+    // Fall back to a server-held key only when no BYOK is set.
+    const serverKey =
+      provider === "gemini" ? (process.env.GEMINI_API_KEY ?? null)
+      : provider === "anthropic" ? (process.env.ANTHROPIC_API_KEY ?? null)
+      : null;
+    const apiKey = ownKey ?? serverKey;
     if (!apiKey) {
       return NextResponse.json(
         { error: "No AI key configured. Add your own API key in Settings to use this feature." },
