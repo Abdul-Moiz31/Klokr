@@ -9,7 +9,7 @@ import { getQuotaStatus, incrementUsage } from "@/lib/ai-quota";
 
 const ANTHROPIC_MODEL   = "claude-opus-4-8";
 const OPENAI_MODEL      = "gpt-4o-mini";
-const GEMINI_MODEL      = "gemini-1.5-flash";
+const GEMINI_MODEL      = "gemini-2.0-flash";
 const OPENROUTER_MODEL  = "openai/gpt-4o-mini";
 
 const LOOKBACK_DAYS   = 30;
