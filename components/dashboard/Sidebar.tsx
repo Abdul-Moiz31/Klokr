@@ -215,7 +215,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: Props) {
       id="app-sidebar"
       onMouseEnter={() => { if (collapsed) setHovered(true); }}
       onMouseLeave={() => setHovered(false)}
-      className={`flex w-56 shrink-0 flex-col min-h-0 transition-all duration-200 ease-out max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:z-50 max-lg:h-[100dvh] max-lg:min-h-0 max-lg:w-[min(16rem,100vw-3rem)] max-lg:max-w-sm max-lg:translate-x-0 lg:relative lg:z-auto lg:h-full lg:max-w-none ${
+      className={`flex w-56 shrink-0 flex-col min-h-0 transition-all duration-200 ease-out max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:z-50 max-lg:h-[100dvh] max-lg:min-h-0 max-lg:w-[min(16rem,100vw-3rem)] max-lg:max-w-sm lg:relative lg:z-auto lg:h-full lg:max-w-none ${
         collapsed ? "lg:w-16" : "lg:w-56"
       } ${
         mobileOpen ? "max-lg:translate-x-0" : "max-lg:-translate-x-full"
