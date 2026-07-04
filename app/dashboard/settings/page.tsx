@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState, type ReactNode } from "react";
+import { Suspense, useEffect, useRef, useState, type ReactNode, type ChangeEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuthSession } from "@/lib/useAuthSession";
 import { AnimatePresence, motion } from "framer-motion";
@@ -73,7 +73,7 @@ function PrefRow({ label, hint, children }: { label: string; hint?: string; chil
 
 function Card({ children }: { children: ReactNode }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.03] shadow-lg shadow-black/20">
+    <div className="overflow-hidden rounded-xl border border-white/[0.14] bg-white/[0.03] shadow-lg shadow-black/30 transition-colors hover:border-white/[0.20]">
       <div className="px-4 py-1 sm:px-5">{children}</div>
     </div>
   );
@@ -86,8 +86,8 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
       role="switch"
       aria-checked={checked}
       onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border transition-colors duration-200 focus:outline-none ${
-        checked ? "border-violet-500/50 bg-violet-600" : "border-white/15 bg-white/10"
+      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0A0A0F] ${
+        checked ? "border-violet-500/50 bg-violet-600" : "border-white/15 bg-white/10 hover:bg-white/[0.14]"
       }`}
     >
       <span
@@ -117,7 +117,7 @@ function ChipSelect<T extends number | string>({
           key={String(o)}
           type="button"
           onClick={() => onChange(o)}
-          className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
+          className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0A0A0F] ${
             value === o
               ? "bg-violet-600/80 text-white border border-violet-500/40"
               : "bg-white/5 text-white/50 border border-white/10 hover:bg-white/10 hover:text-white/80"
@@ -131,6 +131,19 @@ function ChipSelect<T extends number | string>({
 }
 
 /* ─── Export ─────────────────────────────────────────────── */
+
+function getTzOffsetLabel(timeZone: string): string {
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      timeZoneName: "shortOffset",
+    }).formatToParts(new Date());
+    const offset = parts.find((p) => p.type === "timeZoneName")?.value ?? "";
+    return offset.replace("GMT", "UTC") || "UTC+00:00";
+  } catch {
+    return "";
+  }
+}
 
 function formatDuration(seconds: number): string {
   if (seconds < 60) return `${seconds}s`;
@@ -612,6 +625,8 @@ function SettingsPageInner() {
 
   const [displayName, setDisplayName] = useState("");
   const [nameSaving, setNameSaving] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [saving, setSaving] = useState(false);
@@ -679,6 +694,84 @@ function SettingsPageInner() {
     if (error) { toast.error(error.message); return; }
     setUser((u) => u ? { ...u, user_metadata: { ...u.user_metadata, full_name: trimmed } } : u);
     toast.success("Name updated.");
+  };
+
+  const MAX_AVATAR_BYTES = 3 * 1024 * 1024;
+  const ALLOWED_AVATAR_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+
+  const handleAvatarSelect = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the same file later
+    if (!file || !user) return;
+
+    if (!ALLOWED_AVATAR_TYPES.includes(file.type)) {
+      toast.error("Please choose a PNG, JPEG, WebP, or GIF image.");
+      return;
+    }
+    if (file.size > MAX_AVATAR_BYTES) {
+      toast.error("Image must be smaller than 3MB.");
+      return;
+    }
+
+    setAvatarUploading(true);
+    try {
+      const supabase = createClient();
+      const ext = file.name.split(".").pop()?.toLowerCase() || "png";
+      const path = `${user.id}/avatar-${Date.now()}.${ext}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(path, file, { contentType: file.type, upsert: true });
+      if (uploadError) throw uploadError;
+
+      const { data: publicUrlData } = supabase.storage.from("avatars").getPublicUrl(path);
+      const avatarUrl = publicUrlData.publicUrl;
+
+      const { error: updateError } = await supabase.auth.updateUser({ data: { avatar_url: avatarUrl } });
+      if (updateError) throw updateError;
+
+      // Best-effort cleanup of the previous avatar file so storage doesn't accumulate.
+      const prevUrl = user.user_metadata?.avatar_url as string | undefined;
+      if (prevUrl) {
+        const marker = "/avatars/";
+        const idx = prevUrl.indexOf(marker);
+        if (idx !== -1) {
+          const prevPath = prevUrl.slice(idx + marker.length);
+          if (prevPath && prevPath !== path) {
+            void supabase.storage.from("avatars").remove([prevPath]);
+          }
+        }
+      }
+
+      setUser((u) => u ? { ...u, user_metadata: { ...u.user_metadata, avatar_url: avatarUrl } } : u);
+      toast.success("Profile photo updated.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to upload photo.");
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
+  const handleAvatarRemove = async () => {
+    if (!user) return;
+    setAvatarUploading(true);
+    try {
+      const supabase = createClient();
+      const prevUrl = user.user_metadata?.avatar_url as string | undefined;
+      const { error } = await supabase.auth.updateUser({ data: { avatar_url: null } });
+      if (error) throw error;
+      if (prevUrl) {
+        const marker = "/avatars/";
+        const idx = prevUrl.indexOf(marker);
+        if (idx !== -1) void supabase.storage.from("avatars").remove([prevUrl.slice(idx + marker.length)]);
+      }
+      setUser((u) => u ? { ...u, user_metadata: { ...u.user_metadata, avatar_url: null } } : u);
+      toast.success("Profile photo removed.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to remove photo.");
+    } finally {
+      setAvatarUploading(false);
+    }
   };
 
   const updatePrefs = (patch: Partial<KlokrsPrefs>) => {
@@ -961,9 +1054,67 @@ function SettingsPageInner() {
           {activeTab === "general" && (
             <>
               <div>
-                <SectionTitle tooltip="Your display name shown in the dashboard greeting.">Profile</SectionTitle>
+                <SectionTitle tooltip="Your display name and photo shown in the dashboard greeting.">Profile</SectionTitle>
                 <Card>
-                  <form onSubmit={handleSaveName} className="py-3 space-y-4 max-w-sm">
+                  <div className="flex items-center gap-4 py-4">
+                    <div className="relative shrink-0">
+                      {user?.user_metadata?.avatar_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={user.user_metadata.avatar_url as string}
+                          alt="Your profile photo"
+                          className="h-16 w-16 rounded-full border border-white/[0.14] object-cover"
+                        />
+                      ) : (
+                        <div
+                          className="flex h-16 w-16 items-center justify-center rounded-full border border-white/[0.14] bg-gradient-to-br from-violet-500 to-cyan-600 text-lg font-semibold text-white"
+                          aria-hidden
+                        >
+                          {(displayName || user?.email || "?").trim().slice(0, 2).toUpperCase()}
+                        </div>
+                      )}
+                      {avatarUploading && (
+                        <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50">
+                          <div
+                            className="h-5 w-5 animate-spin rounded-full border-2 border-white/25 border-t-white"
+                            role="status"
+                            aria-label="Uploading photo"
+                          />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => avatarInputRef.current?.click()}
+                          disabled={avatarUploading}
+                          className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white/70 transition-colors hover:border-white/20 hover:bg-white/10 hover:text-white/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0A0A0F] disabled:opacity-40"
+                        >
+                          {user?.user_metadata?.avatar_url ? "Change photo" : "Upload photo"}
+                        </button>
+                        {user?.user_metadata?.avatar_url && (
+                          <button
+                            type="button"
+                            onClick={() => void handleAvatarRemove()}
+                            disabled={avatarUploading}
+                            className="rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-300 transition-colors hover:bg-red-500/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0A0A0F] disabled:opacity-40"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-xs text-white/35">PNG, JPEG, WebP, or GIF. Max 3MB.</p>
+                      <input
+                        ref={avatarInputRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp,image/gif"
+                        onChange={(e) => void handleAvatarSelect(e)}
+                        className="hidden"
+                      />
+                    </div>
+                  </div>
+                  <form onSubmit={handleSaveName} className="py-3 space-y-4 max-w-sm border-t border-white/[0.05]">
                     <div className="space-y-1.5">
                       <label className="block text-xs font-medium text-white/50">Full name</label>
                       <input
@@ -1005,7 +1156,11 @@ function SettingsPageInner() {
                 <Card>
                   <PrefRow
                     label="Time zone"
-                    hint={prefs.timezone ? `Saved: ${prefs.timezone}` : `Auto-detected: ${resolveTimezone(prefs)}`}
+                    hint={
+                      prefs.timezone
+                        ? `Saved: ${prefs.timezone} (${getTzOffsetLabel(prefs.timezone)})`
+                        : `Auto-detected: ${resolveTimezone(prefs)} (${getTzOffsetLabel(resolveTimezone(prefs))})`
+                    }
                   >
                     <select
                       value={prefs.timezone ?? ""}
@@ -1013,9 +1168,11 @@ function SettingsPageInner() {
                         const v = e.target.value;
                         updatePrefs({ timezone: v === "" ? null : v });
                       }}
-                      className="w-full max-w-full rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-white/80 focus:outline-none focus:border-violet-500/50 [color-scheme:dark] sm:max-w-[16rem]"
+                      className="w-full max-w-full rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-white/80 transition-colors hover:border-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0A0A0F] focus:border-violet-500/50 [color-scheme:dark] sm:max-w-[16rem]"
                     >
-                      <option value="">Auto-detect from browser</option>
+                      <option value="">
+                        Auto-detect ({resolveTimezone(prefs)}, {getTzOffsetLabel(resolveTimezone(prefs))})
+                      </option>
                       {(() => {
                         let zones: string[] = [];
                         try {
@@ -1025,7 +1182,11 @@ function SettingsPageInner() {
                         if (zones.length === 0) {
                           zones = ["UTC", "America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles", "Europe/London", "Europe/Berlin", "Asia/Karachi", "Asia/Kolkata", "Asia/Tokyo", "Australia/Sydney"];
                         }
-                        return zones.map((z) => <option key={z} value={z}>{z}</option>);
+                        return zones.map((z) => (
+                          <option key={z} value={z}>
+                            {z} ({getTzOffsetLabel(z)})
+                          </option>
+                        ));
                       })()}
                     </select>
                   </PrefRow>

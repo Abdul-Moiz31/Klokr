@@ -162,7 +162,8 @@ export function AiSettingsTab() {
   }
 
   const { quota, hasOwnKey } = status;
-  const pct = quota.limit > 0 ? Math.min(100, Math.round((quota.used / quota.limit) * 100)) : 0;
+  const rawPct = quota.limit > 0 ? (quota.used / quota.limit) * 100 : 0;
+  const pct = quota.used > 0 ? Math.min(100, Math.max(2, Math.round(rawPct))) : 0;
   const activeProvider = PROVIDERS.find((p) => p.value === status.provider);
 
   return (
@@ -196,7 +197,7 @@ export function AiSettingsTab() {
                 <span>Klokrs AI quota this month ({quota.plan} plan)</span>
                 <span className="tabular-nums font-medium text-white/60">{quota.used} / {quota.limit}</span>
               </div>
-              <div className="h-2 w-full overflow-hidden rounded-full bg-white/[0.06]">
+              <div className="h-2 w-full overflow-hidden rounded-full bg-white/[0.03] ring-1 ring-inset ring-white/[0.06]">
                 <div
                   className={`h-full rounded-full transition-all ${quota.remaining === 0 ? "bg-amber-400/70" : "bg-violet-400/70"}`}
                   style={{ width: `${pct}%` }}

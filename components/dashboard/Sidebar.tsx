@@ -351,12 +351,22 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: Props) {
             title={!expanded ? (user?.email ?? "Account") : undefined}
             className={`flex w-full min-w-0 items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-sm transition-colors hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/50 ${!expanded ? "lg:justify-center" : ""}`}
           >
-            <span
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-cyan-600 text-xs font-semibold text-white shadow-lg shadow-violet-900/30"
-              aria-hidden
-            >
-              {initialsFromUser(user)}
-            </span>
+            {user?.user_metadata?.avatar_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={user.user_metadata.avatar_url as string}
+                alt=""
+                aria-hidden
+                className="h-8 w-8 shrink-0 rounded-full object-cover shadow-lg shadow-violet-900/30"
+              />
+            ) : (
+              <span
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-cyan-600 text-xs font-semibold text-white shadow-lg shadow-violet-900/30"
+                aria-hidden
+              >
+                {initialsFromUser(user)}
+              </span>
+            )}
             <span className={`min-w-0 flex-1 ${!expanded ? "lg:hidden" : ""}`}>
               <span className="block truncate text-xs text-white/90">Account</span>
               <span className="block truncate text-[11px] text-white/40">
