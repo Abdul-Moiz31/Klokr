@@ -11,11 +11,12 @@ const ANTHROPIC_MODEL   = "claude-opus-4-8";
 const OPENAI_MODEL      = "gpt-4o-mini";
 const GEMINI_MODEL      = "gemini-2.0-flash";
 const OPENROUTER_MODEL  = "openai/gpt-4o-mini";
+const GROQ_MODEL        = "llama-3.3-70b-versatile";
 
 const LOOKBACK_DAYS   = 30;
 const MAX_QUESTION_LEN = 500;
 
-type Provider = "anthropic" | "openai" | "gemini" | "openrouter";
+type Provider = "anthropic" | "openai" | "gemini" | "openrouter" | "groq";
 type Row = { domain: string; duration_seconds: number; date: string; visits: number | null };
 
 function fmtDuration(seconds: number): string {
@@ -121,6 +122,19 @@ async function askOpenRouter(apiKey: string, summary: string, question: string):
   return response.choices[0]?.message?.content?.trim() ?? "";
 }
 
+async function askGroq(apiKey: string, summary: string, question: string): Promise<string> {
+  const client   = new OpenAI({ apiKey, baseURL: "https://api.groq.com/openai/v1" });
+  const response = await client.chat.completions.create({
+    model: GROQ_MODEL,
+    max_tokens: 1024,
+    messages: [
+      { role: "system", content: `${SYSTEM_INSTRUCTIONS}\n\nUser's tracked data:\n\n${summary}` },
+      { role: "user",   content: question },
+    ],
+  });
+  return response.choices[0]?.message?.content?.trim() ?? "";
+}
+
 async function askGemini(apiKey: string, summary: string, question: string): Promise<string> {
   const genAI  = new GoogleGenerativeAI(apiKey);
   const model  = genAI.getGenerativeModel({ model: GEMINI_MODEL });
@@ -159,13 +173,15 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
 
     const ownKey    = keyRow?.encrypted_key ? decryptSecret(keyRow.encrypted_key as string) : null;
-    // No BYOK row → default to Gemini so free users ride Klokr's server key.
-    const provider  = (keyRow?.provider as Provider | undefined) ?? "gemini";
+    // No BYOK row → default to Groq so free users ride Klokr's server key
+    // (free tier, no region/billing gating, unlike Gemini's free tier).
+    const provider  = (keyRow?.provider as Provider | undefined) ?? "groq";
     const hasOwnKey = Boolean(ownKey);
 
     // Fall back to a server-held key only when no BYOK is set.
     const serverKey =
-      provider === "gemini" ? (process.env.GEMINI_API_KEY ?? null)
+      provider === "groq" ? (process.env.GROQ_API_KEY ?? null)
+      : provider === "gemini" ? (process.env.GEMINI_API_KEY ?? null)
       : provider === "anthropic" ? (process.env.ANTHROPIC_API_KEY ?? null)
       : null;
     const apiKey = ownKey ?? serverKey;
@@ -208,6 +224,8 @@ export async function POST(request: NextRequest) {
       answer = await askOpenRouter(apiKey, summary, question);
     } else if (provider === "gemini") {
       answer = await askGemini(apiKey, summary, question);
+    } else if (provider === "groq") {
+      answer = await askGroq(apiKey, summary, question);
     } else {
       answer = await askAnthropic(apiKey, summary, question);
     }
