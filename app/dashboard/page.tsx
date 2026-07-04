@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase";
 import { useAuthSession } from "@/lib/useAuthSession";
-import { loadPrefs, resolveTimezone } from "@/lib/prefs";
+import { loadPrefs, resolveTimezone, getDayPhase } from "@/lib/prefs";
 import { AppShell } from "@/components/dashboard/AppShell";
 import { PageHeader } from "@/components/dashboard/PageHeader";
 import { DomainChart } from "@/components/dashboard/DomainChart";
@@ -320,7 +320,11 @@ export default function DashboardPage() {
             </section>
 
             {sessions.length === 0 ? (
-              hasEverTracked ? <NoActivityToday /> : hasEverTracked === false ? <ActivationChecklist /> : null
+              hasEverTracked ? (
+                <NoActivityToday dayPhase={getDayPhase(loadPrefs())} workStartHour={loadPrefs().workStartHour} />
+              ) : hasEverTracked === false ? (
+                <ActivationChecklist />
+              ) : null
             ) : (
               <section>
                 <h2 className="mb-2 text-xs font-semibold uppercase tracking-widest text-white/35">Activity</h2>

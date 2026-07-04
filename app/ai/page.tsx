@@ -28,6 +28,10 @@ const SUGGESTIONS = [
   "How much time on social media vs deep work?",
   "Which hour of the day am I most active?",
   "Compare this week to last week.",
+  "What are my top 5 time sinks?",
+  "How many active days did I track this month?",
+  "Am I spending more or less time online than usual?",
+  "What site do I visit most on weekends?",
 ];
 
 /* ─── Helpers ─────────────────────────────────── */
@@ -53,7 +57,7 @@ function timeAgo(ts: number): string {
 }
 
 function providerLabel(p: string): string {
-  const map: Record<string, string> = { openai: "GPT", gemini: "Gemini", openrouter: "OpenRouter", anthropic: "Claude" };
+  const map: Record<string, string> = { openai: "GPT", gemini: "Gemini", openrouter: "OpenRouter", anthropic: "Claude", groq: "Groq" };
   return map[p] ?? "AI";
 }
 
@@ -63,6 +67,7 @@ function providerColor(p: string): string {
     gemini: "bg-blue-500/15 text-blue-300 border-blue-500/25",
     openrouter: "bg-amber-500/15 text-amber-300 border-amber-500/25",
     anthropic: "bg-violet-500/15 text-violet-300 border-violet-500/25",
+    groq: "bg-rose-500/15 text-rose-300 border-rose-500/25",
   };
   return map[p] ?? "bg-white/10 text-white/50 border-white/15";
 }
@@ -198,7 +203,9 @@ export default function AiInsightsPage() {
 
               {/* Suggestion chips — only before first answer */}
               {!answer && !error && !loading && (
-                <div className="mt-4 flex flex-wrap gap-2">
+                <div className="mt-4">
+                  <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-white/25">Try asking</p>
+                  <div className="flex flex-wrap gap-2">
                   {SUGGESTIONS.map((s) => (
                     <button
                       key={s}
@@ -209,6 +216,7 @@ export default function AiInsightsPage() {
                       {s}
                     </button>
                   ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -249,13 +257,29 @@ export default function AiInsightsPage() {
                         {providerLabel(provider)[0]}
                       </span>
                       <div className="min-w-0 flex-1">
-                        <div className="mb-1.5 flex items-center gap-2">
-                          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium ${providerColor(provider)}`}>
-                            {providerLabel(provider)}
-                          </span>
-                          <span className="text-[10px] text-white/25">just now</span>
+                        <div className="mb-1.5 flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium ${providerColor(provider)}`}>
+                              {providerLabel(provider)}
+                            </span>
+                            <span className="text-[10px] text-white/25">just now</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => { void navigator.clipboard.writeText(answer ?? ""); }}
+                            title="Copy answer"
+                            className="shrink-0 rounded-md p-1 text-white/25 transition hover:bg-white/5 hover:text-white/60"
+                          >
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+                            </svg>
+                          </button>
                         </div>
-                        <p className="text-sm leading-relaxed text-white/80">{answer}</p>
+                        <div className="space-y-2 text-sm leading-relaxed text-white/80">
+                          {(answer ?? "").split("\n").filter(Boolean).map((line, i) => (
+                            <p key={i}>{line}</p>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   )}

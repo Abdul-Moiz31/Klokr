@@ -98,3 +98,23 @@ export function savePrefs(p: KlokrsPrefs): void {
   try { localStorage.setItem(PREFS_KEY, JSON.stringify(p)); }
   catch { /* ignore */ }
 }
+
+export type DayPhase = "pending" | "active" | "complete";
+
+/**
+ * Mirrors the extension's getDayPhase() in background.js — kept in sync
+ * manually since the two run in different JS contexts. Distinguishes
+ * "hasn't started yet today" from "already finished today" so dashboard
+ * empty states don't claim tracking is live when it isn't.
+ */
+export function getDayPhase(prefs: Pick<KlokrsPrefs, "workStartHour" | "workEndHour">, date: Date = new Date()): DayPhase {
+  const { workStartHour, workEndHour } = prefs;
+  if (workStartHour === workEndHour) return "active"; // 24h tracking — no window
+  const hour = date.getHours();
+  if (workStartHour < workEndHour) {
+    if (hour < workStartHour) return "pending";
+    if (hour >= workEndHour) return "complete";
+    return "active";
+  }
+  return hour >= workStartHour || hour < workEndHour ? "active" : "complete";
+}
