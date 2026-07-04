@@ -6,9 +6,12 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Privacy Policy — Klokrs",
   description: "Privacy policy for Klokrs, the tab time tracking app.",
+  alternates: {
+    canonical: "/privacy",
+  },
 };
 
-const LAST_UPDATED = "April 27, 2026";
+const LAST_UPDATED = "July 4, 2026";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -92,6 +95,17 @@ export default function PrivacyPage() {
               </p>
             </div>
             <div className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-4">
+              <p className="mb-1.5 font-semibold text-white/75">AI Ask queries (optional)</p>
+              <p>
+                If you enable Ask AI, the questions you ask and the data
+                needed to answer them are sent to the AI provider you connect
+                (OpenAI, Google Gemini, Anthropic, or OpenRouter) using your
+                own API key. We store your question history so you can revisit
+                it, but this feature is entirely opt-in — nothing is sent to
+                an AI provider unless you connect a key and use Ask AI.
+              </p>
+            </div>
+            <div className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-4">
               <p className="mb-1.5 font-semibold text-white/75">Usage and technical data</p>
               <p>
                 Standard web server logs including IP addresses, browser type,
@@ -159,6 +173,22 @@ export default function PrivacyPage() {
               <span className="text-white/75">Infrastructure providers:</span>{" "}
               Supabase (database and auth), Vercel (web hosting). These
               providers process data only as necessary to operate the service.
+            </li>
+            <li>
+              <span className="text-white/75">AI providers (only if you use Ask AI):</span>{" "}
+              If you connect your own API key and use Ask AI, your questions
+              and related data are sent directly to the provider you chose
+              (OpenAI, Google Gemini, Anthropic, or OpenRouter) under your own
+              account with that provider. We do not control how that provider
+              handles data once it's sent — refer to their privacy policy for
+              details. This only happens if you opt in.
+            </li>
+            <li>
+              <span className="text-white/75">Payment processor (once paid plans launch):</span>{" "}
+              When paid plans become available, payment details are handled
+              directly by Stripe. We never see or store your full card
+              details — only what Stripe shares back for billing purposes,
+              such as subscription status.
             </li>
             <li>
               <span className="text-white/75">Legal requirements:</span> If
