@@ -1,8 +1,8 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { motion, useInView, type Variants } from "framer-motion";
+import { AnimatePresence, motion, useInView, type Variants } from "framer-motion";
 import { useAuthCta } from "@/lib/useAuthCta";
 import { buttonClasses, ButtonArrowIcon } from "@/components/ui/Button";
 
@@ -21,30 +21,270 @@ const cardVariants: Variants = {
   },
 };
 
-function SalesChartVisual() {
-  const bars = [45, 72, 58, 90];
-  const years = ["2017", "2018", "2019", "2020"];
+const TRACKED_DOMAINS = [
+  { name: "github.com", target: 82 },
+  { name: "figma.com", target: 58 },
+  { name: "notion.so", target: 40 },
+];
+
+const DASHBOARD_HOURS = ["9a", "10a", "11a", "12p", "1p", "2p", "3p"];
+
+type VisualPhase =
+  | "idle"
+  | "opening"
+  | "tracking"
+  | "clicking"
+  | "loading"
+  | "chart"
+  | "closing";
+
+type Pos = { top: number; left: number };
+
+const IDLE_POS: Pos = { top: 190, left: 210 };
+
+function LiveTrackingVisual() {
+  const [phase, setPhase] = useState<VisualPhase>("idle");
+  const [seconds, setSeconds] = useState(0);
+  const [bars, setBars] = useState([45, 70, 55, 85, 60, 78, 66]);
+  const [iconPos, setIconPos] = useState<Pos>({ top: 10, left: 420 });
+  const [buttonPos, setButtonPos] = useState<Pos>({ top: 190, left: 320 });
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const iconRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  const measure = (
+    ref: React.RefObject<HTMLElement | null>,
+    setPos: (p: Pos) => void
+  ) => {
+    if (!containerRef.current || !ref.current) return;
+    const c = containerRef.current.getBoundingClientRect();
+    const r = ref.current.getBoundingClientRect();
+    setPos({ top: r.top - c.top + r.height / 2, left: r.left - c.left + r.width / 2 });
+  };
+
+  useEffect(() => {
+    measure(iconRef, setIconPos);
+    const onResize = () => measure(iconRef, setIconPos);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  useEffect(() => {
+    if (phase !== "tracking") return;
+    const r = requestAnimationFrame(() => measure(buttonRef, setButtonPos));
+    return () => cancelAnimationFrame(r);
+  }, [phase]);
+
+  useEffect(() => {
+    const timers: number[] = [];
+    const run = () => {
+      setPhase("opening");
+      timers.push(window.setTimeout(() => setPhase("tracking"), 500));
+      timers.push(window.setTimeout(() => setPhase("clicking"), 2600));
+      timers.push(window.setTimeout(() => setPhase("loading"), 3150));
+      timers.push(window.setTimeout(() => setPhase("chart"), 3850));
+      timers.push(window.setTimeout(() => setPhase("closing"), 6100));
+      timers.push(
+        window.setTimeout(() => {
+          setSeconds(0);
+          run();
+        }, 6600)
+      );
+    };
+    run();
+    return () => timers.forEach((t) => window.clearTimeout(t));
+  }, []);
+
+  useEffect(() => {
+    if (phase !== "tracking" && phase !== "clicking") return;
+    const t = window.setInterval(() => setSeconds((s) => s + 1), 1000);
+    return () => window.clearInterval(t);
+  }, [phase]);
+
+  useEffect(() => {
+    if (phase !== "chart") return;
+    const t = window.setInterval(() => {
+      setBars((b) => b.map((v) => Math.min(95, Math.max(30, v + (Math.random() * 30 - 15)))));
+    }, 700);
+    return () => window.clearInterval(t);
+  }, [phase]);
+
+  const showPopup = phase === "opening" || phase === "tracking" || phase === "clicking";
+  const showTracking = phase === "tracking" || phase === "clicking";
+  const showLoading = phase === "loading";
+  const showChart = phase === "chart";
+  const showHint = phase === "idle" || phase === "opening" || phase === "closing";
+
+  const cursorTarget: Pos =
+    phase === "idle" || phase === "closing"
+      ? IDLE_POS
+      : phase === "clicking" || phase === "loading" || phase === "chart"
+        ? buttonPos
+        : iconPos;
 
   return (
-    <div className="rounded-xl border border-white/10 bg-[#0A0A12] p-5">
-      <div className="text-white/40 text-xs mb-1">Statistics</div>
-      <div className="text-white font-semibold text-sm mb-5">Active hours today</div>
-      <div className="flex items-end gap-3">
-        {bars.map((h, i) => (
-          <div key={years[i]} className="flex-1 flex flex-col items-center gap-2">
-            <div className="w-full relative flex items-end h-28">
-              <div
-                className="w-full rounded-t-lg bg-gradient-to-t from-violet-600/20 via-violet-500/60 to-violet-400"
-                style={{ height: `${h}%` }}
-              />
-              <div
-                className="absolute w-2.5 h-2.5 rounded-full border-2 border-white bg-violet-500"
-                style={{ bottom: `calc(${h}% - 5px)`, left: "50%", transform: "translateX(-50%)" }}
-              />
+    <div
+      ref={containerRef}
+      className="relative min-h-[260px] overflow-hidden rounded-xl border border-white/10 bg-[#0A0A12] p-5"
+    >
+      {/* fake browser chrome */}
+      <div className="mb-6 flex items-center gap-2">
+        <span className="h-2.5 w-2.5 rounded-full bg-red-500/50" />
+        <span className="h-2.5 w-2.5 rounded-full bg-yellow-500/50" />
+        <span className="h-2.5 w-2.5 rounded-full bg-green-500/50" />
+        <div className="mx-2 h-5 flex-1 rounded-md bg-white/5 px-2 flex items-center text-[10px] text-white/30">
+          github.com
+        </div>
+        <div ref={iconRef} className="relative">
+          <motion.div
+            className="flex h-5 w-5 items-center justify-center rounded-md bg-violet-500"
+            animate={showPopup ? { scale: [1, 1.25, 1] } : { scale: 1 }}
+            transition={{ duration: 0.4 }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+              <circle cx="12" cy="12" r="8" />
+            </svg>
+          </motion.div>
+          {phase === "opening" && (
+            <motion.span
+              className="pointer-events-none absolute inset-0 rounded-md border-2 border-violet-400"
+              initial={{ opacity: 0.6, scale: 1 }}
+              animate={{ opacity: 0, scale: 1.8 }}
+              transition={{ duration: 0.6 }}
+            />
+          )}
+        </div>
+      </div>
+
+      {/* animated cursor */}
+      <motion.div
+        className="pointer-events-none absolute z-30 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-[0_0_8px_2px_rgba(255,255,255,0.45)]"
+        animate={{ top: cursorTarget.top, left: cursorTarget.left }}
+        transition={{ duration: 0.5, ease: "easeInOut" }}
+      />
+      {phase === "clicking" && (
+        <motion.span
+          className="pointer-events-none absolute z-20 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/70"
+          style={{ top: buttonPos.top, left: buttonPos.left }}
+          initial={{ opacity: 0.7, scale: 0.6 }}
+          animate={{ opacity: 0, scale: 2 }}
+          transition={{ duration: 0.5, delay: 0.15 }}
+        />
+      )}
+
+      <AnimatePresence>
+        {showPopup && (
+          <motion.div
+            initial={{ opacity: 0, y: -8, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.95 }}
+            transition={{ duration: 0.25 }}
+            className="absolute right-4 top-14 z-10 w-52 rounded-lg border border-white/10 bg-[#101018] p-3 shadow-xl"
+          >
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-[10px] text-white/40">Now tracking</span>
+              <span className="font-mono text-[10px] text-cyan-400">
+                {String(Math.floor(seconds / 60)).padStart(2, "0")}:{String(seconds % 60).padStart(2, "0")}
+              </span>
             </div>
-            <span className="text-white/30 text-[10px]">{years[i]}</span>
-          </div>
-        ))}
+            <div className="space-y-2">
+              {TRACKED_DOMAINS.map((d, i) => (
+                <div key={d.name}>
+                  <div className="mb-0.5 text-[10px] text-white/50">{d.name}</div>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-white/5">
+                    <motion.div
+                      className="h-full rounded-full bg-gradient-to-r from-violet-500 to-cyan-400"
+                      initial={{ width: "0%" }}
+                      animate={{ width: showTracking ? `${d.target}%` : "0%" }}
+                      transition={{ duration: 1.2, delay: i * 0.15, ease: "easeOut" }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <motion.button
+              ref={buttonRef}
+              type="button"
+              className="mt-3 flex w-full items-center justify-center gap-1 rounded-md border border-white/10 bg-white/5 py-1.5 text-[10px] font-medium text-white/70"
+              animate={
+                phase === "clicking"
+                  ? {
+                      scale: [1, 0.92, 1],
+                      backgroundColor: [
+                        "rgba(255,255,255,0.05)",
+                        "rgba(139,92,246,0.35)",
+                        "rgba(255,255,255,0.05)",
+                      ],
+                    }
+                  : {}
+              }
+              transition={{ duration: 0.5 }}
+            >
+              Dashboard
+            </motion.button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* main empty area: hint -> loader -> live chart */}
+      <div className="flex h-40 flex-col items-center justify-center text-center">
+        <AnimatePresence mode="wait">
+          {showHint && (
+            <motion.span
+              key="hint"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="text-white/25 text-xs"
+            >
+              Click the extension icon to see tracking live
+            </motion.span>
+          )}
+          {showLoading && (
+            <motion.div
+              key="loading"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex flex-col items-center gap-3"
+            >
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/10 border-t-violet-400 border-r-cyan-400" />
+              <span className="text-white/35 text-xs">Loading dashboard…</span>
+            </motion.div>
+          )}
+          {showChart && (
+            <motion.div
+              key="chart"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="w-full"
+            >
+              <div className="mb-4 flex items-center justify-between">
+                <span className="text-white/40 text-xs">Active hours today</span>
+                <span className="flex items-center gap-1 text-[10px] text-cyan-400">
+                  <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                  Live
+                </span>
+              </div>
+              <div className="flex h-28 gap-2">
+                {DASHBOARD_HOURS.map((h, i) => (
+                  <div key={h} className="flex h-full flex-1 flex-col items-center gap-1.5">
+                    <div className="relative flex h-full w-full items-end">
+                      <motion.div
+                        className="w-full rounded-t-sm bg-gradient-to-t from-violet-600/30 via-violet-500/70 to-cyan-400"
+                        animate={{ height: `${bars[i]}%` }}
+                        transition={{ duration: 0.6, ease: "easeInOut" }}
+                      />
+                    </div>
+                    <span className="text-[9px] text-white/25">{h}</span>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );
@@ -257,7 +497,7 @@ export function Features() {
               </Link>
             </div>
             <div className="px-4 pb-4 md:px-8 md:pb-8">
-              <SalesChartVisual />
+              <LiveTrackingVisual />
             </div>
           </motion.div>
 

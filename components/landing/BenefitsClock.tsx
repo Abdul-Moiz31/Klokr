@@ -28,6 +28,14 @@ const BENEFITS: { title: string; blurb: string }[] = [
     title: "Focus tied to your plan",
     blurb: "Optional daily planner and domain tags help match tab time to what you intended.",
   },
+  {
+    title: "Ask AI about your time",
+    blurb: "Ask questions about your own tracked time and get straight answers—bring your own key.",
+  },
+  {
+    title: "Streaks, XP, and badges",
+    blurb: "A forgiving streak system and accountability score turn consistent tracking into progress you can see.",
+  },
 ];
 
 export function BenefitsClock() {
@@ -35,7 +43,7 @@ export function BenefitsClock() {
   const [active, setActive] = useState(0);
   const sectionRef = useRef(null);
   const inView = useInView(sectionRef, { amount: 0.3 });
-  const needleDeg = -90 + (active * 360) / BENEFITS.length;
+  const needleDeg = (active * 360) / BENEFITS.length;
 
   useEffect(() => {
     if (!inView) return;
