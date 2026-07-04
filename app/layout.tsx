@@ -11,6 +11,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://klokrs.com"),
   title: "Klokrs — Tab Time Tracker for Engineers",
   description:
     "A silent tab tracker built for engineers who want honest data about their day. Install the extension, work normally, see everything.",
@@ -21,6 +22,32 @@ export const metadata: Metadata = {
     "software engineers",
     "chrome extension",
   ],
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    title: "Klokrs — Tab Time Tracker for Engineers",
+    description:
+      "A silent tab tracker built for engineers who want honest data about their day. Install the extension, work normally, see everything.",
+    url: "/",
+    siteName: "Klokrs",
+    images: [
+      {
+        url: "/dashboard-preview.png",
+        width: 3012,
+        height: 1716,
+        alt: "Klokrs dashboard preview",
+      },
+    ],
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Klokrs — Tab Time Tracker for Engineers",
+    description:
+      "A silent tab tracker built for engineers who want honest data about their day. Install the extension, work normally, see everything.",
+    images: ["/dashboard-preview.png"],
+  },
 };
 
 export default function RootLayout({
