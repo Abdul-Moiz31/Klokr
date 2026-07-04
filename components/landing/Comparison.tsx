@@ -205,6 +205,21 @@ export function Comparison() {
         >
           Competitor details based on their publicly listed plans as of 2026. Klokrs is free while in beta — early users keep their plan.
         </motion.p>
+
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={inView ? { opacity: 1 } : {}}
+          transition={{ delay: 0.75, duration: 0.5 }}
+          className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-white/35"
+        >
+          <a href="/vs/rescuetime" className="underline-offset-2 hover:text-violet-300 hover:underline">
+            Full comparison: Klokrs vs RescueTime
+          </a>
+          <span aria-hidden>·</span>
+          <a href="/vs/toggl" className="underline-offset-2 hover:text-violet-300 hover:underline">
+            Full comparison: Klokrs vs Toggl
+          </a>
+        </motion.div>
       </div>
     </section>
   );
