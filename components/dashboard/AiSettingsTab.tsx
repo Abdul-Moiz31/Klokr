@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@/lib/supabase";
 import { toast } from "sonner";
 
-type Provider = "anthropic" | "openai" | "gemini" | "openrouter";
+type Provider = "anthropic" | "openai" | "gemini" | "openrouter" | "groq";
 
 type Quota = {
   plan: "free" | "standard" | "pro";
@@ -60,6 +60,14 @@ const PROVIDERS: {
     description: "Access 100+ models — pay per use, one key",
     url: "https://openrouter.ai/settings/keys",
     color: "from-amber-500/15 to-orange-500/10 border-amber-500/25",
+  },
+  {
+    value: "groq",
+    label: "Groq",
+    placeholder: "gsk_...",
+    description: "Llama 3.3 70B — extremely fast, generous free tier",
+    url: "https://console.groq.com/keys",
+    color: "from-rose-500/15 to-red-500/10 border-rose-500/25",
   },
 ];
 

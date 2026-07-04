@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
   try { body = (await req.json()) as { provider?: string; key?: string }; }
   catch { return NextResponse.json({ error: "Invalid body" }, { status: 400 }); }
 
-  const SUPPORTED_PROVIDERS = ["anthropic", "openai", "gemini", "openrouter"] as const;
+  const SUPPORTED_PROVIDERS = ["anthropic", "openai", "gemini", "openrouter", "groq"] as const;
   type Provider = typeof SUPPORTED_PROVIDERS[number];
   const provider = (body.provider ?? "anthropic") as Provider;
   const key = (body.key ?? "").trim();
