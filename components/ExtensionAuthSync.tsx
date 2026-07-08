@@ -38,18 +38,30 @@ export function ExtensionAuthSync() {
   useEffect(() => {
     const supabase = createClient();
     let recovering = false;
+    let extensionResponded = false;
 
-    // Push current session immediately on mount.
-    void supabase.auth.getSession().then(({ data: { session } }: { data: { session: Session | null } }) => {
-      if (session?.access_token && session.user?.id) {
-        sendToExtension({
-          type: "SET_AUTH",
-          token: session.access_token,
-          refreshToken: session.refresh_token ?? "",
-          userId: session.user.id,
-        });
-      }
-    });
+    // getSession() self-refreshes if the locally stored session is already
+    // past its expiry margin (it does this even with autoRefreshToken: false
+    // — see GoTrueClient's __loadSession). If this tab was asleep long enough
+    // for that to be true, refreshing here with our own (possibly
+    // already-rotated-out) refresh token would race the extension's copy.
+    // Give the extension's on-load broadcast (below) a brief head start to
+    // land first — content.js sends it synchronously on script injection, so
+    // in practice it beats this timer — before falling back to our own
+    // stored session.
+    const initTimer = setTimeout(() => {
+      if (extensionResponded) return;
+      void supabase.auth.getSession().then(({ data: { session } }: { data: { session: Session | null } }) => {
+        if (session?.access_token && session.user?.id) {
+          sendToExtension({
+            type: "SET_AUTH",
+            token: session.access_token,
+            refreshToken: session.refresh_token ?? "",
+            userId: session.user.id,
+          });
+        }
+      });
+    }, 300);
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
       if (session?.access_token && session.user?.id) {
@@ -66,33 +78,44 @@ export function ExtensionAuthSync() {
       }
     });
 
-    // Recovery path: the extension refreshes its Supabase tokens independently
-    // of this tab. Since refresh tokens are single-use, whichever side
-    // refreshes last invalidates the other's copy — if that happened while
-    // this tab was closed, our localStorage session is now dead and a normal
-    // refresh attempt will fail with "already used" and sign us out. The
-    // content script (content.js) hands us the extension's last-known-good
-    // token on page load; if our own session is missing, adopt it instead of
-    // bouncing the user to /login.
+    // This client runs with autoRefreshToken: false (see lib/supabase.ts) —
+    // the extension is the sole owner of the rotating Supabase refresh token,
+    // since it runs 24/7 and refreshes proactively before expiry. Every token
+    // the extension holds (fresh or newly rotated) flows to us through this
+    // message, so we always adopt it rather than only recovering a dead
+    // session — otherwise our own copy would just quietly go stale.
+    let lastAdoptedToken: string | null = null;
     const onExtAuthState = (event: MessageEvent) => {
       if (event.source !== window || event.origin !== window.location.origin) return;
       if (event.data?.type !== "Klokrs_EXT_AUTH_STATE") return;
       const { token, refreshToken } = event.data as { token?: string; refreshToken?: string };
-      if (!token || !refreshToken || recovering) return;
+      if (!token || !refreshToken || recovering || token === lastAdoptedToken) return;
 
-      void supabase.auth.getSession().then(({ data: { session } }: { data: { session: Session | null } }) => {
-        if (session?.access_token) return; // We already have a live session — don't clobber it.
-        recovering = true;
-        void supabase.auth
-          .setSession({ access_token: token, refresh_token: refreshToken })
-          .finally(() => { recovering = false; });
-      });
+      extensionResponded = true;
+      recovering = true;
+      lastAdoptedToken = token;
+      void supabase.auth
+        .setSession({ access_token: token, refresh_token: refreshToken })
+        .finally(() => { recovering = false; });
     };
     window.addEventListener("message", onExtAuthState);
 
+    // Ask the extension for its current token whenever this tab regains
+    // visibility — covers the case where a refresh broadcast was sent while
+    // this tab was backgrounded/discarded and missed it.
+    const requestAuthState = () => {
+      window.postMessage({ type: "Klokrs_REQUEST_AUTH_STATE" }, window.location.origin);
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") requestAuthState();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
     return () => {
+      clearTimeout(initTimer);
       subscription.unsubscribe();
       window.removeEventListener("message", onExtAuthState);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, []);
 

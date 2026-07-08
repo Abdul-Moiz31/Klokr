@@ -219,12 +219,12 @@ export default function DashboardPage() {
                 Synced {lastSynced.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
               </div>
             )}
-            <Link
+            {/* <Link
               href="/daily-planner"
               className="inline-flex items-center justify-center rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white/80 transition hover:border-violet-500/30 hover:bg-violet-500/10 hover:text-white"
             >
               Daily planner
-            </Link>
+            </Link> */}
           </>
         }
       />

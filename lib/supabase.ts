@@ -12,9 +12,13 @@ export function createClient(): BrowserClient {
         auth: {
           // Persist in localStorage so a refresh/restart restores the session.
           persistSession: true,
-          // Refresh the access token in the background before it expires —
-          // a brief network blip should never log the user out.
-          autoRefreshToken: true,
+          // The extension is the sole owner of the rotating Supabase refresh
+          // token — it runs 24/7 and refreshes proactively before expiry.
+          // Supabase refresh tokens are single-use, so if this client also
+          // auto-refreshed, whichever side refreshed second would invalidate
+          // the other's copy and force a sign-out (see ExtensionAuthSync.tsx).
+          // This client instead adopts tokens pushed from the extension.
+          autoRefreshToken: false,
           // Pick up tokens from URL after OAuth/magic-link callbacks.
           detectSessionInUrl: true,
         },
