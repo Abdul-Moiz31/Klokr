@@ -180,8 +180,15 @@ export function TimelineView({
         const end = minutesToDate(forDate, t.endMinutes!);
         const isActive = !t.done && nowMinutes != null &&
           t.startMinutes! <= nowMinutes && t.endMinutes! > nowMinutes;
-        const isMissed = !t.done && !t.skipped && nowMinutes != null &&
-          (t.endMinutes as number) <= nowMinutes;
+        // Prefer the persisted outcome (set once, at window end, by
+        // pickAutoCompletions) — falls back to the old live time-based guess
+        // only for tasks that haven't been classified yet (e.g. auto-complete
+        // is disabled in Settings, or the window only just ended).
+        const isPartial = !t.done && t.outcome === "partial";
+        const isMissed = !t.done && !t.skipped && (
+          t.outcome === "missed" ||
+          (t.outcome == null && nowMinutes != null && (t.endMinutes as number) <= nowMinutes)
+        );
         return {
           id: t.id,
           title: t.title || "(untitled)",
@@ -193,6 +200,7 @@ export function TimelineView({
             `klokrs-event--${getTaskColor(t.title || "")}`,
             t.done ? "klokrs-event--done" : "",
             isActive ? "klokrs-event--active" : "",
+            isPartial ? "klokrs-event--partial" : "",
             isMissed ? "klokrs-event--missed" : "",
           ].filter(Boolean),
           extendedProps: { kind: "task", task: t },
@@ -349,6 +357,7 @@ export function TimelineView({
             task != null &&
             !task.done &&
             !task.skipped &&
+            task.outcome == null &&
             windowEndedInPast &&
             noActivityInWindow &&
             onMarkOfflineComplete != null &&
@@ -357,6 +366,14 @@ export function TimelineView({
             task != null && task.startMinutes != null && task.endMinutes != null &&
             task.startMinutes <= nowMinutes && task.endMinutes > nowMinutes;
           const category = getTaskColor(task?.title ?? "");
+          // Persisted outcome (set once, at window end) — falls back to the
+          // live time-based guess only for tasks not yet classified (e.g.
+          // auto-complete disabled, or window just ended this tick).
+          const isPartial = !done && task?.outcome === "partial";
+          const isMissedFinal = !done && task != null && !task.skipped && (
+            task.outcome === "missed" ||
+            (task.outcome == null && windowEndedInPast)
+          );
           return (
             <div className="klokrs-event-body">
               <div className="klokrs-event-row">
@@ -381,13 +398,25 @@ export function TimelineView({
                     e.stopPropagation();
                     onToggleDone(task!.id);
                   }}
+                  title={isPartial ? "Partial — tap to mark done" : isMissedFinal ? "Missed — tap to mark done" : undefined}
                   className={`klokrs-event-icon-badge klokrs-event-icon-badge--${category} ${done ? "klokrs-event-icon-badge--done" : ""} ${
+                    isPartial ? "klokrs-event-icon-badge--partial" : ""
+                  } ${isMissedFinal ? "klokrs-event-icon-badge--missed" : ""} ${
                     canToggle ? "" : "klokrs-event-icon-badge--readonly"
                   }`}
                 >
                   {done ? (
                     <svg width="10" height="10" viewBox="0 0 12 12" fill="none" aria-hidden>
                       <path d="M2.5 6.5L5 9L9.5 3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  ) : isPartial ? (
+                    <svg width="10" height="10" viewBox="0 0 12 12" fill="none" aria-hidden>
+                      <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.5" />
+                      <path d="M6 1.5A4.5 4.5 0 0 1 10.5 6H6V1.5Z" fill="currentColor" />
+                    </svg>
+                  ) : isMissedFinal ? (
+                    <svg width="9" height="9" viewBox="0 0 12 12" fill="none" aria-hidden>
+                      <path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                     </svg>
                   ) : (
                     <CategoryIcon category={category} size={11} />

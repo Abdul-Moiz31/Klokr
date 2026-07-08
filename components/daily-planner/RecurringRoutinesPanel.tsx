@@ -7,6 +7,7 @@ import type {
   RoutineTemplateKind,
 } from "@/lib/daily-planner/types";
 import { dayKey } from "@/lib/daily-planner/date";
+import { InfoTooltip } from "@/components/ui/InfoTooltip";
 
 const FREQ: { value: RecurrenceFrequency; label: string; hint: string }[] = [
   { value: "daily",     label: "Every day",  hint: "Runs daily" },
@@ -40,6 +41,7 @@ function emptyForm(): Omit<RecurringRule, "id" | "order"> {
     title: "",
     description: "",
     domainTags: [],
+    blockedDomainTags: [],
     frequency: "daily",
     weekdays: [1, 2, 3, 4, 5],
     monthDays: [1],
@@ -185,6 +187,11 @@ export function RecurringRoutinesPanel({ rules, newId, onAdd, onReplace, onRemov
                         {r.domainTags.slice(0, 2).join(", ")}{r.domainTags.length > 2 ? ` +${r.domainTags.length - 2}` : ""}
                       </span>
                     )}
+                    {(r.blockedDomainTags?.length ?? 0) > 0 && (
+                      <span className="rounded-full border border-red-500/15 bg-red-500/8 px-2 py-0.5 text-[10px] text-red-300/60">
+                        Blocks {r.blockedDomainTags!.slice(0, 2).join(", ")}{r.blockedDomainTags!.length > 2 ? ` +${r.blockedDomainTags!.length - 2}` : ""}
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -278,10 +285,13 @@ export function RecurringRoutinesPanel({ rules, newId, onAdd, onReplace, onRemov
 
 /* ── Recurring rule modal ─────────────────────────────────── */
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, tooltip, children }: { label: string; tooltip?: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1.5">
-      <label className="block text-xs font-semibold text-white/45">{label}</label>
+      <label className="flex items-center gap-1.5 text-xs font-semibold text-white/45">
+        {label}
+        {tooltip && <InfoTooltip text={tooltip} />}
+      </label>
       {children}
     </div>
   );
@@ -297,7 +307,15 @@ function RecurringRuleModal({
   onClose: () => void;
 }) {
   const [form, setForm] = useState<RecurringRule>(() => {
-    if (initial) return { ...initial, description: initial.description ?? "", defaultStartMinutes: initial.defaultStartMinutes ?? null, defaultDurationMinutes: initial.defaultDurationMinutes ?? null };
+    if (initial) {
+      return {
+        ...initial,
+        description: initial.description ?? "",
+        blockedDomainTags: initial.blockedDomainTags ?? [],
+        defaultStartMinutes: initial.defaultStartMinutes ?? null,
+        defaultDurationMinutes: initial.defaultDurationMinutes ?? null,
+      };
+    }
     return { ...emptyForm(), id: newId(), order: maxOrder + 1, biweeklyAnchor: dayKey(new Date()) } as RecurringRule;
   });
 
@@ -317,8 +335,16 @@ function RecurringRuleModal({
     if (!form.title.trim()) return;
     if ((form.frequency === "weekly" || form.frequency === "biweekly") && form.weekdays.length === 0) return;
     if (form.frequency === "monthly" && form.monthDays.length === 0) return;
-    const domains = form.domainTags.map((d) => d.trim()).filter(Boolean).map((d) => d.toLowerCase().replace(/^www\./, ""));
-    onSave({ ...form, title: form.title.trim(), domainTags: domains, biweeklyAnchor: !initial && form.frequency === "biweekly" ? dayKey(new Date()) : form.biweeklyAnchor });
+    const normalize = (list: string[]) => list.map((d) => d.trim()).filter(Boolean).map((d) => d.toLowerCase().replace(/^www\./, ""));
+    const domains = normalize(form.domainTags);
+    const blockedDomains = normalize(form.blockedDomainTags ?? []);
+    onSave({
+      ...form,
+      title: form.title.trim(),
+      domainTags: domains,
+      blockedDomainTags: blockedDomains,
+      biweeklyAnchor: !initial && form.frequency === "biweekly" ? dayKey(new Date()) : form.biweeklyAnchor,
+    });
   };
 
   const inputCls = "w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-sm text-white placeholder:text-white/25 focus:border-violet-500/40 focus:outline-none";
@@ -471,7 +497,10 @@ function RecurringRuleModal({
           </div>
 
           {/* Domains */}
-          <Field label="Tab domains to track (optional)">
+          <Field
+            label="Tab domains to track (optional)"
+            tooltip="Tracked for this routine's progress bar. Only time spent on these domains during its scheduled window counts toward completion — everything else you browse is still recorded elsewhere, just not credited to this task."
+          >
             <input
               value={form.domainTags.join(", ")}
               onChange={(e) => {
@@ -482,6 +511,23 @@ function RecurringRuleModal({
               placeholder="github.com, notion.so, figma.com"
             />
             <p className="mt-1 text-[11px] text-white/25">Time on these sites counts toward this task&apos;s progress bar.</p>
+          </Field>
+
+          {/* Blocked domains */}
+          <Field
+            label="Blocked domains (optional)"
+            tooltip="Blocked for the duration of this routine's window, regardless of the extension's always-blocked list in Settings. e.g. block youtube.com during a Reading block even if it's not on your always-blocked list."
+          >
+            <input
+              value={form.blockedDomainTags?.join(", ") ?? ""}
+              onChange={(e) => {
+                const parts = e.target.value.split(/[,;]+/).map((d) => d.trim()).filter(Boolean);
+                set({ blockedDomainTags: parts });
+              }}
+              className={inputCls}
+              placeholder="youtube.com, reddit.com"
+            />
+            <p className="mt-1 text-[11px] text-white/25">Blocked only while this routine's window is active, on every materialized instance.</p>
           </Field>
 
           {/* Actions */}

@@ -9,7 +9,6 @@ import type {
 } from "./types";
 import {
   appendRecurringRuleAsTaskToDayData,
-  buildTabTrackingRules,
   createEmptyDayData,
   dayDataWithFreshIds,
   dayKey,
@@ -417,11 +416,6 @@ export function useDailyPlannerState() {
     [update]
   );
 
-  const getTrackingRules = useCallback(() => {
-    if (!state) return [];
-    return buildTabTrackingRules(state, new Date());
-  }, [state]);
-
   return {
     state,
     hydrated,
@@ -440,7 +434,6 @@ export function useDailyPlannerState() {
     appendRecurringRuleToToday,
     forceAppendRecurringRuleToToday,
     newId,
-    getTrackingRules,
     setRoutineTemplate,
     setTemplateTaskDomains,
     applyRoutineTemplateToToday,

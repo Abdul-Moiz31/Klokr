@@ -3,21 +3,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import FullCalendar from "@fullcalendar/react";
 import timeGridPlugin from "@fullcalendar/timegrid";
-import interactionPlugin from "@fullcalendar/interaction";
-import type {
-  DateSelectArg,
-  EventClickArg,
-  EventDropArg,
-  EventInput,
-} from "@fullcalendar/core";
-import type { EventResizeDoneArg } from "@fullcalendar/interaction";
+import type { EventInput } from "@fullcalendar/core";
 import type { DayData, PlannerTask, RoutineTemplateKind } from "@/lib/daily-planner/types";
 import { dayKey } from "@/lib/daily-planner/storage";
 import {
   SNAP_MINUTES,
-  dateToMinutes,
   minutesToDate,
-  normalizeRange,
   startOfLocalDay,
   formatMinutes,
 } from "@/lib/daily-planner/timeline";
@@ -64,10 +55,6 @@ type Props = {
   anchorDate: Date;
   adHocByDate: Record<string, DayData | undefined>;
   routineTemplates: Record<RoutineTemplateKind, DayData>;
-  minViewableDay?: Date | null;
-  onTaskTimeChange: (dayDate: Date, taskId: string, startMinutes: number, endMinutes: number) => void;
-  onCreateRange: (dayDate: Date, startMinutes: number, endMinutes: number) => void;
-  onEditTask: (dayDate: Date, taskId: string) => void;
 };
 
 function startOfWeek(d: Date): Date {
@@ -86,10 +73,6 @@ export function WeekView({
   anchorDate,
   adHocByDate,
   routineTemplates,
-  minViewableDay = null,
-  onTaskTimeChange,
-  onCreateRange,
-  onEditTask,
 }: Props) {
   const calendarRef = useRef<FullCalendar | null>(null);
   const hasScrolledRef = useRef(false);
@@ -128,7 +111,7 @@ export function WeekView({
   const dayStats = useMemo(() => {
     const map = new Map<
       string,
-      { total: number; done: number; minutes: number; isTemplate: boolean; categories: string[] }
+      { total: number; done: number; partial: number; missed: number; minutes: number; isTemplate: boolean; categories: string[] }
     >();
     for (let i = 0; i < 7; i++) {
       const date = addDays(weekStart, i);
@@ -140,6 +123,8 @@ export function WeekView({
         map.set(key, {
           total: realTasks.length,
           done: realTasks.filter((t) => t.done).length,
+          partial: realTasks.filter((t) => !t.done && t.outcome === "partial").length,
+          missed: realTasks.filter((t) => !t.done && t.outcome === "missed").length,
           minutes: realTasks.reduce((s, t) => s + (t.endMinutes! - t.startMinutes!), 0),
           isTemplate: false,
           categories: [...new Set(realTasks.map((t) => getTaskColor(t.title || "")))].slice(0, 5),
@@ -152,6 +137,8 @@ export function WeekView({
         map.set(key, {
           total: tplTasks.length,
           done: 0,
+          partial: 0,
+          missed: 0,
           minutes: tplTasks.reduce((s, t) => s + (t.endMinutes! - t.startMinutes!), 0),
           isTemplate: tplTasks.length > 0,
           categories: [...new Set(tplTasks.map((t) => getTaskColor(t.title || "")))].slice(0, 5),
@@ -163,11 +150,11 @@ export function WeekView({
 
   // Week totals count only real (non-template) tasks
   const weekTotals = useMemo(() => {
-    let total = 0, done = 0, minutes = 0;
+    let total = 0, done = 0, partial = 0, missed = 0, minutes = 0;
     for (const s of dayStats.values()) {
-      if (!s.isTemplate) { total += s.total; done += s.done; minutes += s.minutes; }
+      if (!s.isTemplate) { total += s.total; done += s.done; partial += s.partial; missed += s.missed; minutes += s.minutes; }
     }
-    return { total, done, minutes };
+    return { total, done, partial, missed, minutes };
   }, [dayStats]);
 
   const events: EventInput[] = useMemo(() => {
@@ -186,17 +173,27 @@ export function WeekView({
       for (const t of tasks) {
         if (t.startMinutes == null || t.endMinutes == null) continue;
         const color = getTaskColor(t.title || "");
+        // A template preview is just a pattern, not a resolved instance of
+        // any real day — it must never show done/partial/missed, regardless
+        // of whatever completion state happens to sit on the template's own
+        // task object (e.g. left over from before an instance was cloned out
+        // of it). Persisted outcome only applies to real, non-template tasks.
+        const done = !isTemplateDay && t.done === true;
+        const isPartial = !isTemplateDay && !t.done && t.outcome === "partial";
+        const isMissed = !isTemplateDay && !t.done && !t.skipped && t.outcome === "missed";
         out.push({
           id: isTemplateDay ? `tpl-${key}::${t.id}` : `${key}::${t.id}`,
           title: t.title || "(untitled)",
           start: minutesToDate(date, t.startMinutes),
           end: minutesToDate(date, t.endMinutes),
-          editable: !isTemplateDay && !t.done,
+          editable: false,
           classNames: [
             "klokrs-event",
             "klokrs-week-event",
             `klokrs-event--${color}`,
-            t.done ? "klokrs-event--done" : "",
+            done ? "klokrs-event--done" : "",
+            isPartial ? "klokrs-event--partial" : "",
+            isMissed ? "klokrs-event--missed" : "",
             isTemplateDay ? "klokrs-event--template" : "",
           ].filter(Boolean),
           extendedProps: { taskId: t.id, task: t, isTemplate: isTemplateDay },
@@ -205,43 +202,6 @@ export function WeekView({
     }
     return out;
   }, [weekStart, adHocByDate, routineTemplates]);
-
-  const handleDrop = (info: EventDropArg) => {
-    const ev = info.event;
-    if (!ev.start || !ev.end || ev.extendedProps?.isTemplate) { info.revert(); return; }
-    const taskId = (ev.extendedProps?.taskId as string) ?? ev.id.split("::")[1] ?? ev.id;
-    const dayDate = startOfLocalDay(ev.start);
-    const { start, end } = normalizeRange(dateToMinutes(ev.start), dateToMinutes(ev.end));
-    onTaskTimeChange(dayDate, taskId, start, end);
-  };
-
-  const handleResize = (info: EventResizeDoneArg) => {
-    const ev = info.event;
-    if (!ev.start || !ev.end || ev.extendedProps?.isTemplate) { info.revert(); return; }
-    const taskId = (ev.extendedProps?.taskId as string) ?? ev.id.split("::")[1] ?? ev.id;
-    const dayDate = startOfLocalDay(ev.start);
-    const { start, end } = normalizeRange(dateToMinutes(ev.start), dateToMinutes(ev.end));
-    onTaskTimeChange(dayDate, taskId, start, end);
-  };
-
-  const handleSelect = (info: DateSelectArg) => {
-    const dayDate = startOfLocalDay(info.start);
-    if (minViewableDay && dayDate < startOfLocalDay(minViewableDay)) {
-      calendarRef.current?.getApi().unselect();
-      return;
-    }
-    const { start, end } = normalizeRange(dateToMinutes(info.start), dateToMinutes(info.end));
-    onCreateRange(dayDate, start, end);
-    calendarRef.current?.getApi().unselect();
-  };
-
-  const handleEventClick = (info: EventClickArg) => {
-    if (info.event.extendedProps?.isTemplate) return;
-    const taskId = info.event.extendedProps?.taskId as string | undefined;
-    if (info.event.start && taskId) {
-      onEditTask(startOfLocalDay(info.event.start), taskId);
-    }
-  };
 
   return (
     <div>
@@ -258,6 +218,22 @@ export function WeekView({
             {weekTotals.done}
           </p>
         </div>
+        {weekTotals.partial > 0 && (
+          <div>
+            <p className="text-[10px] uppercase tracking-widest text-white/30">Partial</p>
+            <p className="text-xl font-bold leading-none tabular-nums text-amber-300">
+              {weekTotals.partial}
+            </p>
+          </div>
+        )}
+        {weekTotals.missed > 0 && (
+          <div>
+            <p className="text-[10px] uppercase tracking-widest text-white/30">Missed</p>
+            <p className="text-xl font-bold leading-none tabular-nums text-red-300/80">
+              {weekTotals.missed}
+            </p>
+          </div>
+        )}
         <div className="hidden h-8 w-px bg-white/[0.08] sm:block" />
         <div>
           <p className="text-[10px] uppercase tracking-widest text-white/30">Planned time</p>
@@ -296,7 +272,7 @@ export function WeekView({
       <div className="klokrs-timeline klokrs-week rounded-xl border border-white/[0.07] bg-white/[0.02] p-2 sm:p-3">
         <FullCalendar
           ref={calendarRef as unknown as React.Ref<FullCalendar>}
-          plugins={[timeGridPlugin, interactionPlugin]}
+          plugins={[timeGridPlugin]}
           initialView="timeGridWeek"
           initialDate={weekStart}
           headerToolbar={false}
@@ -310,16 +286,11 @@ export function WeekView({
           slotDuration={SNAP_DURATION}
           slotLabelInterval="01:00"
           snapDuration={SNAP_DURATION}
-          editable
-          selectable
-          selectMirror
+          editable={false}
+          selectable={false}
           events={events}
           eventOverlap
           slotEventOverlap
-          eventDrop={handleDrop}
-          eventResize={handleResize}
-          select={handleSelect}
-          eventClick={handleEventClick}
           dayHeaderContent={(arg) => {
             const key = dayKey(startOfLocalDay(arg.date));
             const s = dayStats.get(key) ?? { total: 0, done: 0, minutes: 0, isTemplate: false, categories: [] };
@@ -372,7 +343,12 @@ export function WeekView({
           }}
           eventContent={(arg) => {
             const task = arg.event.extendedProps?.task as PlannerTask | undefined;
-            const done = task?.done === true;
+            const isTemplate = arg.event.extendedProps?.isTemplate === true;
+            // A template preview is a pattern, not a resolved day — never
+            // shown as done/partial/missed, whatever the template task holds.
+            const done = !isTemplate && task?.done === true;
+            const isPartial = !isTemplate && !done && task?.outcome === "partial";
+            const isMissed = !isTemplate && !done && !task?.skipped && task?.outcome === "missed";
             const startM = arg.event.start
               ? arg.event.start.getHours() * 60 + arg.event.start.getMinutes()
               : 0;
@@ -381,14 +357,36 @@ export function WeekView({
               : startM;
             const dur = endM - startM;
             const category = getTaskColor(task?.title ?? "");
-            const fullLabel = `${arg.event.title} · ${formatMinutes(startM)} (${fmtTime(dur)})`;
+            const outcomeLabel = done ? " · Done" : isPartial ? " · Partial" : isMissed ? " · Missed" : "";
+            const fullLabel = `${arg.event.title} · ${formatMinutes(startM)} (${fmtTime(dur)})${outcomeLabel}`;
             // Structured-style compressed week view: short blocks show just the
             // category icon (time is already encoded by vertical position);
-            // blocks with enough room also get a single-line label.
+            // blocks with enough room also get a single-line label. Once a
+            // task is classified, the icon swaps to reflect done/partial/missed
+            // instead of the category, same as the single-day timeline.
             return (
               <div className="klokrs-event-body klokrs-week-event-body" title={fullLabel}>
-                <div className="klokrs-week-event-icon">
-                  <CategoryIcon category={category} size={11} />
+                <div
+                  className={`klokrs-week-event-icon ${done ? "klokrs-week-event-icon--done" : ""} ${
+                    isPartial ? "klokrs-week-event-icon--partial" : ""
+                  } ${isMissed ? "klokrs-week-event-icon--missed" : ""}`}
+                >
+                  {done ? (
+                    <svg width="9" height="9" viewBox="0 0 12 12" fill="none" aria-hidden>
+                      <path d="M2.5 6.5L5 9L9.5 3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  ) : isPartial ? (
+                    <svg width="9" height="9" viewBox="0 0 12 12" fill="none" aria-hidden>
+                      <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.5" />
+                      <path d="M6 1.5A4.5 4.5 0 0 1 10.5 6H6V1.5Z" fill="currentColor" />
+                    </svg>
+                  ) : isMissed ? (
+                    <svg width="8" height="8" viewBox="0 0 12 12" fill="none" aria-hidden>
+                      <path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                    </svg>
+                  ) : (
+                    <CategoryIcon category={category} size={11} />
+                  )}
                 </div>
                 {dur >= 40 && (
                   <div className={`klokrs-event-title ${done ? "klokrs-event-title--done" : ""}`}>

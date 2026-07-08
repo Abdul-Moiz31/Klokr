@@ -16,6 +16,8 @@ import { WorkDayCompleteBanner } from "@/components/dashboard/WorkDayCompleteBan
 import { ActivationChecklist } from "@/components/dashboard/ActivationChecklist";
 import { NoActivityToday } from "@/components/dashboard/NoActivityToday";
 import { PlanVsActualCard } from "@/components/dashboard/PlanVsActualCard";
+import { CurrentTaskCard, useActiveScheduledTask } from "@/components/dashboard/CurrentTaskCard";
+import { useAutoCompleteTasks } from "@/lib/daily-planner/useAutoCompleteTasks";
 import { StreakStrip } from "@/components/dashboard/StreakStrip";
 import { AccountabilityCard } from "@/components/dashboard/AccountabilityCard";
 import { WeeklyReviewCard } from "@/components/dashboard/WeeklyReviewCard";
@@ -75,6 +77,8 @@ export default function DashboardPage() {
   const [fetchError, setFetchError] = useState(false);
   const [drilldown, setDrilldown] = useState<{ domain: string; totalSeconds: number } | null>(null);
   const [showInsights, setShowInsights] = useState(false);
+  const activeTask = useActiveScheduledTask(sessions, loadPrefs().autoCompleteThreshold);
+  useAutoCompleteTasks(sessions, loadPrefs());
 
   const fetchSessions = useCallback(async (uid: string) => {
     const supabase = createClient();
@@ -219,12 +223,12 @@ export default function DashboardPage() {
                 Synced {lastSynced.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
               </div>
             )}
-            {/* <Link
+            <Link
               href="/daily-planner"
               className="inline-flex items-center justify-center rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white/80 transition hover:border-violet-500/30 hover:bg-violet-500/10 hover:text-white"
             >
               Daily planner
-            </Link> */}
+            </Link>
           </>
         }
       />
@@ -319,7 +323,7 @@ export default function DashboardPage() {
               )}
             </section>
 
-            {sessions.length === 0 ? (
+            {sessions.length === 0 && !activeTask ? (
               hasEverTracked ? (
                 <NoActivityToday dayPhase={getDayPhase(loadPrefs())} workStartHour={loadPrefs().workStartHour} />
               ) : hasEverTracked === false ? (
@@ -329,16 +333,22 @@ export default function DashboardPage() {
               <section>
                 <h2 className="mb-2 text-xs font-semibold uppercase tracking-widest text-white/35">Activity</h2>
                 <div className="space-y-5">
-                  <TodayActivityChart sessions={sessions} />
-                  <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                    <DomainChart data={domainStats} totalSeconds={totalSeconds} />
-                    <TopDomains
-                      data={domainStats}
-                      onDomainClick={(domain, totalSeconds) =>
-                        setDrilldown({ domain, totalSeconds })
-                      }
-                    />
-                  </div>
+                  {activeTask ? (
+                    <CurrentTaskCard active={activeTask} />
+                  ) : (
+                    <TodayActivityChart sessions={sessions} />
+                  )}
+                  {sessions.length > 0 && (
+                    <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                      <DomainChart data={domainStats} totalSeconds={totalSeconds} />
+                      <TopDomains
+                        data={domainStats}
+                        onDomainClick={(domain, totalSeconds) =>
+                          setDrilldown({ domain, totalSeconds })
+                        }
+                      />
+                    </div>
+                  )}
                 </div>
               </section>
             )}

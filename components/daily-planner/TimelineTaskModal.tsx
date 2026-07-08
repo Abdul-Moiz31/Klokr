@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import type { PlannerTask, RoutineTemplateKind } from "@/lib/daily-planner/types";
+import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import {
   MIN_DURATION_MINUTES,
   SNAP_MINUTES,
@@ -15,6 +16,7 @@ export type TimelineTaskDraft = {
   description: string;
   done: boolean;
   domainTags: string[];
+  blockedDomainTags: string[];
   startMinutes: number | null;
   endMinutes: number | null;
   /**
@@ -77,6 +79,9 @@ export function TimelineTaskModal({ initial, initialRange, onSave, onDelete, onC
   const [description, setDescription] = useState(initial?.description ?? "");
   const [done, setDone] = useState(initial?.done ?? false);
   const [domains, setDomains] = useState<string>(initial?.domainTags.join(", ") ?? "");
+  const [blockedDomains, setBlockedDomains] = useState<string>(
+    initial?.blockedDomainTags?.join(", ") ?? ""
+  );
   const [scheduled, setScheduled] = useState<boolean>(
     initial ? initial.startMinutes != null : Boolean(initialRange)
   );
@@ -118,6 +123,7 @@ export function TimelineTaskModal({ initial, initialRange, onSave, onDelete, onC
       description: description.trim(),
       done,
       domainTags: splitDomains(domains),
+      blockedDomainTags: splitDomains(blockedDomains),
       startMinutes,
       endMinutes,
     };
@@ -252,12 +258,28 @@ export function TimelineTaskModal({ initial, initialRange, onSave, onDelete, onC
           )}
 
           <div>
-            <label className="block text-xs text-white/45">Domains (tab time)</label>
+            <label className="flex items-center gap-1.5 text-xs text-white/45">
+              Domains (tab time)
+              <InfoTooltip text="Tracked for this task's progress bar. Only time spent on these domains during the scheduled window counts toward completion — everything else you browse is still recorded elsewhere, just not credited to this task." />
+            </label>
             <input
               value={domains}
               onChange={(e) => setDomains(e.target.value)}
               className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white/90 focus:border-violet-500/40 focus:outline-none"
               placeholder="github.com, notion.so"
+            />
+          </div>
+
+          <div>
+            <label className="flex items-center gap-1.5 text-xs text-white/45">
+              Blocked domains (optional)
+              <InfoTooltip text="Blocked for the duration of this task's window, regardless of the extension's global Focus Mode toggle. e.g. block youtube.com during a Reading block even if Focus Mode is off elsewhere." />
+            </label>
+            <input
+              value={blockedDomains}
+              onChange={(e) => setBlockedDomains(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white/90 focus:border-violet-500/40 focus:outline-none"
+              placeholder="youtube.com, reddit.com"
             />
           </div>
         </div>
