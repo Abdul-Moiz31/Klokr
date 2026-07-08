@@ -79,6 +79,41 @@ function Card({ children }: { children: ReactNode }) {
   );
 }
 
+function DomainListField({
+  value,
+  onCommit,
+  placeholder,
+}: {
+  value: string[];
+  onCommit: (domains: string[]) => void;
+  placeholder?: string;
+}) {
+  const [text, setText] = useState(value.join(", "));
+  useEffect(() => setText(value.join(", ")), [value]);
+
+  const commit = () => {
+    const domains = text
+      .split(/[,;]+/)
+      .map((d) => d.trim().toLowerCase().replace(/^www\./, ""))
+      .filter(Boolean);
+    setText(domains.join(", "));
+    onCommit(domains);
+  };
+
+  return (
+    <input
+      value={text}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+      }}
+      placeholder={placeholder ?? "youtube.com, reddit.com"}
+      className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/90 placeholder:text-white/30 focus:border-violet-500/40 focus:outline-none"
+    />
+  );
+}
+
 function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   return (
     <button
@@ -1361,6 +1396,22 @@ function SettingsPageInner() {
                       onChange={(v) => updatePrefs({ redBlockMinGapMinutes: v as number })}
                     />
                   </PrefRow>
+                </Card>
+              </div>
+
+              <div>
+                <SectionTitle tooltip="Domains here are blocked at all times — no toggle, no schedule needed. This replaces the old manual Focus Mode switch. A planner task's own 'Blocked domains' field (set per-task in the Daily Planner) is separate and only blocks during that task's scheduled window.">Blocking</SectionTitle>
+                <Card>
+                  <div className="py-3.5">
+                    <p className="text-sm text-white/80">Always-blocked domains</p>
+                    <p className="mt-0.5 mb-2.5 text-xs leading-relaxed text-white/35">
+                      Comma-separated. Enforced by the extension immediately, all day, every day — no need to turn anything on.
+                    </p>
+                    <DomainListField
+                      value={prefs.alwaysBlockedDomains}
+                      onCommit={(domains) => updatePrefs({ alwaysBlockedDomains: domains })}
+                    />
+                  </div>
                 </Card>
               </div>
 

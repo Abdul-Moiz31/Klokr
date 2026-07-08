@@ -12,11 +12,11 @@ import { WeekView } from "./WeekView";
 import { CapacityWarning } from "./CapacityWarning";
 import { UnscheduledRail } from "./UnscheduledRail";
 import { TimelineTaskModal, type TimelineTaskDraft } from "./TimelineTaskModal";
-import { ExtensionPlannerSync } from "@/components/ExtensionPlannerSync";
 import { useDailyPlannerState } from "@/lib/daily-planner/useDailyPlannerState";
 import { useTodaySessions } from "@/lib/daily-planner/useTodaySessions";
 import { findUnscheduledGaps, type UnscheduledGap } from "@/lib/daily-planner/onTask";
-import { localMinutesNow, pickAutoCompletions } from "@/lib/daily-planner/autoComplete";
+import { localMinutesNow } from "@/lib/daily-planner/autoComplete";
+import { useAutoCompleteTasks } from "@/lib/daily-planner/useAutoCompleteTasks";
 import { createEmptyDayData, dayKey } from "@/lib/daily-planner/storage";
 import { suggestedRoutineTemplateKind } from "@/lib/daily-planner/date";
 import { normalizeRange, formatRange } from "@/lib/daily-planner/timeline";
@@ -146,7 +146,6 @@ export function DailyPlannerApp({ accountCreatedAt = null, userId = null }: Dail
     appendRecurringRuleToTemplate,
     appendRecurringRuleToToday,
     forceAppendRecurringRuleToToday,
-    getTrackingRules,
     applyRoutineTemplateToToday,
     applyRoutineTemplateToDate,
     setRoutineTemplate,
@@ -190,7 +189,6 @@ export function DailyPlannerApp({ accountCreatedAt = null, userId = null }: Dail
     | null
   >(null);
   const [gapModal, setGapModal] = useState<UnscheduledGap | null>(null);
-  const ignoredAutoCompleteRef = useRef<Set<string>>(new Set());
   const [autoCompleteTick, setAutoCompleteTick] = useState(0);
   const unscheduledRailRef = useRef<HTMLDivElement | null>(null);
 
@@ -247,24 +245,12 @@ export function DailyPlannerApp({ accountCreatedAt = null, userId = null }: Dail
     return () => clearInterval(id);
   }, [isViewingToday]);
 
-  useEffect(() => {
-    if (!isViewingToday) return;
-    if (!prefs.autoCompleteEnabled) return;
-    if (scheduledTasks.length === 0) return;
-    const nowMin = localMinutesNow();
-    const picks = pickAutoCompletions(scheduledTasks, sessions, viewDate, prefs, nowMin, ignoredAutoCompleteRef.current);
-    if (picks.length === 0) return;
-    const pickIds = new Set(picks.map((p) => p.taskId));
-    setTodayTasks((tasks) =>
-      tasks.map((t) => {
-        const p = picks.find((x) => x.taskId === t.id);
-        if (!p) return t;
-        return { ...t, done: true, autoCompleted: true, completedAt: p.completedAt };
-      })
-    );
-    void pickIds;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isViewingToday, scheduledTasks, sessions, prefs.autoCompleteEnabled, prefs.autoCompleteThreshold, viewDate, autoCompleteTick]);
+  // Shared with the dashboard (useAutoCompleteTasks) so a task gets classified
+  // done/partial/missed at window end regardless of which page is open —
+  // this component no longer applies it locally. Passing viewDate also means
+  // browsing to a past day backfills any task that was never classified
+  // because the app wasn't open when its window ended.
+  useAutoCompleteTasks(sessions, prefs, viewDate);
 
   const unscheduledGaps = useMemo(() => {
     const raw = findUnscheduledGaps(scheduledTasks, sessions, viewDate, prefs.redBlockMinGapMinutes);
@@ -272,7 +258,6 @@ export function DailyPlannerApp({ accountCreatedAt = null, userId = null }: Dail
     return raw.filter((g) => !todayIdleRanges.some((r) => r.fromMinutes <= g.fromMinutes && r.toMinutes >= g.toMinutes));
   }, [scheduledTasks, sessions, viewDate, prefs.redBlockMinGapMinutes, todayIdleRanges]);
 
-  const rules = getTrackingRules();
   const suggestedKind = suggestedRoutineTemplateKind(now);
 
   const ensureFirstGroupId = (data: DayData): { data: DayData; groupId: string } => {
@@ -299,44 +284,16 @@ export function DailyPlannerApp({ accountCreatedAt = null, userId = null }: Dail
   const getDayData = (key: string): DayData => (state?.adHocByDate[key] ?? createEmptyDayData());
   const mutateDay = (key: string, mutate: (d: DayData) => DayData) => setAdHocForDate(key, mutate(getDayData(key)));
 
-  const weekUpsertTaskTime = (dayDate: Date, taskId: string, startMinutes: number, endMinutes: number) => {
-    const range = normalizeRange(startMinutes, endMinutes);
-    const targetKey = dayKey(dayDate);
-    let sourceKey: string | null = null;
-    let moved: PlannerTask | null = null;
-    if (state) {
-      for (const [k, d] of Object.entries(state.adHocByDate)) {
-        const found = d?.tasks.find((t) => t.id === taskId);
-        if (found) { sourceKey = k; moved = found; break; }
-      }
-    }
-    if (sourceKey === targetKey || sourceKey == null) {
-      mutateDay(targetKey, (d) => ({ ...d, tasks: d.tasks.map((t) => t.id === taskId ? { ...t, startMinutes: range.start, endMinutes: range.end } : t) }));
-      return;
-    }
-    mutateDay(sourceKey, (d) => ({ ...d, tasks: d.tasks.filter((t) => t.id !== taskId) }));
-    const taskMoved = moved!;
-    mutateDay(targetKey, (d) => ({ ...d, tasks: [...d.tasks, { ...taskMoved, startMinutes: range.start, endMinutes: range.end }] }));
-  };
-
-  const weekCreateRange = (dayDate: Date, startMinutes: number, endMinutes: number) => {
-    setModal({ mode: "create", initialRange: { start: startMinutes, end: endMinutes }, dayKey: dayKey(dayDate) });
-  };
-
-  const weekEditTask = (dayDate: Date, taskId: string) => {
-    setModal({ mode: "edit", taskId, dayKey: dayKey(dayDate) });
-  };
-
   const createTaskForDay = (key: string, draft: TimelineTaskDraft) => {
     const day = getDayData(key);
     const { data, groupId } = ensureFirstGroupId(day);
     const maxOrder = data.tasks.filter((t) => t.groupId === groupId).reduce((m, t) => Math.max(m, t.order), -1);
-    const newTask: PlannerTask = { id: newIdFn(), groupId, title: draft.title, description: draft.description, done: draft.done, domainTags: draft.domainTags, order: maxOrder + 1, startMinutes: draft.startMinutes, endMinutes: draft.endMinutes };
+    const newTask: PlannerTask = { id: newIdFn(), groupId, title: draft.title, description: draft.description, done: draft.done, domainTags: draft.domainTags, blockedDomainTags: draft.blockedDomainTags, order: maxOrder + 1, startMinutes: draft.startMinutes, endMinutes: draft.endMinutes };
     setAdHocForDate(key, { ...data, tasks: [...data.tasks, newTask] });
   };
 
   const updateTaskForDay = (key: string, taskId: string, draft: TimelineTaskDraft) => {
-    mutateDay(key, (d) => ({ ...d, tasks: d.tasks.map((t) => t.id === taskId ? { ...t, title: draft.title, description: draft.description, done: draft.done, domainTags: draft.domainTags, startMinutes: draft.startMinutes, endMinutes: draft.endMinutes } : t) }));
+    mutateDay(key, (d) => ({ ...d, tasks: d.tasks.map((t) => t.id === taskId ? { ...t, title: draft.title, description: draft.description, done: draft.done, domainTags: draft.domainTags, blockedDomainTags: draft.blockedDomainTags, startMinutes: draft.startMinutes, endMinutes: draft.endMinutes } : t) }));
   };
 
   const deleteTaskForDay = (key: string, taskId: string) => {
@@ -346,7 +303,7 @@ export function DailyPlannerApp({ accountCreatedAt = null, userId = null }: Dail
   const createTaskFromModal = (draft: TimelineTaskDraft) => {
     const { data, groupId } = ensureFirstGroupId(todayAdHoc);
     const maxOrder = data.tasks.filter((t) => t.groupId === groupId).reduce((m, t) => Math.max(m, t.order), -1);
-    const newTask: PlannerTask = { id: newIdFn(), groupId, title: draft.title, description: draft.description, done: draft.done, domainTags: draft.domainTags, order: maxOrder + 1, startMinutes: draft.startMinutes, endMinutes: draft.endMinutes };
+    const newTask: PlannerTask = { id: newIdFn(), groupId, title: draft.title, description: draft.description, done: draft.done, domainTags: draft.domainTags, blockedDomainTags: draft.blockedDomainTags, order: maxOrder + 1, startMinutes: draft.startMinutes, endMinutes: draft.endMinutes };
     setTodayAdHoc({ ...data, tasks: [...data.tasks, newTask] });
   };
 
@@ -358,7 +315,7 @@ export function DailyPlannerApp({ accountCreatedAt = null, userId = null }: Dail
         if (draft.applyDomainsToTemplate && t.sourceTemplateTaskId && t.sourceTemplateKind) {
           propagateTo = { kind: t.sourceTemplateKind, templateTaskId: t.sourceTemplateTaskId };
         }
-        return { ...t, title: draft.title, description: draft.description, done: draft.done, domainTags: draft.domainTags, startMinutes: draft.startMinutes, endMinutes: draft.endMinutes };
+        return { ...t, title: draft.title, description: draft.description, done: draft.done, domainTags: draft.domainTags, blockedDomainTags: draft.blockedDomainTags, startMinutes: draft.startMinutes, endMinutes: draft.endMinutes };
       })
     );
     if (propagateTo) {
@@ -377,12 +334,14 @@ export function DailyPlannerApp({ accountCreatedAt = null, userId = null }: Dail
       tasks.map((t) => {
         if (t.id !== taskId) return t;
         const nextDone = !t.done;
+        // Clearing `outcome` on any manual override — pickAutoCompletions only
+        // classifies a task once (outcome == null), so this permanently opts
+        // it out of being auto-reclassified afterward.
         if (!nextDone && t.autoCompleted) {
-          ignoredAutoCompleteRef.current.add(t.id);
-          return { ...t, done: false, autoCompleted: false, completedAt: undefined };
+          return { ...t, done: false, autoCompleted: false, completedAt: undefined, outcome: undefined };
         }
-        if (nextDone) return { ...t, done: true, completedAt: Date.now() };
-        return { ...t, done: false, completedAt: undefined };
+        if (nextDone) return { ...t, done: true, completedAt: Date.now(), outcome: "done" };
+        return { ...t, done: false, completedAt: undefined, outcome: undefined };
       })
     );
   };
@@ -445,8 +404,6 @@ export function DailyPlannerApp({ accountCreatedAt = null, userId = null }: Dail
 
   return (
     <div className="w-full max-w-7xl">
-      <ExtensionPlannerSync rules={rules} />
-
       {/* ── Tab bar ── */}
       <div className="mb-7 flex items-center gap-1 rounded-xl border border-white/[0.07] bg-white/[0.03] p-1">
         {TABS.map((t) => {
@@ -637,7 +594,7 @@ export function DailyPlannerApp({ accountCreatedAt = null, userId = null }: Dail
                 <>
                   <CapacityWarning userId={userId} plannedMinutes={plannedMinutesToday} />
 
-                  <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
+                  <div className="grid gap-4">
                     <TimelineView
                       forDate={viewDate}
                       tasks={scheduledTasks}
@@ -660,7 +617,7 @@ export function DailyPlannerApp({ accountCreatedAt = null, userId = null }: Dail
                     {/* ── Right panel ── */}
                     <div className="flex flex-col gap-3">
 
-                      {/* Active now / Up next */}
+                      {/* Active now / Up next
                       {(activeTask ?? nextTask) && (
                         <div className="overflow-hidden rounded-xl border border-white/[0.07] bg-white/[0.02]">
                           <div className="flex items-center gap-2 border-b border-white/[0.05] px-4 py-2.5">
@@ -708,7 +665,7 @@ export function DailyPlannerApp({ accountCreatedAt = null, userId = null }: Dail
                         </div>
                       )}
 
-                      {/* Unscheduled tasks */}
+                      Unscheduled tasks
                       <UnscheduledRail
                         ref={unscheduledRailRef}
                         tasks={unscheduledTasks}
@@ -716,7 +673,7 @@ export function DailyPlannerApp({ accountCreatedAt = null, userId = null }: Dail
                         onEdit={(taskId) => setModal({ mode: "edit", taskId })}
                         onDelete={deleteTask}
                         onToggleDone={toggleTaskDone}
-                      />
+                      /> */}
                     </div>
                   </div>
                 </>
@@ -742,9 +699,15 @@ export function DailyPlannerApp({ accountCreatedAt = null, userId = null }: Dail
                   <span className="min-w-[8rem] text-center text-base font-bold text-white/90">{weekRangeLabel(weekAnchor)}</span>
                   <button
                     type="button"
+                    disabled={startOfWeekLocal(weekAnchor).getTime() >= startOfWeekLocal(new Date()).getTime()}
                     onClick={() => setWeekAnchor((d) => addDays(d, 7))}
-                    className="flex h-7 w-7 items-center justify-center rounded-lg text-white/40 transition hover:bg-white/[0.06] hover:text-white/80"
+                    className="flex h-7 w-7 items-center justify-center rounded-lg text-white/40 transition hover:bg-white/[0.06] hover:text-white/80 disabled:cursor-not-allowed disabled:opacity-25 disabled:hover:bg-transparent"
                     aria-label="Next week"
+                    title={
+                      startOfWeekLocal(weekAnchor).getTime() >= startOfWeekLocal(new Date()).getTime()
+                        ? "This week is the latest week you can view"
+                        : undefined
+                    }
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
                   </button>
@@ -802,10 +765,6 @@ export function DailyPlannerApp({ accountCreatedAt = null, userId = null }: Dail
                 anchorDate={weekAnchor}
                 adHocByDate={state.adHocByDate}
                 routineTemplates={state.routineTemplates}
-                minViewableDay={minViewableDay}
-                onTaskTimeChange={weekUpsertTaskTime}
-                onCreateRange={weekCreateRange}
-                onEditTask={weekEditTask}
               />
             </div>
           )}

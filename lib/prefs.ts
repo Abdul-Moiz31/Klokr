@@ -23,6 +23,13 @@ export interface KlokrsPrefs {
   redBlockMinGapMinutes: number;
   /** User overrides for domain→category mapping. Keyed by root domain. */
   categoryOverrides: Record<string, CategoryId>;
+  /**
+   * Domains blocked at all times, independent of any schedule — no on/off
+   * toggle, presence in this list is the enforcement. Distinct from a
+   * planner task's own blockedDomainTags, which only apply during that
+   * task's scheduled window.
+   */
+  alwaysBlockedDomains: string[];
 }
 
 export const DEFAULT_PREFS: KlokrsPrefs = {
@@ -41,6 +48,7 @@ export const DEFAULT_PREFS: KlokrsPrefs = {
   autoCompleteThreshold: 80,
   redBlockMinGapMinutes: 15,
   categoryOverrides: {},
+  alwaysBlockedDomains: [],
 };
 
 /** Resolves the user's effective time zone: stored override or browser default. */

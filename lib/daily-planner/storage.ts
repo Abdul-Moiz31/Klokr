@@ -8,6 +8,7 @@ import type {
   IdleRange,
   ManualAttribution,
   PlannerTask,
+  PlannerTaskRule,
   RecurringRule,
   RoutineTemplateKind,
 } from "./types";
@@ -72,6 +73,7 @@ export function dayDataWithFreshIds(
     delete fresh.completedAt;
     delete fresh.manualAttributions;
     delete fresh.skipped;
+    delete fresh.outcome;
     return fresh;
   });
   return { groups, tasks };
@@ -88,6 +90,7 @@ export function appendRecurringRuleAsTaskToDayData(
     | "title"
     | "description"
     | "domainTags"
+    | "blockedDomainTags"
     | "defaultStartMinutes"
     | "defaultDurationMinutes"
   >,
@@ -105,6 +108,9 @@ export function appendRecurringRuleAsTaskToDayData(
   const tasksInG = tasks.filter((t) => t.groupId === target.id);
   const maxOrder = tasksInG.reduce((m, t) => Math.max(m, t.order), -1);
   const domainTags = (rule.domainTags ?? [])
+    .map((d) => d.trim().toLowerCase().replace(/^www\./, ""))
+    .filter(Boolean);
+  const blockedDomainTags = (rule.blockedDomainTags ?? [])
     .map((d) => d.trim().toLowerCase().replace(/^www\./, ""))
     .filter(Boolean);
   let startMinutes: number | null = null;
@@ -125,6 +131,7 @@ export function appendRecurringRuleAsTaskToDayData(
     description: rule.description ?? "",
     done: false,
     domainTags,
+    ...(blockedDomainTags.length > 0 ? { blockedDomainTags } : {}),
     order: maxOrder + 1,
     startMinutes,
     endMinutes,
@@ -221,6 +228,13 @@ function migrateTask(raw: unknown): PlannerTask {
     endMinutes,
   };
   // v5 additions — only set when present so older blobs round-trip cleanly.
+  if (Array.isArray(t.blockedDomainTags)) {
+    const blocked = t.blockedDomainTags.filter((d) => typeof d === "string") as string[];
+    if (blocked.length > 0) out.blockedDomainTags = blocked;
+  }
+  if (t.outcome === "done" || t.outcome === "partial" || t.outcome === "missed") {
+    out.outcome = t.outcome;
+  }
   if (t.autoCompleted === true) out.autoCompleted = true;
   if (typeof t.completedAt === "number") out.completedAt = t.completedAt;
   const ma = migrateManualAttributions(t.manualAttributions);
@@ -287,6 +301,9 @@ function migrateRule(raw: unknown): RecurringRule {
     domainTags: Array.isArray(r.domainTags)
       ? (r.domainTags.filter((d) => typeof d === "string") as string[])
       : [],
+    ...(Array.isArray(r.blockedDomainTags)
+      ? { blockedDomainTags: r.blockedDomainTags.filter((d) => typeof d === "string") as string[] }
+      : {}),
     frequency: freq,
     weekdays: Array.isArray(r.weekdays)
       ? (r.weekdays.filter((d) => typeof d === "number") as number[])
@@ -440,20 +457,26 @@ function tasksInGroup(tasks: PlannerTask[], groupId: string) {
     .sort((a, b) => a.order - b.order);
 }
 
+function normalizeDomainList(domains: string[]): string[] {
+  return domains
+    .map((d) => d.trim().toLowerCase().replace(/^www\./, ""))
+    .filter(Boolean);
+}
+
 function pushGroupTasks(
   groups: DayData["groups"],
   tasks: PlannerTask[],
-  order: { taskId: string; domains: string[] }[],
+  order: PlannerTaskRule[],
   checkDone: (t: PlannerTask) => boolean
 ) {
   const pushTask = (t: PlannerTask) => {
     if (!checkDone(t)) return;
     if (t.domainTags.length === 0) return;
-    const domains = t.domainTags
-      .map((d) => d.trim().toLowerCase().replace(/^www\./, ""))
-      .filter(Boolean);
+    const domains = normalizeDomainList(t.domainTags);
     if (domains.length === 0) return;
-    order.push({ taskId: t.id, domains });
+    // Unscheduled by construction (task dump / unscheduled rail) — never
+    // drives time-based blocking, so blockedDomains/window are always empty/null.
+    order.push({ taskId: t.id, domains, blockedDomains: [], startMinutes: null, endMinutes: null });
   };
 
   for (const g of sortGroups(groups)) {
@@ -462,27 +485,41 @@ function pushGroupTasks(
 }
 
 /**
- * Tab-time rules: planned tasks for that day → task dump.
+ * Tab-time + blocking rules: planned tasks for that day → task dump.
  * Recurring-rule rows are a library only until added to a template or today.
+ * Scheduled entries carry their window (startMinutes/endMinutes) and
+ * blockedDomains so the extension can enforce task-scoped blocking without
+ * any manual toggle — a task's blockedDomains are only ever active while
+ * `now` falls inside its own window.
  */
 export function buildTabTrackingRules(
   state: DailyPlannerV5,
   forDate: Date
-): { taskId: string; domains: string[] }[] {
-  const order: { taskId: string; domains: string[] }[] = [];
+): PlannerTaskRule[] {
+  const order: PlannerTaskRule[] = [];
 
   const k = dayKey(forDate);
   const adHoc = state.adHocByDate[k] ?? { groups: [], tasks: [] };
 
   // Scheduled tasks first, in time order — matches "the thing I'm doing now".
   const scheduled = adHoc.tasks
-    .filter((t) => !t.done && t.startMinutes != null && t.domainTags.length > 0)
+    .filter(
+      (t) =>
+        !t.done &&
+        t.startMinutes != null &&
+        (t.domainTags.length > 0 || (t.blockedDomainTags?.length ?? 0) > 0)
+    )
     .sort((a, b) => (a.startMinutes ?? 0) - (b.startMinutes ?? 0));
   for (const t of scheduled) {
-    const domains = t.domainTags
-      .map((d) => d.trim().toLowerCase().replace(/^www\./, ""))
-      .filter(Boolean);
-    if (domains.length > 0) order.push({ taskId: t.id, domains });
+    const domains = normalizeDomainList(t.domainTags);
+    const blockedDomains = normalizeDomainList(t.blockedDomainTags ?? []);
+    order.push({
+      taskId: t.id,
+      domains,
+      blockedDomains,
+      startMinutes: t.startMinutes,
+      endMinutes: t.endMinutes,
+    });
   }
 
   // Unscheduled tasks within the day's plan, by group/order.

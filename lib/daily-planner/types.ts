@@ -28,6 +28,13 @@ export type PlannerTask = {
   done: boolean;
   /** e.g. github.com — matched without www */
   domainTags: string[];
+  /**
+   * Domains to actively block while this task's window is active — independent
+   * of the extension's global Focus Mode toggle. e.g. block youtube.com during
+   * a "Reading" block even if Focus Mode is off. Enforced by the extension
+   * (Phase 3 sync); this field just carries the intent from the planner.
+   */
+  blockedDomainTags?: string[];
   order: number;
   /**
    * Minutes since local midnight [0, 1440). null = unscheduled (lives in the
@@ -56,6 +63,14 @@ export type PlannerTask = {
    * "completed offline" from "skipped".
    */
   skipped?: boolean;
+  /**
+   * Final on-task classification for a domain-tracked scheduled task, set once
+   * at window end and never re-evaluated after (durable idempotency guard for
+   * the auto-complete engine — also what lets a manual override afterward
+   * stick permanently). null/undefined = not yet resolved (window hasn't
+   * ended, or task isn't domain-tracked / isn't scheduled).
+   */
+  outcome?: "done" | "partial" | "missed";
 };
 
 /**
@@ -96,6 +111,8 @@ export type RecurringRule = {
   /** Free-form notes carried onto the materialized task. */
   description: string;
   domainTags: string[];
+  /** Domains to block while a materialized instance's window is active — see PlannerTask.blockedDomainTags. */
+  blockedDomainTags?: string[];
   frequency: RecurrenceFrequency;
   /** 0=Sun .. 6=Sat — for weekly and biweekly */
   weekdays: number[];
@@ -177,4 +194,9 @@ export type DailyPlannerState = DailyPlannerV5;
 export type PlannerTaskRule = {
   taskId: string;
   domains: string[];
+  /** Domains to block while this task's window is active. Empty if none set. */
+  blockedDomains: string[];
+  /** null for unscheduled tasks (task dump, unscheduled rail) — never drive blocking. */
+  startMinutes: number | null;
+  endMinutes: number | null;
 };

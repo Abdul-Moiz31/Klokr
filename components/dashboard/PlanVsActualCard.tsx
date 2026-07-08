@@ -38,6 +38,8 @@ export function PlanVsActualCard({ sessions, autoCompleteThreshold = 80 }: Props
     if (scheduled.length === 0) return null;
 
     const completed = scheduled.filter((t) => t.done).length;
+    const partial = scheduled.filter((t) => !t.done && t.outcome === "partial").length;
+    const missed = scheduled.filter((t) => !t.done && t.outcome === "missed").length;
     const plannedMinutes = scheduled.reduce(
       (sum, t) => sum + ((t.endMinutes as number) - (t.startMinutes as number)),
       0
@@ -54,6 +56,8 @@ export function PlanVsActualCard({ sessions, autoCompleteThreshold = 80 }: Props
     return {
       total: scheduled.length,
       completed,
+      partial,
+      missed,
       plannedMinutes,
       onTaskMinutes,
       completionPct,
@@ -112,6 +116,21 @@ export function PlanVsActualCard({ sessions, autoCompleteThreshold = 80 }: Props
         <Stat label="Planned time" value={fmtMinutes(summary.plannedMinutes)} accent="violet" />
         <Stat label="On-task time" value={fmtMinutes(summary.onTaskMinutes)} accent={onTrack ? "emerald" : "amber"} />
       </div>
+
+      {(summary.partial > 0 || summary.missed > 0) && (
+        <div className="mt-3 flex items-center gap-2">
+          {summary.partial > 0 && (
+            <span className="rounded-md border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-300">
+              {summary.partial} partial
+            </span>
+          )}
+          {summary.missed > 0 && (
+            <span className="rounded-md border border-red-500/20 bg-red-500/10 px-2 py-0.5 text-xs font-medium text-red-300/80">
+              {summary.missed} missed
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Adherence bar */}
       <div className="mt-6">

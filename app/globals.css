@@ -221,6 +221,11 @@ html {
   border-color: rgba(248, 113, 113, 0.08);
   border-left-color: rgba(248, 113, 113, 0.52);
 }
+.klokrs-timeline .fc-event.klokrs-event--partial {
+  background: rgba(28, 20, 2, 0.42);
+  border-color: rgba(251, 191, 36, 0.1);
+  border-left-color: rgba(251, 191, 36, 0.5);
+}
 .klokrs-timeline .klokrs-event-body {
   display: flex;
   flex-direction: column;
@@ -284,6 +289,14 @@ html {
 .klokrs-timeline .klokrs-event-icon-badge--done {
   background: rgba(255, 255, 255, 0.1) !important;
   color: rgba(255, 255, 255, 0.75) !important;
+}
+.klokrs-timeline .klokrs-event-icon-badge--partial {
+  background: rgba(251, 191, 36, 0.22) !important;
+  color: rgb(253, 224, 71) !important;
+}
+.klokrs-timeline .klokrs-event-icon-badge--missed {
+  background: rgba(248, 113, 113, 0.18) !important;
+  color: rgb(252, 165, 165) !important;
 }
 .klokrs-timeline .klokrs-event-meta {
   font-size: 10px;
@@ -444,6 +457,18 @@ html {
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.12);
   color: inherit;
+}
+.klokrs-week .klokrs-week-event-icon--done {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.75);
+}
+.klokrs-week .klokrs-week-event-icon--partial {
+  background: rgba(251, 191, 36, 0.22);
+  color: rgb(253, 224, 71);
+}
+.klokrs-week .klokrs-week-event-icon--missed {
+  background: rgba(248, 113, 113, 0.18);
+  color: rgb(252, 165, 165);
 }
 .klokrs-week .klokrs-week-event-body .klokrs-event-title {
   font-size: 10px;
