@@ -54,9 +54,25 @@ function isoToLocalDayMinutes(iso: string, dayDate: Date): number | null {
 /**
  * Minutes of `session` that overlap [fromMinutes, toMinutes) on `dayDate`.
  * Sessions that span midnight are truncated to the day under inspection.
+ *
+ * `/api/track` upserts one row per (user, domain, date) — repeat visits to
+ * the same domain extend `end_time` forward without moving `start_time`, so
+ * a domain visited both before and after a gap (e.g. during two separate
+ * scheduled tasks) ends up as a single row whose [start_time, end_time]
+ * wall-clock envelope spans both windows, even though real activity was
+ * only a fraction of that span (`duration_seconds` is the true total).
+ * Treating the full envelope as "active" would let two non-overlapping
+ * tasks each separately claim the whole overlap — double-counting the same
+ * real minutes. Instead we scale `duration_seconds` by the fraction of the
+ * envelope that falls in this window, so the total attributed across every
+ * task in the day can never exceed the session's true active time. This is
+ * an approximation (it assumes activity is spread evenly across the
+ * envelope) rather than exact per-visit truth, but it eliminates the
+ * cross-task leak; only genuinely storing one row per visit would give
+ * exact per-window attribution, at the cost of far more written rows.
  */
 export function sessionMinutesInWindow(
-  session: Pick<TabSession, "start_time" | "end_time">,
+  session: Pick<TabSession, "start_time" | "end_time" | "duration_seconds">,
   dayDate: Date,
   fromMinutes: number,
   toMinutes: number
@@ -68,9 +84,17 @@ export function sessionMinutesInWindow(
   const start = startInDay ?? 0;
   const end = endInDay ?? 1440;
   if (end <= start) return 0;
+
   const lo = Math.max(start, fromMinutes);
   const hi = Math.min(end, toMinutes);
-  return hi > lo ? hi - lo : 0;
+  const overlapMinutes = hi > lo ? hi - lo : 0;
+  if (overlapMinutes <= 0) return 0;
+
+  const envelopeMinutes = end - start;
+  const activeMinutes = Math.max(0, (session.duration_seconds ?? 0) / 60);
+  // Never exceed the true active time, and never exceed the raw overlap
+  // (defends against duration_seconds somehow outgrowing the envelope).
+  return Math.min(overlapMinutes, activeMinutes * (overlapMinutes / envelopeMinutes));
 }
 
 /** Sum the manualAttributions minutes that overlap the task's window. */
