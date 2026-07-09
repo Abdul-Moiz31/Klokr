@@ -18,6 +18,7 @@ const ROWS: { feature: string; klokrs: string; toggl: string }[] = [
   { feature: "Runs in your browser", klokrs: "Yes", toggl: "Yes, plus desktop and mobile apps" },
   { feature: "Ask AI about your time in plain English", klokrs: "Yes, bring your own key", toggl: "No" },
   { feature: "Daily planner mapped to tracked time", klokrs: "Yes", toggl: "Project-based time entries only" },
+  { feature: "Automatic distraction blocking, no toggle", klokrs: "Yes, schedule-aware", toggl: "No" },
   { feature: "Built-in Pomodoro focus timer", klokrs: "Yes", toggl: "No" },
   { feature: "Domain drill-down + 90-day heatmap", klokrs: "Yes", toggl: "Reports by project/client, no domain view" },
   { feature: "PDF & CSV export", klokrs: "Yes", toggl: "Yes" },
@@ -93,6 +94,12 @@ export default function KlokrsVsTogglPage() {
               <span className="text-white/80">Built-in planning and focus tools.</span> The Daily
               Planner and Pomodoro timer are built in. Toggl Track is a pure time-logging tool with
               no planning layer.
+            </li>
+            <li>
+              <span className="text-white/80">Blocks distracting sites on its own.</span> Tag a
+              planner task with sites to block and it enforces itself only during that task's window,
+              plus an always-blocked list for the sites you never want open. Toggl has no site-blocking
+              feature at all.
             </li>
           </ul>
         </section>

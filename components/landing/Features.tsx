@@ -423,7 +423,7 @@ function StatsBento({ inView }: { inView: boolean }) {
         >
           <div className="text-5xl font-bold bg-gradient-to-r from-violet-400 to-cyan-400 bg-clip-text text-transparent">20+</div>
           <div className="text-white/60 font-medium mt-1">Features Shipped</div>
-          <p className="text-white/35 text-sm mt-4">From tab tracking to AI insights, planner, pomodoro, and exports.</p>
+          <p className="text-white/35 text-sm mt-4">From tab tracking to AI insights, planner, scheduled blocking, pomodoro, and exports.</p>
         </motion.div>
 
         <motion.div
@@ -528,15 +528,25 @@ export function Features() {
               <div className="p-6 pt-4 border-t border-white/5">
                 <h3 className="text-xl font-bold text-white mb-2">Daily Planner</h3>
                 <p className="text-white/50 text-sm leading-relaxed">
-                  A Google Calendar-style vertical timeline for your day. Drag, resize, and assign domain tags to tasks so your actual browsing maps back to your plan.
+                  A Google Calendar-style vertical timeline for your day. Drag, resize, and assign domain tags to tasks so your actual browsing maps back to your plan — each task auto-resolves to done, partial, or missed the moment its window ends.
                 </p>
               </div>
             </motion.div>
           </div>
 
           {/* Remaining features — compact grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 pt-4">
             {[
+              {
+                title: "Schedule-Aware Blocking",
+                desc: "Block distracting sites automatically — always-on domains from Settings, plus per-task blocks that only apply during that task's window. No toggle to remember.",
+                icon: (
+                  <>
+                    <rect x="5" y="11" width="14" height="10" rx="2" />
+                    <path d="M8 11V7a4 4 0 0 1 8 0v4" strokeLinecap="round" />
+                  </>
+                ),
+              },
               {
                 title: "Ask AI",
                 desc: "Ask natural-language questions about your data with your own API key.",

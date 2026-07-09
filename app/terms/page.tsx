@@ -74,7 +74,10 @@ export default function TermsPage() {
           <p>
             Klokrs is a productivity tool that tracks time spent on browser tabs,
             provides analytics dashboards, and offers planning features including
-            a daily planner, routine templates, and a Pomodoro timer.
+            a daily planner, routine templates, and a Pomodoro timer. The Service
+            also lets you configure domains to block — either at all times, or
+            only during a specific planner task's scheduled window — which the
+            extension enforces automatically by redirecting matching tabs.
           </p>
           <p>
             The Service consists of a Chrome browser extension that records
@@ -198,6 +201,13 @@ export default function TermsPage() {
             available&rdquo; without warranties of any kind, express or implied.
             We do not warrant that the Service will be uninterrupted, error-free,
             or free of harmful components.
+          </p>
+          <p>
+            Site blocking is enforced on a best-effort basis and depends on the
+            extension having a working connection to our servers. We do not
+            guarantee that every configured domain will be blocked at every
+            moment, and you should not rely on it as the sole safeguard for
+            anything security- or safety-critical.
           </p>
           <p>
             To the maximum extent permitted by law, Klokrs shall not be liable

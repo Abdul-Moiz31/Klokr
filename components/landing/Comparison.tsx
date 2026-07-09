@@ -40,6 +40,7 @@ const ROWS: Row[] = [
   { feature: "Ask AI about your time in plain English", cells: [y, n, p("reports only"), n] },
   { feature: "Bring your own AI key — unlimited & private", cells: [y, n, n, n] },
   { feature: "Daily planner that maps tasks to real time", cells: [y, n, p("projects"), p("projects")] },
+  { feature: "Schedule-aware site blocking, no toggle needed", cells: [y, p("manual FocusTime"), p("focus sessions"), n] },
   { feature: "Built-in Pomodoro focus timer", cells: [y, p("focus blocks"), y, n] },
   { feature: "Streaks, XP & accountability score", cells: [y, n, n, n] },
   { feature: "Domain drill-down + 90-day heatmap", cells: [y, y, y, p("reports")] },
