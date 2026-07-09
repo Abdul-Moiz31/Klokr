@@ -86,6 +86,7 @@ const FREE_FEATURES = [
   "Domain drill-down with hourly chart",
   "90-day activity heatmap",
   "Streak and productivity tracking",
+  "Schedule-aware distraction blocking",
   // "Daily Planner with unlimited tasks",    // coming soon
   // "Weekday, Saturday and Sunday templates", // coming soon
   // "Pomodoro timer",                         // coming soon

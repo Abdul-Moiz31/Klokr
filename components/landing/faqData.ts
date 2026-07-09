@@ -31,4 +31,12 @@ export const FAQ_ITEMS: { q: string; a: string }[] = [
     q: "How do I delete my data or account?",
     a: "Go to Settings — you can pause tracking anytime, export everything as CSV, or permanently delete your account. Deletion is irreversible and fully processed within 30 days.",
   },
+  {
+    q: "Can Klokrs block distracting sites for me?",
+    a: "Yes — and there's no toggle to remember. Add an always-blocked list once in Settings for sites you never want open, then tag any Daily Planner task with sites to block only during that task's scheduled window. It enforces itself the moment the window starts and lifts automatically the moment it ends.",
+  },
+  {
+    q: "Does Klokrs know if I actually finished a scheduled task?",
+    a: "Yes. Any task you tag with domains auto-resolves the moment its scheduled window ends — done if you hit your completion threshold (80% by default, adjustable in Settings), partial if you were on-task 50–79% of the window, or missed below that. No manual checkbox required, and the same status shows up in the Daily Planner, the Week view, and the dashboard's Plan vs Actual card.",
+  },
 ];

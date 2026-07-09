@@ -18,6 +18,7 @@ const ROWS: { feature: string; klokrs: string; rescuetime: string }[] = [
   { feature: "Runs in your browser (no desktop app required)", klokrs: "Yes", rescuetime: "Desktop app + browser extension" },
   { feature: "Ask AI about your time in plain English", klokrs: "Yes, bring your own key", rescuetime: "No" },
   { feature: "Daily planner mapped to tracked time", klokrs: "Yes", rescuetime: "No" },
+  { feature: "Automatic distraction blocking, no toggle", klokrs: "Yes, schedule-aware", rescuetime: "Manual FocusTime sessions" },
   { feature: "Built-in Pomodoro focus timer", klokrs: "Yes", rescuetime: "FocusTime blocking only" },
   { feature: "Domain drill-down + 90-day heatmap", klokrs: "Yes", rescuetime: "Yes" },
   { feature: "PDF & CSV export", klokrs: "Yes", rescuetime: "Yes" },
@@ -92,6 +93,12 @@ export default function KlokrsVsRescueTimePage() {
               <span className="text-white/80">Built-in planning, not just reporting.</span> The Daily
               Planner maps your intended schedule against what you actually did, and a Pomodoro timer
               is built in. RescueTime is reporting-only, plus basic FocusTime site blocking.
+            </li>
+            <li>
+              <span className="text-white/80">Blocking that follows your schedule, not a manual switch.</span> Set
+              an always-blocked list once in Settings, then tag any planner task with sites to block
+              only during that task's window — it enforces itself and lifts automatically when the
+              window ends. RescueTime's FocusTime is a manual session you start by hand.
             </li>
           </ul>
         </section>

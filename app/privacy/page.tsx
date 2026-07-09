@@ -91,7 +91,13 @@ export default function PrivacyPage() {
               <p>
                 Task lists, routine templates, and planner entries you create
                 are stored on our servers so they sync across devices and
-                persist across sessions.
+                persist across sessions. This includes any domains you tag on
+                a task for progress tracking, and any domains you choose to
+                block — either always (Settings) or only during a specific
+                task's scheduled window (Daily Planner). The extension
+                fetches your schedule directly from our servers, using your
+                own account credentials, to know which domains to block and
+                when.
               </p>
             </div>
             <div className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-4">
@@ -134,6 +140,7 @@ export default function PrivacyPage() {
             <li>Display your time tracking analytics and reports in the dashboard</li>
             <li>Calculate streaks, productivity scores, and activity heatmaps</li>
             <li>Sync your planner tasks and routine templates across sessions</li>
+            <li>Enforce the site-blocking rules you've configured (always-blocked list and per-task blocked domains) via the extension</li>
             <li>Send essential transactional emails (account verification, password reset)</li>
             <li>Detect and prevent abuse or security incidents</li>
             <li>Improve the service based on aggregated, anonymised usage patterns</li>
