@@ -1,5 +1,6 @@
 import type { TabSession } from "@/lib/supabase";
 import type { ManualAttribution, PlannerTask } from "./types";
+import { normalizeDomainInput } from "@/lib/domain";
 
 /**
  * Pure on-task computation for planner tasks. No React, no IO — these helpers
@@ -30,7 +31,7 @@ const ZERO_STATS: OnTaskStats = {
 };
 
 function normalizeDomain(d: string): string {
-  return d.trim().toLowerCase().replace(/^www\./, "");
+  return normalizeDomainInput(d);
 }
 
 /**

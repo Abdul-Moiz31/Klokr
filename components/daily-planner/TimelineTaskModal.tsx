@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import type { PlannerTask, RoutineTemplateKind } from "@/lib/daily-planner/types";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
+import { normalizeDomainInput } from "@/lib/domain";
 import {
   MIN_DURATION_MINUTES,
   SNAP_MINUTES,
@@ -54,7 +55,7 @@ type Props = {
 function splitDomains(s: string) {
   return s
     .split(/[,;]+/)
-    .map((d) => d.trim().toLowerCase().replace(/^www\./, ""))
+    .map(normalizeDomainInput)
     .filter(Boolean);
 }
 

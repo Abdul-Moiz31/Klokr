@@ -193,6 +193,8 @@ export type DailyPlannerState = DailyPlannerV5;
 
 export type PlannerTaskRule = {
   taskId: string;
+  /** Carried so the extension can name the task in start/ending-soon notifications. */
+  title: string;
   domains: string[];
   /** Domains to block while this task's window is active. Empty if none set. */
   blockedDomains: string[];

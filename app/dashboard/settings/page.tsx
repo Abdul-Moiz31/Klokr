@@ -15,6 +15,7 @@ import { Loader } from "@/components/ui/Loader";
 import { BillingCard } from "@/components/dashboard/BillingCard";
 import { AiSettingsTab } from "@/components/dashboard/AiSettingsTab";
 import { DEFAULT_PREFS, loadPrefs, savePrefs, resolveTimezone, type KlokrsPrefs } from "@/lib/prefs";
+import { normalizeDomainInput } from "@/lib/domain";
 import { getSiteName } from "@/lib/domain";
 import { getCategoryForDomain, getCategoryStats, CATEGORIES, hexToRgb } from "@/lib/categories";
 import type { CategoryId } from "@/lib/categories";
@@ -94,7 +95,7 @@ function DomainListField({
   const commit = () => {
     const domains = text
       .split(/[,;]+/)
-      .map((d) => d.trim().toLowerCase().replace(/^www\./, ""))
+      .map(normalizeDomainInput)
       .filter(Boolean);
     setText(domains.join(", "));
     onCommit(domains);
@@ -1434,6 +1435,24 @@ function SettingsPageInner() {
                     <Toggle
                       checked={prefs.notifications.dayComplete}
                       onChange={(v) => updatePrefs({ notifications: { ...prefs.notifications, dayComplete: v } })}
+                    />
+                  </PrefRow>
+                  <PrefRow
+                    label="Task started"
+                    hint="Notify me the moment a scheduled Daily Planner task's window begins"
+                  >
+                    <Toggle
+                      checked={prefs.notifications.taskStarted}
+                      onChange={(v) => updatePrefs({ notifications: { ...prefs.notifications, taskStarted: v } })}
+                    />
+                  </PrefRow>
+                  <PrefRow
+                    label="Task ending soon"
+                    hint="Notify me a few minutes before a scheduled task's window closes"
+                  >
+                    <Toggle
+                      checked={prefs.notifications.taskEndingSoon}
+                      onChange={(v) => updatePrefs({ notifications: { ...prefs.notifications, taskEndingSoon: v } })}
                     />
                   </PrefRow>
                 </Card>

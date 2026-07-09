@@ -3,6 +3,10 @@ import type { CategoryId } from "./categories";
 export interface KlokrsNotificationPrefs {
   dayStart: boolean;
   dayComplete: boolean;
+  /** "Reading has started" the moment a scheduled task's window begins. */
+  taskStarted: boolean;
+  /** "Reading ends in 5 minutes" heads-up before a scheduled task's window closes. */
+  taskEndingSoon: boolean;
 }
 
 export interface KlokrsPrefs {
@@ -42,6 +46,8 @@ export const DEFAULT_PREFS: KlokrsPrefs = {
   notifications: {
     dayStart: true,
     dayComplete: true,
+    taskStarted: true,
+    taskEndingSoon: true,
   },
   timezone: null,
   autoCompleteEnabled: true,
