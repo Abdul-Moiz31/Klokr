@@ -7,6 +7,7 @@ import type {
   RoutineTemplateKind,
 } from "@/lib/daily-planner/types";
 import { dayKey } from "@/lib/daily-planner/date";
+import { normalizeDomainInput } from "@/lib/domain";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 
 const FREQ: { value: RecurrenceFrequency; label: string; hint: string }[] = [
@@ -335,7 +336,7 @@ function RecurringRuleModal({
     if (!form.title.trim()) return;
     if ((form.frequency === "weekly" || form.frequency === "biweekly") && form.weekdays.length === 0) return;
     if (form.frequency === "monthly" && form.monthDays.length === 0) return;
-    const normalize = (list: string[]) => list.map((d) => d.trim()).filter(Boolean).map((d) => d.toLowerCase().replace(/^www\./, ""));
+    const normalize = (list: string[]) => list.map(normalizeDomainInput).filter(Boolean);
     const domains = normalize(form.domainTags);
     const blockedDomains = normalize(form.blockedDomainTags ?? []);
     onSave({

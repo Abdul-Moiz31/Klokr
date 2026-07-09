@@ -46,7 +46,7 @@ function useNow(tickMs: number): Date {
 export function useActiveScheduledTask(
   sessions: TabSession[],
   autoCompleteThreshold = 80,
-  tickMs = 45_000
+  tickMs = 20_000
 ): ActiveTask | null {
   const { state } = useDailyPlannerState();
   const now = useNow(tickMs);

@@ -1,3 +1,19 @@
+// Cleans up a user-typed domain entry into a bare hostname: strips any
+// protocol, path/query/hash, and a leading "www.", lowercases the result.
+// "https://www.youtube.com/watch?v=1" → "youtube.com". Used anywhere a user
+// types domains into a text field (planner tasks, routines, always-blocked
+// list in Settings) — the extension's own matching only ever works against
+// bare hostnames, so unnormalized entries (a pasted full URL) silently never
+// match anything.
+export function normalizeDomainInput(raw: string): string {
+  let v = (raw ?? "").trim().toLowerCase();
+  if (!v) return "";
+  v = v.replace(/^[a-z][a-z0-9+.-]*:\/\//, ""); // strip protocol, e.g. "https://"
+  v = v.split(/[/?#]/)[0] ?? ""; // strip path/query/hash
+  v = v.replace(/^www\./, "");
+  return v;
+}
+
 // Returns the registrable root domain: "gist.github.com" → "github.com".
 // Handles common two-part TLDs (co.uk, com.au, etc.) and leaves plain
 // "domain.tld" untouched.

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseForUserJwt } from "@/lib/supabase-user-client";
 import { fetchRemotePlanner } from "@/lib/services/plannerSync";
 import { buildTabTrackingRules, migrateAnyToV5 } from "@/lib/daily-planner/storage";
+import { dayKey } from "@/lib/daily-planner/date";
 
 /**
  * Pulled by the extension (not pushed by the website) so today's schedule —
@@ -27,14 +28,25 @@ export async function GET(request: NextRequest) {
 
   const remote = await fetchRemotePlanner(user.id);
   if (!remote) {
-    return NextResponse.json({ rules: [] });
+    return NextResponse.json({ rules: [], summary: { total: 0, completed: 0 } });
   }
 
   const state = migrateAnyToV5(remote.data);
   // Matches the client's own dayKey(new Date()) — both read the day off the
   // instant's UTC calendar date, so "today" always resolves to the same
   // adHocByDate entry the planner UI itself just wrote.
-  const rules = buildTabTrackingRules(state, new Date());
+  const now = new Date();
+  const rules = buildTabTrackingRules(state, now);
 
-  return NextResponse.json({ rules });
+  // Unlike `rules` (which drops already-done tasks), the day-complete
+  // notification needs the full picture — every scheduled task today,
+  // done or not — to report "N of M tasks completed".
+  const today = state.adHocByDate[dayKey(now)];
+  const scheduledToday = (today?.tasks ?? []).filter((t) => t.startMinutes != null);
+  const summary = {
+    total: scheduledToday.length,
+    completed: scheduledToday.filter((t) => t.done).length,
+  };
+
+  return NextResponse.json({ rules, summary });
 }

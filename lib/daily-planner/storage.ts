@@ -13,6 +13,7 @@ import type {
   RoutineTemplateKind,
 } from "./types";
 import { dayKey } from "./date";
+import { normalizeDomainInput } from "@/lib/domain";
 export { dayKey } from "./date";
 export { ruleAppliesOnDate, rulesForDate, completionKey, isRecurringDone } from "./recurrence";
 
@@ -107,12 +108,8 @@ export function appendRecurringRuleAsTaskToDayData(
   const target = dailyRoutine ?? sorted[0];
   const tasksInG = tasks.filter((t) => t.groupId === target.id);
   const maxOrder = tasksInG.reduce((m, t) => Math.max(m, t.order), -1);
-  const domainTags = (rule.domainTags ?? [])
-    .map((d) => d.trim().toLowerCase().replace(/^www\./, ""))
-    .filter(Boolean);
-  const blockedDomainTags = (rule.blockedDomainTags ?? [])
-    .map((d) => d.trim().toLowerCase().replace(/^www\./, ""))
-    .filter(Boolean);
+  const domainTags = (rule.domainTags ?? []).map(normalizeDomainInput).filter(Boolean);
+  const blockedDomainTags = (rule.blockedDomainTags ?? []).map(normalizeDomainInput).filter(Boolean);
   let startMinutes: number | null = null;
   let endMinutes: number | null = null;
   if (
@@ -458,9 +455,7 @@ function tasksInGroup(tasks: PlannerTask[], groupId: string) {
 }
 
 function normalizeDomainList(domains: string[]): string[] {
-  return domains
-    .map((d) => d.trim().toLowerCase().replace(/^www\./, ""))
-    .filter(Boolean);
+  return domains.map(normalizeDomainInput).filter(Boolean);
 }
 
 function pushGroupTasks(
@@ -475,8 +470,9 @@ function pushGroupTasks(
     const domains = normalizeDomainList(t.domainTags);
     if (domains.length === 0) return;
     // Unscheduled by construction (task dump / unscheduled rail) — never
-    // drives time-based blocking, so blockedDomains/window are always empty/null.
-    order.push({ taskId: t.id, domains, blockedDomains: [], startMinutes: null, endMinutes: null });
+    // drives time-based blocking or start/end notifications, so
+    // blockedDomains/window are always empty/null.
+    order.push({ taskId: t.id, title: t.title, domains, blockedDomains: [], startMinutes: null, endMinutes: null });
   };
 
   for (const g of sortGroups(groups)) {
@@ -485,12 +481,16 @@ function pushGroupTasks(
 }
 
 /**
- * Tab-time + blocking rules: planned tasks for that day → task dump.
- * Recurring-rule rows are a library only until added to a template or today.
- * Scheduled entries carry their window (startMinutes/endMinutes) and
- * blockedDomains so the extension can enforce task-scoped blocking without
- * any manual toggle — a task's blockedDomains are only ever active while
- * `now` falls inside its own window.
+ * Tab-time + blocking + notification rules: planned tasks for that day →
+ * task dump. Recurring-rule rows are a library only until added to a
+ * template or today. Scheduled entries carry their window
+ * (startMinutes/endMinutes), title, and blockedDomains so the extension can
+ * enforce task-scoped blocking and fire start/ending-soon notifications
+ * without any manual toggle — a task's blockedDomains are only ever active
+ * while `now` falls inside its own window. Every *scheduled* task is
+ * included regardless of whether it has domains/blockedDomains set (a task
+ * with neither still deserves a start/end notification), unlike unscheduled
+ * tasks below, which only ever exist here for domain-tag attribution.
  */
 export function buildTabTrackingRules(
   state: DailyPlannerV5,
@@ -503,18 +503,14 @@ export function buildTabTrackingRules(
 
   // Scheduled tasks first, in time order — matches "the thing I'm doing now".
   const scheduled = adHoc.tasks
-    .filter(
-      (t) =>
-        !t.done &&
-        t.startMinutes != null &&
-        (t.domainTags.length > 0 || (t.blockedDomainTags?.length ?? 0) > 0)
-    )
+    .filter((t) => !t.done && t.startMinutes != null)
     .sort((a, b) => (a.startMinutes ?? 0) - (b.startMinutes ?? 0));
   for (const t of scheduled) {
     const domains = normalizeDomainList(t.domainTags);
     const blockedDomains = normalizeDomainList(t.blockedDomainTags ?? []);
     order.push({
       taskId: t.id,
+      title: t.title,
       domains,
       blockedDomains,
       startMinutes: t.startMinutes,
