@@ -16,8 +16,7 @@ import { getTaskColor } from "@/lib/daily-planner/taskColor";
 import { CategoryIcon } from "@/lib/daily-planner/taskIcon";
 import type { TabSession } from "@/lib/supabase";
 import {
-  computeOnTaskStats,
-  type OnTaskStats,
+  computeOnTaskStatsForDay,
   type UnscheduledGap,
 } from "@/lib/daily-planner/onTask";
 import {
@@ -108,14 +107,10 @@ export function TimelineView({
   onMarkOfflineComplete,
   onMarkSkipped,
 }: Props) {
-  const statsByTaskId = useMemo(() => {
-    const map = new Map<string, OnTaskStats>();
-    for (const t of tasks) {
-      if (t.startMinutes == null || t.endMinutes == null) continue;
-      map.set(t.id, computeOnTaskStats(t, sessions, forDate, autoCompleteThreshold));
-    }
-    return map;
-  }, [tasks, sessions, forDate, autoCompleteThreshold]);
+  const statsByTaskId = useMemo(
+    () => computeOnTaskStatsForDay(tasks, sessions, forDate, autoCompleteThreshold),
+    [tasks, sessions, forDate, autoCompleteThreshold]
+  );
 
   const calendarRef = useRef<FullCalendar | null>(null);
   const dragRef = useRef<Draggable | null>(null);
