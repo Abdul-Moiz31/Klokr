@@ -4,13 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { useDailyPlannerState } from "@/lib/daily-planner/useDailyPlannerState";
-import { computeOnTaskStats } from "@/lib/daily-planner/onTask";
+import { computeOnTaskStatsForDay, type OnTaskStats } from "@/lib/daily-planner/onTask";
 import { localMinutesNow } from "@/lib/daily-planner/autoComplete";
 import { dayKey } from "@/lib/daily-planner/storage";
 import type { PlannerTask } from "@/lib/daily-planner/types";
 import type { TabSession } from "@/lib/supabase";
 
-type ActiveTask = { task: PlannerTask; stats: ReturnType<typeof computeOnTaskStats> };
+type ActiveTask = { task: PlannerTask; stats: OnTaskStats };
 
 type Props = {
   active: ActiveTask;
@@ -67,7 +67,12 @@ export function useActiveScheduledTask(
     );
     if (!active) return null;
 
-    const stats = computeOnTaskStats(active, sessions, now, autoCompleteThreshold);
+    // Day-level (not just this task) so a sibling overlapping task tagging
+    // the same domain doesn't cause both to independently claim the full
+    // shared minutes — see computeOnTaskStatsForDay().
+    const statsByTask = computeOnTaskStatsForDay(day.tasks, sessions, now, autoCompleteThreshold);
+    const stats = statsByTask.get(active.id);
+    if (!stats) return null;
     return { task: active, stats };
   }, [state, now, sessions, autoCompleteThreshold]);
 }

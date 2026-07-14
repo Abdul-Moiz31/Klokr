@@ -1,6 +1,6 @@
 import type { TabSession } from "@/lib/supabase";
 import type { PlannerTask } from "./types";
-import { computeOnTaskStats } from "./onTask";
+import { computeOnTaskStatsForDay } from "./onTask";
 
 /** Below this, a domain-tracked task is classified "missed" at window end. */
 export const PARTIAL_THRESHOLD = 50;
@@ -46,6 +46,10 @@ export function pickAutoCompletions(
   if (!prefs.autoCompleteEnabled) return [];
   const completedAt = Date.now();
   const out: AutoCompleteApply[] = [];
+  // Computed once for the whole day (not per task) so two overlapping tasks
+  // tagging the same domain split their shared minutes fairly instead of
+  // each independently claiming the full overlap — see computeOnTaskStatsForDay().
+  const statsByTask = computeOnTaskStatsForDay(tasks, sessions, dayDate, prefs.autoCompleteThreshold);
   for (const t of tasks) {
     if (t.outcome != null) continue;
     if (t.done === true) continue;
@@ -53,7 +57,8 @@ export function pickAutoCompletions(
     if (t.domainTags.length === 0) continue;
     if (t.startMinutes == null || t.endMinutes == null) continue;
     if (t.endMinutes > nowMinutes) continue;
-    const stats = computeOnTaskStats(t, sessions, dayDate, prefs.autoCompleteThreshold);
+    const stats = statsByTask.get(t.id);
+    if (!stats) continue;
     if (stats.percent >= prefs.autoCompleteThreshold) {
       out.push({ taskId: t.id, completedAt, done: true, outcome: "done" });
     } else if (stats.percent >= PARTIAL_THRESHOLD) {

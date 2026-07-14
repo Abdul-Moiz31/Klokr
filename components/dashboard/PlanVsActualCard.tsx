@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { useDailyPlannerState } from "@/lib/daily-planner/useDailyPlannerState";
-import { computeOnTaskStats } from "@/lib/daily-planner/onTask";
+import { computeOnTaskStatsForDay } from "@/lib/daily-planner/onTask";
 import { dayKey } from "@/lib/daily-planner/storage";
 import type { TabSession } from "@/lib/supabase";
 
@@ -45,9 +45,13 @@ export function PlanVsActualCard({ sessions, autoCompleteThreshold = 80 }: Props
       0
     );
 
+    // Day-level so overlapping same-domain tasks split their shared minutes
+    // instead of each independently claiming the full overlap — summing the
+    // old per-task calls could otherwise push adherence% past 100.
+    const statsByTask = computeOnTaskStatsForDay(scheduled, sessions, today, autoCompleteThreshold);
     let onTaskMinutes = 0;
     for (const t of scheduled) {
-      onTaskMinutes += computeOnTaskStats(t, sessions, today, autoCompleteThreshold).onTaskMinutes;
+      onTaskMinutes += statsByTask.get(t.id)?.onTaskMinutes ?? 0;
     }
 
     const completionPct = scheduled.length > 0 ? Math.round((completed / scheduled.length) * 100) : 0;
