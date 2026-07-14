@@ -14,6 +14,7 @@ import {
   computeProgress,
   fmtHm,
   localDateStr,
+  mergeEarnedAchievements,
   type ProgressResult,
   type Badge,
 } from "@/lib/gamification";
@@ -458,7 +459,9 @@ function RecordsCard({ p }: { p: ProgressResult }) {
     { label: "Best deep-work day",  value: fmtHm(p.records.bestDeepDaySeconds),  sub: fmtDate(p.records.bestDeepDayDate) },
     { label: "Best score",          value: String(p.records.bestScore),           sub: fmtDate(p.records.bestScoreDate) },
     { label: "Most tracked day",    value: fmtHm(p.records.bestTotalDaySeconds), sub: fmtDate(p.records.bestTotalDayDate) },
-    { label: "Longest streak",      value: `${p.records.longestStreakDays}d`,     sub: "all time" },
+    // Computed from the same 90-day window as the rest of this page, not
+    // truly "all time" — a longer historical streak wouldn't be visible here.
+    { label: "Longest streak",      value: `${p.records.longestStreakDays}d`,     sub: "last 90 days" },
   ];
   return (
     <motion.div
@@ -696,22 +699,60 @@ export default function ProgressPage() {
       from.setDate(today.getDate() - 90);
 
       const supabase = createClient();
-      const { data } = await supabase
-        .from("tab_sessions")
-        .select("domain, duration_seconds, date")
-        .eq("user_id", user.id)
-        .gte("date", localDateStr(from))
-        .lte("date", todayStr)
-        .gte("duration_seconds", prefs.minSessionSeconds);
+      const [{ data }, { data: achievementRows }] = await Promise.all([
+        supabase
+          .from("tab_sessions")
+          .select("domain, duration_seconds, date")
+          .eq("user_id", user.id)
+          .gte("date", localDateStr(from))
+          .lte("date", todayStr)
+          .gte("duration_seconds", prefs.minSessionSeconds),
+        supabase
+          .from("user_achievements")
+          .select("badge_id")
+          .eq("user_id", user.id),
+      ]);
 
       if (cancelled) return;
       const rows = (data ?? []) as Array<{ domain: string; duration_seconds: number; date: string }>;
-      setResult(computeProgress(rows, {
+      const persistedBadgeIds = new Set(
+        ((achievementRows ?? []) as Array<{ badge_id: string }>).map((r) => r.badge_id)
+      );
+
+      const computed = computeProgress(rows, {
         overrides: prefs.categoryOverrides,
         goalHours: prefs.productiveHoursThreshold,
         todayStr,
-      }));
+      });
+      // A badge earned by the live (90-day-windowed) computation is never
+      // un-earned again once persisted — see mergeEarnedAchievements()'s doc
+      // comment for why the raw computation alone isn't enough.
+      const badges = mergeEarnedAchievements(computed.badges, persistedBadgeIds);
+      setResult({ ...computed, badges });
       setLoading(false);
+
+      // Persist any newly-earned badge (first time this window has shown it
+      // as earned) so it can never silently un-earn later. Fire-and-forget —
+      // if this insert fails (offline, RLS hiccup), the same badge will just
+      // get persisted on a future page load instead; nothing is lost, and a
+      // duplicate insert attempt is a harmless no-op (primary key conflict).
+      const newlyEarned = badges.filter((b) => b.earned && !persistedBadgeIds.has(b.id));
+      if (newlyEarned.length > 0) {
+        void supabase
+          .from("user_achievements")
+          .insert(
+            newlyEarned.map((b) => ({
+              user_id: user.id,
+              badge_id: b.id,
+              criteria_snapshot: { progress: b.progress ?? null, earnedFrom: "90d-window" },
+            }))
+          )
+          .then(({ error }: { error: { code?: string; message: string } | null }) => {
+            if (error && error.code !== "23505") {
+              console.error("Failed to persist achievement:", error.message);
+            }
+          });
+      }
     })();
     return () => { cancelled = true; };
   }, [user, prefs, todayStr]);
