@@ -21,6 +21,7 @@ import { suggestedRoutineTemplateKind } from "./date";
 import { ruleAppliesOnDate } from "./recurrence";
 import { fetchRemotePlanner, upsertRemotePlanner } from "@/lib/services/plannerSync";
 import { getAuthUser } from "@/lib/services/userPreferences";
+import { createClient } from "@/lib/supabase";
 
 const SYNC_DEBOUNCE_MS = 2000;
 
@@ -37,6 +38,36 @@ export function useDailyPlannerState() {
   // Ensures we auto-apply a template at most once per page session.
   const autoAppliedRef = useRef(false);
 
+  // Pulls the remote planner and adopts it only if newer than what we have
+  // (compares against Klokrs_planner_synced_at) — safe to call repeatedly,
+  // including from the realtime listener below, since it never blindly
+  // overwrites a local edit that hasn't synced yet. Remote rows may be older
+  // v1..v4 shapes — migrate before adopting, and if migration changed the
+  // version, write v5 back so the DB row catches up without waiting for the
+  // next user edit.
+  const syncFromRemote = useCallback(async (userId: string, localSnapshot?: DailyPlannerV5) => {
+    const remote = await fetchRemotePlanner(userId);
+    if (!remote) return;
+
+    const localTs = localStorage.getItem("Klokrs_planner_synced_at") ?? "0";
+    const remoteVersion = (remote.data as { v?: number })?.v;
+    if (remote.updated_at > localTs) {
+      const migrated = migrateAnyToV5(remote.data);
+      setState(migrated);
+      saveDailyPlanner(migrated);
+      localStorage.setItem("Klokrs_planner_synced_at", remote.updated_at);
+      if (remoteVersion !== 5) {
+        await upsertRemotePlanner(userId, migrated);
+        localStorage.setItem("Klokrs_planner_synced_at", new Date().toISOString());
+      }
+    } else if (remoteVersion !== 5 && localSnapshot) {
+      // Remote is older but we already had newer local data — still upgrade
+      // the DB row to v5 with our local state so the schema converges.
+      await upsertRemotePlanner(userId, localSnapshot);
+      localStorage.setItem("Klokrs_planner_synced_at", new Date().toISOString());
+    }
+  }, []);
+
   // 1. Hydrate from localStorage immediately, then merge with Supabase in background.
   useEffect(() => {
     const local = loadDailyPlanner();
@@ -46,33 +77,48 @@ export function useDailyPlannerState() {
     void (async () => {
       const user = await getAuthUser();
       if (!user) return;
-
-      const remote = await fetchRemotePlanner(user.id);
-      if (!remote) return;
-
-      // If remote is newer than what we loaded from localStorage, adopt it.
-      // Remote rows may be older v1..v4 shapes — migrate before adopting,
-      // and if migration changed the version, write v5 back so the DB row
-      // catches up without waiting for the next user edit.
-      const localTs = localStorage.getItem("Klokrs_planner_synced_at") ?? "0";
-      const remoteVersion = (remote.data as { v?: number })?.v;
-      if (remote.updated_at > localTs) {
-        const migrated = migrateAnyToV5(remote.data);
-        setState(migrated);
-        saveDailyPlanner(migrated);
-        localStorage.setItem("Klokrs_planner_synced_at", remote.updated_at);
-        if (remoteVersion !== 5) {
-          await upsertRemotePlanner(user.id, migrated);
-          localStorage.setItem("Klokrs_planner_synced_at", new Date().toISOString());
-        }
-      } else if (remoteVersion !== 5) {
-        // Remote is older but we already had newer local data — still upgrade
-        // the DB row to v5 with our local state so the schema converges.
-        await upsertRemotePlanner(user.id, local);
-        localStorage.setItem("Klokrs_planner_synced_at", new Date().toISOString());
-      }
+      await syncFromRemote(user.id, local);
     })();
-  }, []);
+  }, [syncFromRemote]);
+
+  // 2. Live sync across tabs/devices: if the plan is edited elsewhere (another
+  // open tab, another device, a future server-side writer), pick it up
+  // without requiring a reload — closes the gap where this was the only
+  // major piece of user data with no realtime path (tab_sessions and
+  // notifications both already have one). Reuses syncFromRemote()'s existing
+  // timestamp comparison, so a stale/duplicate event can't clobber a newer
+  // local edit that just hasn't finished its own debounced write yet.
+  useEffect(() => {
+    let cancelled = false;
+    let channel: ReturnType<ReturnType<typeof createClient>["channel"]> | null = null;
+
+    void (async () => {
+      const user = await getAuthUser();
+      if (!user || cancelled) return;
+      const supabase = createClient();
+      channel = supabase
+        .channel(`user_planner_data_live:${user.id}:${crypto.randomUUID()}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "user_planner_data",
+            filter: `user_id=eq.${user.id}`,
+          },
+          () => void syncFromRemote(user.id)
+        );
+      channel.subscribe();
+    })();
+
+    return () => {
+      cancelled = true;
+      if (channel) {
+        const supabase = createClient();
+        void supabase.removeChannel(channel);
+      }
+    };
+  }, [syncFromRemote]);
 
   // 2. On every state change: save to localStorage immediately, debounce Supabase write.
   useEffect(() => {

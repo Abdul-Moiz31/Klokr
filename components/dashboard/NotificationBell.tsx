@@ -104,6 +104,36 @@ export function NotificationBell({ userId }: Props) {
     return () => { cancelled = true; };
   }, [userId, refresh]);
 
+  // Live sync across tabs/devices: a notification generated, marked read, or
+  // dismissed elsewhere (another open tab, another device) shows up here
+  // without needing a reload — same Realtime + polling-fallback pattern used
+  // for tab_sessions elsewhere in the dashboard.
+  useEffect(() => {
+    if (!userId) return;
+    const supabase = createClient();
+
+    const channel = supabase
+      .channel(`notifications_live:${userId}:${crypto.randomUUID()}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${userId}`,
+        },
+        () => void refresh()
+      );
+    channel.subscribe();
+
+    const pollingInterval = setInterval(() => void refresh(), 30_000);
+
+    return () => {
+      clearInterval(pollingInterval);
+      void supabase.removeChannel(channel);
+    };
+  }, [userId, refresh]);
+
   // Close on outside click / Escape.
   useEffect(() => {
     if (!open) return;
