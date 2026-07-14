@@ -25,7 +25,18 @@ export async function POST(request: NextRequest) {
     );
 
     if (!res.ok) {
-      return NextResponse.json({ error: "Token refresh failed" }, { status: 401 });
+      let detail: { error?: string; error_description?: string } = {};
+      try { detail = (await res.json()) as typeof detail; } catch { /* non-JSON error body */ }
+      const description = detail.error_description || detail.error || "";
+      // Supabase returns "invalid_grant" + a description like "Already Used"
+      // or "Not Found" when this exact refresh token was already rotated —
+      // e.g. by the same account's extension on a different device, since
+      // refresh tokens are single-use. That's permanent: retrying with the
+      // same stored token can never succeed, unlike a network blip or 5xx.
+      // Forward which kind this is so the caller can stop retrying a token
+      // that can never come back instead of hammering it forever.
+      const permanent = /already used|not found|revoked/i.test(description);
+      return NextResponse.json({ error: "Token refresh failed", permanent }, { status: 401 });
     }
 
     const data = (await res.json()) as {

@@ -148,6 +148,76 @@ export function computeOnTaskStats(
   return { onTaskMinutes, totalWindowMinutes, percent, status };
 }
 
+/**
+ * Day-level version of computeOnTaskStats(): correctly handles two scheduled
+ * tasks with overlapping windows that tag the same domain.
+ *
+ * computeOnTaskStats() looks at one task in isolation, so sessionMinutesInWindow()
+ * has no way to know a sibling task's window claims the same wall-clock minutes
+ * — two overlapping tasks tagging "github.com" would each independently be
+ * credited the full overlap, so the sum attributed across tasks could exceed
+ * the domain's real tracked time for that stretch. This function computes
+ * every scheduled task's claim on every session up front, and if a session's
+ * combined claims from multiple tasks exceed what was actually tracked, scales
+ * every claim down proportionally so the total across tasks can never exceed
+ * the session's real active time. In the (overwhelmingly common) case of no
+ * overlapping same-domain tasks, this produces identical numbers to calling
+ * computeOnTaskStats() per task — the scale factor is 1.
+ */
+export function computeOnTaskStatsForDay(
+  tasks: PlannerTask[],
+  sessions: TabSession[],
+  dayDate: Date,
+  thresholdPercent: number
+): Map<string, OnTaskStats> {
+  const scheduled = tasks.filter((t) => t.startMinutes != null && t.endMinutes != null);
+
+  const claimedMinutes = new Map<string, number>();
+  for (const t of scheduled) claimedMinutes.set(t.id, 0);
+
+  const taggedTasks = scheduled.filter((t) => t.domainTags.length > 0);
+  for (const s of sessions) {
+    const domain = normalizeDomain(s.domain);
+    const claims: { taskId: string; minutes: number }[] = [];
+    for (const t of taggedTasks) {
+      if (!t.domainTags.some((d) => normalizeDomain(d) === domain)) continue;
+      const m = sessionMinutesInWindow(s, dayDate, t.startMinutes as number, t.endMinutes as number);
+      if (m > 0) claims.push({ taskId: t.id, minutes: m });
+    }
+    if (claims.length === 0) continue;
+
+    const claimedTotal = claims.reduce((sum, c) => sum + c.minutes, 0);
+    const activeMinutes = Math.max(0, (s.duration_seconds ?? 0) / 60);
+    const scale = claimedTotal > activeMinutes && claimedTotal > 0 ? activeMinutes / claimedTotal : 1;
+    for (const c of claims) {
+      claimedMinutes.set(c.taskId, (claimedMinutes.get(c.taskId) ?? 0) + c.minutes * scale);
+    }
+  }
+
+  const out = new Map<string, OnTaskStats>();
+  for (const t of scheduled) {
+    const totalWindowMinutes = (t.endMinutes as number) - (t.startMinutes as number);
+    if (totalWindowMinutes <= 0) {
+      out.set(t.id, ZERO_STATS);
+      continue;
+    }
+    let onTaskMinutes = (claimedMinutes.get(t.id) ?? 0) + manualAttributionMinutes(t.manualAttributions);
+    // Cap at the window length — overlapping sessions (multiple tabs in the
+    // same window) must not push on-task time above the wall-clock window.
+    onTaskMinutes = Math.min(onTaskMinutes, totalWindowMinutes);
+
+    const percent = (onTaskMinutes / totalWindowMinutes) * 100;
+    let status: OnTaskStatus;
+    if (onTaskMinutes === 0) status = "no-activity";
+    else if (percent < thresholdPercent) status = "below";
+    else if (percent === thresholdPercent) status = "at-threshold";
+    else status = "above";
+
+    out.set(t.id, { onTaskMinutes, totalWindowMinutes, percent, status });
+  }
+  return out;
+}
+
 export type UnscheduledGap = {
   fromMinutes: number;
   toMinutes: number;
