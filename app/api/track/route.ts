@@ -77,55 +77,29 @@ export async function POST(request: NextRequest) {
 
     const supabase = createSupabaseForUserJwt(auth_token);
 
-    // Upsert: one row per (user, domain, date). Increment on repeat visits.
-    // .limit(1) prevents PGRST116 when old data has multiple rows for the same key.
-    // We target the most-recently-created row so increments consolidate over time.
-    const { data: existing, error: fetchError } = await supabase
-      .from("tab_sessions")
-      .select("id, duration_seconds, visits")
-      .eq("user_id", user_id)
-      .eq("domain", domain)
-      .eq("date", date)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    // Atomic insert-or-increment via upsert_tab_session() (migration 012) —
+    // one row per (user, domain, date), enforced by a DB unique constraint.
+    // The previous SELECT-then-INSERT/UPDATE here was not atomic: concurrent
+    // writes for the same key (two tabs/windows flushing at once, or a
+    // retried offline-queue payload landing alongside a fresh save) could
+    // both read "no existing row" and duplicate-insert, or both read the same
+    // duration_seconds and lose one side's increment. Postgres's
+    // `ON CONFLICT ... DO UPDATE` inside the function makes the read+write a
+    // single atomic operation, closing both races.
+    const { error } = await supabase.rpc("upsert_tab_session", {
+      p_user_id: user_id,
+      p_domain: domain,
+      p_page_title: page_title || domain,
+      p_start_time: start_time,
+      p_end_time: end_time,
+      p_duration_seconds: duration_seconds,
+      p_date: date,
+      p_is_new_visit: is_new_visit,
+      p_planner_task_id: planner_task_id ?? null,
+    });
 
-    if (fetchError) {
+    if (error) {
       return NextResponse.json({ error: "Database error" }, { status: 500 });
-    }
-
-    if (existing) {
-      const { error } = await supabase
-        .from("tab_sessions")
-        .update({
-          duration_seconds: existing.duration_seconds + duration_seconds,
-          visits: (existing.visits ?? 0) + (is_new_visit ? 1 : 0),
-          end_time,
-          page_title: page_title || domain,
-          ...(planner_task_id ? { planner_task_id } : {}),
-        })
-        .eq("id", existing.id);
-
-      if (error) {
-        return NextResponse.json({ error: "Database error" }, { status: 500 });
-      }
-    } else {
-      const row: Record<string, unknown> = {
-        user_id,
-        domain,
-        page_title: page_title || domain,
-        start_time,
-        end_time,
-        duration_seconds,
-        date,
-        visits: 1,
-      };
-      if (planner_task_id) row.planner_task_id = planner_task_id;
-
-      const { error } = await supabase.from("tab_sessions").insert(row);
-      if (error) {
-        return NextResponse.json({ error: "Database error" }, { status: 500 });
-      }
     }
 
     return NextResponse.json({ success: true });

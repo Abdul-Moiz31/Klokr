@@ -494,12 +494,11 @@ function pushGroupTasks(
  */
 export function buildTabTrackingRules(
   state: DailyPlannerV5,
-  forDate: Date
+  todayKey: string
 ): PlannerTaskRule[] {
   const order: PlannerTaskRule[] = [];
 
-  const k = dayKey(forDate);
-  const adHoc = state.adHocByDate[k] ?? { groups: [], tasks: [] };
+  const adHoc = state.adHocByDate[todayKey] ?? { groups: [], tasks: [] };
 
   // Scheduled tasks first, in time order — matches "the thing I'm doing now".
   const scheduled = adHoc.tasks

@@ -962,11 +962,39 @@ function SettingsPageInner() {
         minSessionSeconds: storedPrefs.minSessionSeconds,
         workHours,
       });
+
+      // Ask the extension (via content.js) for its live version/queue/sync
+      // state — picked up by the Klokrs_DIAGNOSTICS_STATE listener below.
+      // If no extension is installed this just goes unanswered and the
+      // fields stay at their "Not detected" defaults.
+      window.postMessage({ type: "Klokrs_REQUEST_DIAGNOSTICS" }, window.location.origin);
     } catch {
       toast.error("Failed to load diagnostics.");
     }
     setDiagLoading(false);
   };
+
+  useEffect(() => {
+    const onDiagnosticsState = (event: MessageEvent) => {
+      if (event.source !== window || event.origin !== window.location.origin) return;
+      if (event.data?.type !== "Klokrs_DIAGNOSTICS_STATE") return;
+      const { version, pendingWrites, lastSyncTs, lastSyncStatus } = event.data as {
+        version?: string | null;
+        pendingWrites?: number;
+        lastSyncTs?: number | null;
+        lastSyncStatus?: "ok" | "fail" | null;
+      };
+      setDiagData((prev) => prev && ({
+        ...prev,
+        extensionVersion: version ?? prev.extensionVersion,
+        pendingWrites: pendingWrites ?? prev.pendingWrites,
+        lastSyncTs: lastSyncTs ?? prev.lastSyncTs,
+        lastSyncStatus: lastSyncStatus ?? prev.lastSyncStatus,
+      }));
+    };
+    window.addEventListener("message", onDiagnosticsState);
+    return () => window.removeEventListener("message", onDiagnosticsState);
+  }, []);
 
   const handleForceSyncMessage = () => {
     setDiagForceSyncing(true);
