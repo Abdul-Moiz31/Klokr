@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase";
 import { loadPrefs } from "@/lib/prefs";
 import { computeProgress, localDateStr, type ProgressResult } from "@/lib/gamification";
+import { useTabSessionsLive } from "@/lib/hooks/useTabSessionsLive";
 
 type Props = { userId: string | null };
 
@@ -22,6 +23,7 @@ function scoreColor(score: number): string {
 export function AccountabilityCard({ userId }: Props) {
   const [result, setResult] = useState<ProgressResult | null>(null);
   const prefs = useMemo(() => loadPrefs(), []);
+  const liveTick = useTabSessionsLive(userId);
 
   useEffect(() => {
     if (!userId) return;
@@ -51,7 +53,7 @@ export function AccountabilityCard({ userId }: Props) {
       );
     })();
     return () => { cancelled = true; };
-  }, [userId, prefs]);
+  }, [userId, prefs, liveTick]);
 
   if (!result) return null;
 

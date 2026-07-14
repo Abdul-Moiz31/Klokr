@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase";
 import { loadPrefs } from "@/lib/prefs";
 import { getSiteName } from "@/lib/domain";
+import { useTabSessionsLive } from "@/lib/hooks/useTabSessionsLive";
 
 type Props = {
   userId: string | null;
@@ -49,6 +50,7 @@ function fmt(seconds: number): string {
 export function WeeklyReviewCard({ userId }: Props) {
   const [review, setReview] = useState<Review | null>(null);
   const prefs = useMemo(() => loadPrefs(), []);
+  const liveTick = useTabSessionsLive(userId);
 
   useEffect(() => {
     if (!userId) return;
@@ -115,7 +117,7 @@ export function WeeklyReviewCard({ userId }: Props) {
     })();
 
     return () => { cancelled = true; };
-  }, [userId, prefs]);
+  }, [userId, prefs, liveTick]);
 
   // Hide until there's something to say.
   if (!review || review.thisWeekSeconds === 0) return null;

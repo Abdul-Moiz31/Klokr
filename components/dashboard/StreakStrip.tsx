@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase";
 import { loadPrefs } from "@/lib/prefs";
 import { calcForgivingStreak, countProductiveDays, localDateStr } from "@/lib/streak";
+import { useTabSessionsLive } from "@/lib/hooks/useTabSessionsLive";
 
 type Props = {
   userId: string | null;
@@ -24,6 +25,7 @@ type StreakData = {
 export function StreakStrip({ userId }: Props) {
   const [data, setData] = useState<StreakData | null>(null);
   const prefs = useMemo(() => loadPrefs(), []);
+  const liveTick = useTabSessionsLive(userId);
 
   useEffect(() => {
     if (!userId) return;
@@ -65,7 +67,7 @@ export function StreakStrip({ userId }: Props) {
     })();
 
     return () => { cancelled = true; };
-  }, [userId, prefs]);
+  }, [userId, prefs, liveTick]);
 
   if (!data) return null;
 
