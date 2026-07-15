@@ -271,6 +271,23 @@ export function computeBadges(s: BadgeStats): Badge[] {
   return defs;
 }
 
+/**
+ * Forces `earned: true` (and fills in progress as complete) for any badge
+ * whose id is in `persistedBadgeIds`, regardless of what the live rolling-
+ * window computation says. computeBadges() only sees the last 90 days of
+ * tab_sessions, so a badge that was genuinely earned can otherwise flip back
+ * to unearned once the qualifying activity ages out of that window — this is
+ * the fix: once persisted (see user_achievements, migration 014), a badge can
+ * never appear unearned again.
+ */
+export function mergeEarnedAchievements(badges: Badge[], persistedBadgeIds: ReadonlySet<string>): Badge[] {
+  if (persistedBadgeIds.size === 0) return badges;
+  return badges.map((b) => {
+    if (!persistedBadgeIds.has(b.id) || b.earned) return b;
+    return { ...b, earned: true, progress: b.progress ? { ...b.progress, current: b.progress.target } : undefined };
+  });
+}
+
 /* ── Top-level: compute everything for the Progress page ──────────────────── */
 export interface PerDay {
   date: string;
