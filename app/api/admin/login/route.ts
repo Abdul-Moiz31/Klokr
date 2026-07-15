@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase-admin";
-
-const COOKIE_NAME = "admin_session";
-const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
+import { ADMIN_SESSION_COOKIE, createAdminSession } from "@/lib/admin-auth";
 
 // Single static shared password + no lockout was brute-forceable at whatever
 // rate the network allowed. Vercel functions don't share in-process memory
@@ -19,9 +17,8 @@ export async function POST(req: NextRequest) {
 
   const adminEmail = process.env.ADMIN_EMAIL;
   const adminPassword = process.env.ADMIN_PASSWORD;
-  const sessionSecret = process.env.ADMIN_SESSION_SECRET;
 
-  if (!adminEmail || !adminPassword || !sessionSecret) {
+  if (!adminEmail || !adminPassword) {
     return NextResponse.json({ error: "Server misconfigured." }, { status: 500 });
   }
 
@@ -53,12 +50,14 @@ export async function POST(req: NextRequest) {
   // or two doesn't count against the legitimate admin later this window.
   await supabase.rpc("clear_admin_login_rate_limit", { p_ip: ip });
 
+  const { token, expiresAt } = await createAdminSession();
+
   const res = NextResponse.json({ ok: true });
-  res.cookies.set(COOKIE_NAME, sessionSecret, {
+  res.cookies.set(ADMIN_SESSION_COOKIE, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
-    maxAge: COOKIE_MAX_AGE,
+    expires: expiresAt,
     path: "/",
   });
   return res;
