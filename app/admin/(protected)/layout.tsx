@@ -3,15 +3,15 @@ import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { AutoRefresh } from "@/components/admin/AutoRefresh";
+import { ADMIN_SESSION_COOKIE, verifyAdminSession } from "@/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   const cookieStore = await cookies();
-  const token = cookieStore.get("admin_session")?.value;
-  const secret = process.env.ADMIN_SESSION_SECRET;
+  const token = cookieStore.get(ADMIN_SESSION_COOKIE)?.value;
 
-  if (!secret || !token || token !== secret) {
+  if (!(await verifyAdminSession(token))) {
     redirect("/admin/login");
   }
 

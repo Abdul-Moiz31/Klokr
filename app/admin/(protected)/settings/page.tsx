@@ -1,12 +1,14 @@
 import { createAdminClient } from "@/lib/supabase-admin";
 import { SettingsControls } from "@/components/admin/SettingsControls";
 
+// ADMIN_SESSION_SECRET is no longer read here — admin sessions are now real,
+// per-login, revocable tokens (see lib/admin-auth.ts, migration 017), not a
+// single static secret shared by every login.
 const ENV_VARS = [
   { key: "NEXT_PUBLIC_SUPABASE_URL",  label: "Supabase URL",      secret: false },
   { key: "SUPABASE_SERVICE_ROLE_KEY", label: "Service Role Key",   secret: true  },
   { key: "ADMIN_EMAIL",               label: "Admin Email",        secret: false },
   { key: "ADMIN_PASSWORD",            label: "Admin Password",     secret: true  },
-  { key: "ADMIN_SESSION_SECRET",      label: "Session Secret",     secret: true  },
 ];
 
 function mask(v: string) {
@@ -120,11 +122,12 @@ export default async function SettingsPage() {
       <div className="mt-4 rounded-xl border border-amber-500/15 bg-amber-500/5 p-5">
         <p className="mb-1 text-sm font-medium text-amber-300/80">To change credentials</p>
         <p className="text-sm text-white/40">
-          Update <span className="font-mono text-white/55">ADMIN_EMAIL</span>,{" "}
-          <span className="font-mono text-white/55">ADMIN_PASSWORD</span>, or{" "}
-          <span className="font-mono text-white/55">ADMIN_SESSION_SECRET</span> in your{" "}
-          <span className="font-mono text-white/55">.env</span> file and redeploy.
-          Changing the session secret immediately invalidates all active admin sessions.
+          Update <span className="font-mono text-white/55">ADMIN_EMAIL</span> or{" "}
+          <span className="font-mono text-white/55">ADMIN_PASSWORD</span> in your{" "}
+          <span className="font-mono text-white/55">.env</span> file and redeploy — this only
+          affects future logins. Each login now creates its own revocable session; use Log Out
+          to end the current one, or clear the <span className="font-mono text-white/55">admin_sessions</span> table
+          to revoke every active session at once.
         </p>
       </div>
     </div>
