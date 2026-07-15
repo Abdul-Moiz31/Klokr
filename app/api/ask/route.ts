@@ -5,7 +5,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createSupabaseForUserJwt } from "@/lib/supabase-user-client";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { decryptSecret } from "@/lib/crypto";
-import { getQuotaStatus, incrementUsage } from "@/lib/ai-quota";
+import { getQuotaStatus, incrementUsageIfAllowed, decrementUsageReservation } from "@/lib/ai-quota";
 
 const ANTHROPIC_MODEL   = "claude-opus-4-8";
 const OPENAI_MODEL      = "gpt-4o-mini";
@@ -193,7 +193,16 @@ export async function POST(request: NextRequest) {
     }
 
     const quota = await getQuotaStatus(supabase, user.id, hasOwnKey);
-    if (!quota.allowed) {
+
+    // Reserve a call slot BEFORE touching the LLM, not after — this is the
+    // actual fix for the check-then-act race: two concurrent requests can no
+    // longer both observe "under limit" and both proceed, since the reserve
+    // is one atomic DB operation (migration 015). Own-key users are unmetered
+    // so nothing to reserve for them.
+    const reservation = hasOwnKey
+      ? null
+      : await incrementUsageIfAllowed(createAdminClient(), user.id, quota.limit);
+    if (reservation && !reservation.allowed) {
       return NextResponse.json(
         {
           error: `You've used all ${quota.limit} AI questions on your ${quota.plan} plan this month. Upgrade, or add your own API key for unlimited use.`,
@@ -202,6 +211,15 @@ export async function POST(request: NextRequest) {
         { status: 429 }
       );
     }
+
+    // From here on, any failure must give back the reserved slot (a failed
+    // call shouldn't cost the user quota — matches the old code only ever
+    // counting successful calls) before returning an error response.
+    const releaseReservation = async () => {
+      if (reservation) {
+        try { await decrementUsageReservation(createAdminClient(), user.id); } catch { /* best effort */ }
+      }
+    };
 
     const from = new Date();
     from.setDate(from.getDate() - LOOKBACK_DAYS);
@@ -212,32 +230,38 @@ export async function POST(request: NextRequest) {
       .gte("date", localDateStr(from))
       .order("date", { ascending: false });
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) {
+      await releaseReservation();
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
 
     const summary = buildDataSummary((data as Row[]) ?? []);
 
     // Route to the correct provider.
     let answer = "";
-    if (provider === "openai") {
-      answer = await askOpenAI(apiKey, summary, question);
-    } else if (provider === "openrouter") {
-      answer = await askOpenRouter(apiKey, summary, question);
-    } else if (provider === "gemini") {
-      answer = await askGemini(apiKey, summary, question);
-    } else if (provider === "groq") {
-      answer = await askGroq(apiKey, summary, question);
-    } else {
-      answer = await askAnthropic(apiKey, summary, question);
-    }
-
-    if (!hasOwnKey) {
-      try { await incrementUsage(createAdminClient(), user.id); } catch { /* non-fatal */ }
+    try {
+      if (provider === "openai") {
+        answer = await askOpenAI(apiKey, summary, question);
+      } else if (provider === "openrouter") {
+        answer = await askOpenRouter(apiKey, summary, question);
+      } else if (provider === "gemini") {
+        answer = await askGemini(apiKey, summary, question);
+      } else if (provider === "groq") {
+        answer = await askGroq(apiKey, summary, question);
+      } else {
+        answer = await askAnthropic(apiKey, summary, question);
+      }
+    } catch (err) {
+      await releaseReservation();
+      throw err;
     }
 
     return NextResponse.json({
       answer: answer || "I couldn't find an answer in your data.",
       provider,
-      quota: hasOwnKey ? null : { ...quota, used: quota.used + 1, remaining: Math.max(0, quota.remaining - 1) },
+      quota: hasOwnKey || !reservation
+        ? null
+        : { ...quota, used: reservation.newCount, remaining: Math.max(0, quota.limit - reservation.newCount) },
     });
   } catch (err) {
     console.error("[ask]", err);
