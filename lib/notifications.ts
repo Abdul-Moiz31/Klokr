@@ -72,7 +72,38 @@ async function insertNew(
       { onConflict: "user_id,dedupe_key", ignoreDuplicates: true }
     )
     .select("id, type, title, body, href, dedupe_key, read, created_at");
-  return (data as AppNotification[] | null) ?? [];
+  const created = (data as AppNotification[] | null) ?? [];
+  if (created.length > 0) void pushNewly(supabase, created);
+  return created;
+}
+
+// Best-effort Web Push for freshly-created notifications, so a device that
+// isn't the one currently generating them (browser closed, another tab, a
+// different device on the same account) still gets notified — the in-app
+// bell alone only shows what's already loaded in an open tab. Fire-and-
+// forget: this generation still ran and the notification is already
+// persisted even if the push itself fails (offline, no subscription, etc).
+async function pushNewly(supabase: SupabaseClient, items: AppNotification[]): Promise<void> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    if (!token) return;
+    await fetch("/api/push/notify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        notifications: items.map((n) => ({
+          title: n.title,
+          body: n.body,
+          url: n.href ?? "/dashboard",
+          tag: n.dedupe_key,
+        })),
+      }),
+    });
+  } catch {
+    // Offline / no subscription / server hiccup — the notification itself
+    // already made it into the DB and the in-app bell; push is a bonus.
+  }
 }
 
 // ── Generation ──────────────────────────────────────────────────────────────

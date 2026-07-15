@@ -15,6 +15,7 @@ import { Loader } from "@/components/ui/Loader";
 import { BillingCard } from "@/components/dashboard/BillingCard";
 import { AiSettingsTab } from "@/components/dashboard/AiSettingsTab";
 import { DEFAULT_PREFS, loadPrefs, savePrefs, resolveTimezone, type KlokrsPrefs } from "@/lib/prefs";
+import { usePushNotifications } from "@/lib/hooks/usePushNotifications";
 import { normalizeDomainInput } from "@/lib/domain";
 import { getSiteName } from "@/lib/domain";
 import { getCategoryForDomain, getCategoryStats, CATEGORIES, hexToRgb } from "@/lib/categories";
@@ -670,6 +671,20 @@ function SettingsPageInner() {
   const [prefs, setPrefs] = useState<KlokrsPrefs>(DEFAULT_PREFS);
   const prefsSyncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prefsToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const push = usePushNotifications();
+  const onTogglePush = async () => {
+    if (push.state === "subscribed") {
+      await push.unsubscribe();
+      toast.success("Push notifications turned off on this browser.");
+    } else if (push.state === "denied") {
+      toast.error("Notifications are blocked for klokrs.com in your browser settings — enable them there first.");
+    } else {
+      const ok = await push.subscribe();
+      if (ok) toast.success("Push notifications enabled — you'll get these even when Chrome is closed.");
+      else toast.error("Couldn't enable push notifications. Try again in a moment.");
+    }
+  };
 
   const [exportRange, setExportRange] = useState<ExportRange>("week");
   const [customFrom, setCustomFrom] = useState("");
@@ -1447,6 +1462,31 @@ function SettingsPageInner() {
               <div>
                 <SectionTitle tooltip="Desktop notifications from the Klokrs Chrome extension. Browser must allow notifications for klokrs.com / the extension.">Notifications</SectionTitle>
                 <Card>
+                  {push.state !== "unsupported" && (
+                    <PrefRow
+                      label="Push notifications"
+                      hint={
+                        push.state === "denied"
+                          ? "Blocked in your browser settings for klokrs.com"
+                          : "Get these even when Chrome is closed — separate from the extension's own notifications, works without it installed"
+                      }
+                    >
+                      <button
+                        type="button"
+                        onClick={() => void onTogglePush()}
+                        disabled={push.loading || push.state === "denied"}
+                        className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white/70 transition-colors hover:border-white/20 hover:bg-white/10 hover:text-white/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0A0A0F] disabled:opacity-40"
+                      >
+                        {push.loading
+                          ? "Working…"
+                          : push.state === "subscribed"
+                          ? "Turn off"
+                          : push.state === "denied"
+                          ? "Blocked"
+                          : "Enable"}
+                      </button>
+                    </PrefRow>
+                  )}
                   <PrefRow
                     label="Day started"
                     hint={`Notify me when my work day begins (${String(prefs.workStartHour).padStart(2, "0")}:00)`}
