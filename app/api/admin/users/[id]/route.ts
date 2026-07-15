@@ -1,15 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { cookies } from "next/headers";
+import { ADMIN_SESSION_COOKIE, verifyAdminSession } from "@/lib/admin-auth";
 
 async function verifyAdmin() {
   const cookieStore = await cookies();
-  const token = cookieStore.get("admin_session")?.value;
-  return (
-    !!token &&
-    !!process.env.ADMIN_SESSION_SECRET &&
-    token === process.env.ADMIN_SESSION_SECRET
-  );
+  return verifyAdminSession(cookieStore.get(ADMIN_SESSION_COOKIE)?.value);
 }
 
 // PATCH /api/admin/users/[id]
