@@ -271,18 +271,24 @@ export function TimelineTaskModal({ initial, initialRange, onSave, onDelete, onC
             />
           </div>
 
-          <div>
-            <label className="flex items-center gap-1.5 text-xs text-white/45">
-              Blocked domains (optional)
-              <InfoTooltip text="Blocked for the duration of this task's window, regardless of the extension's global Focus Mode toggle. e.g. block youtube.com during a Reading block even if Focus Mode is off elsewhere." />
-            </label>
-            <input
-              value={blockedDomains}
-              onChange={(e) => setBlockedDomains(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white/90 focus:border-violet-500/40 focus:outline-none"
-              placeholder="youtube.com, reddit.com"
-            />
-          </div>
+          {/* Blocking is enforced against this task's own scheduled window —
+              an unscheduled task has no window to enforce it during, so this
+              field would silently save a value that can never take effect.
+              Only shown once "Schedule on timeline" is checked. */}
+          {scheduled && (
+            <div>
+              <label className="flex items-center gap-1.5 text-xs text-white/45">
+                Blocked domains (optional)
+                <InfoTooltip text="Blocked for the duration of this task's window, regardless of the extension's global Focus Mode toggle. e.g. block youtube.com during a Reading block even if Focus Mode is off elsewhere." />
+              </label>
+              <input
+                value={blockedDomains}
+                onChange={(e) => setBlockedDomains(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white/90 focus:border-violet-500/40 focus:outline-none"
+                placeholder="youtube.com, reddit.com"
+              />
+            </div>
+          )}
         </div>
 
         <div className="mt-6 flex items-center gap-2">
