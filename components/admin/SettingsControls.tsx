@@ -27,6 +27,18 @@ function Modal({ children, onClose }: { children: React.ReactNode; onClose: () =
   );
 }
 
+// Excel/Sheets treat a cell whose content starts with =, +, -, or @ as a
+// formula to evaluate on open, not literal text. `name` (and in principle
+// `email`) is attacker-controllable at signup — a full_name of
+// `=HYPERLINK("http://evil.com","x")` would be exported verbatim, and an
+// admin opening this export in a spreadsheet tool is exactly the expected
+// workflow here. Prefixing a lone `'` forces those tools to render the
+// value as plain text instead of evaluating it, without changing what a
+// CSV-only consumer sees (the character has no meaning in CSV itself).
+function sanitizeCsvCell(value: string): string {
+  return /^[=+\-@]/.test(value) ? `'${value}` : value;
+}
+
 export function SettingsControls({ sessions90dCount, exportRows }: Props) {
   const router = useRouter();
   const [purgeOpen, setPurgeOpen] = useState(false);
@@ -36,7 +48,9 @@ export function SettingsControls({ sessions90dCount, exportRows }: Props) {
   const exportCSV = () => {
     const headers = ["id", "email", "name", "provider", "created_at", "banned"];
     const rows = exportRows.map((r) =>
-      headers.map((h) => `"${String(r[h as keyof ExportRow]).replace(/"/g, '""')}"`).join(",")
+      headers
+        .map((h) => `"${sanitizeCsvCell(String(r[h as keyof ExportRow])).replace(/"/g, '""')}"`)
+        .join(",")
     );
     const csv = [headers.join(","), ...rows].join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
