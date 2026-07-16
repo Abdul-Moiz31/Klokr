@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { getSiteName } from "@/lib/domain";
+import { getSiteName, getFamilyDomains } from "@/lib/domain";
 import {
   BarChart,
   Bar,
@@ -82,11 +82,22 @@ export function DomainDrilldownModal({
       } = await supabase.auth.getUser();
       if (!user) return;
 
+      // Match every domain in this brand's family (e.g. "github.com" also
+      // pulls in "githubusercontent.com", "github.io", …) exactly or by a
+      // genuine subdomain — never an unanchored substring. The previous
+      // `.ilike("domain", "%"+domain)` matched anything merely *ending with*
+      // the string, so a "github.com" drilldown also silently pulled in an
+      // unrelated domain like "evilgithub.com".
+      const familyRoots = getFamilyDomains(domain);
+      const orFilter = familyRoots
+        .map((root) => `domain.eq.${root},domain.like.%.${root}`)
+        .join(",");
+
       const { data } = await supabase
         .from("tab_sessions")
         .select("domain, duration_seconds, visits, end_time, start_time")
         .eq("user_id", user.id)
-        .ilike("domain", `%${domain}`)
+        .or(orFilter)
         .gte("date", startDate)
         .lte("date", endDate);
 
