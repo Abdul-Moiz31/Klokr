@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase";
 import { useAuthSession } from "@/lib/useAuthSession";
-import { loadPrefs, resolveTimezone, getDayPhase } from "@/lib/prefs";
+import { loadPrefs, getDayPhase, getLocalDateString } from "@/lib/prefs";
 import { AppShell } from "@/components/dashboard/AppShell";
 import { PageHeader } from "@/components/dashboard/PageHeader";
 import { DomainChart } from "@/components/dashboard/DomainChart";
@@ -48,18 +48,7 @@ function formatTotalTime(seconds: number): string {
 }
 
 function getTodayString() {
-  const zone = resolveTimezone(loadPrefs());
-  try {
-    // en-CA gives ISO-shaped "YYYY-MM-DD" via Intl reliably.
-    return new Intl.DateTimeFormat("en-CA", {
-      timeZone: zone,
-      year: "numeric", month: "2-digit", day: "2-digit",
-    }).format(new Date());
-  } catch {
-    const d = new Date();
-    const local = new Date(d.getTime() - d.getTimezoneOffset() * 60_000);
-    return local.toISOString().split("T")[0]!;
-  }
+  return getLocalDateString(loadPrefs());
 }
 
 

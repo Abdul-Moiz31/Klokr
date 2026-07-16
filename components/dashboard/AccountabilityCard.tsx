@@ -4,8 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase";
-import { loadPrefs } from "@/lib/prefs";
-import { computeProgress, localDateStr, type ProgressResult } from "@/lib/gamification";
+import { loadPrefs, getLocalDateString, addDaysToDateString } from "@/lib/prefs";
+import { computeProgress, type ProgressResult } from "@/lib/gamification";
 import { useTabSessionsLive } from "@/lib/hooks/useTabSessionsLive";
 
 type Props = { userId: string | null };
@@ -29,17 +29,15 @@ export function AccountabilityCard({ userId }: Props) {
     if (!userId) return;
     let cancelled = false;
     void (async () => {
-      const today = new Date();
-      const todayStr = localDateStr(today);
-      const from = new Date(today);
-      from.setDate(today.getDate() - 90);
+      const todayStr = getLocalDateString(prefs);
+      const fromStr = addDaysToDateString(todayStr, -90);
 
       const supabase = createClient();
       const { data } = await supabase
         .from("tab_sessions")
         .select("domain, duration_seconds, date")
         .eq("user_id", userId)
-        .gte("date", localDateStr(from))
+        .gte("date", fromStr)
         .lte("date", todayStr)
         .gte("duration_seconds", prefs.minSessionSeconds);
 
