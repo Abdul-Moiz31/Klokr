@@ -33,6 +33,7 @@
     "sonner": "^2.0.7",
     "stripe": "^22.2.0",
     "three": "^0.184.0",
+    "tldts": "^7.4.9",
     "web-push": "^3.6.7"
   },
   "overrides": {
