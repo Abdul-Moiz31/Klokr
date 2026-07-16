@@ -17,6 +17,10 @@ const MODE_LABEL: Record<Mode, string> = {
   long: "Long Break",
 };
 
+// Classic Pomodoro cadence: after every 4th completed focus session, take a
+// long break instead of a short one.
+const FOCUS_CYCLES_BEFORE_LONG_BREAK = 4;
+
 function formatHms(total: number) {
   const s = Math.max(0, Math.floor(total));
   const m = Math.floor(s / 60);
@@ -39,19 +43,95 @@ function formatDate(d: Date) {
 type Task = { id: string; text: string; done: boolean };
 
 const TASKS_KEY = "Klokrs_pomodoro_tasks";
+const TIMER_KEY = "Klokrs_pomodoro_timer";
+
+// The countdown is anchored to a real wall-clock deadline (epoch ms) rather
+// than decremented tick-by-tick, and persisted on every change. Two bugs
+// this fixes in one move:
+//   1. A tick-counted timer that only lives in React state loses all
+//      progress on refresh/navigation, with no warning.
+//   2. Browsers throttle setInterval in backgrounded tabs (sometimes to
+//      ~1 tick/minute) — a tick-counted timer reads much longer than real
+//      elapsed time after switching away and back. A deadline-based timer
+//      always recomputes the true remaining time from Date.now() on every
+//      read, so throttling can only delay *noticing* zero, never distort
+//      what's displayed before that.
+type TimerState = {
+  mode: Mode;
+  isRunning: boolean;
+  /** Epoch ms the countdown reaches 0 — meaningful only while isRunning. */
+  deadline: number | null;
+  /** Seconds left — meaningful only while paused. */
+  pausedRemaining: number;
+  /** DEFAULTS[mode] baseline, extended by +time clicks. Drives the "over
+   *  time" indicator, kept separate from the ring's fixed 100% reference. */
+  totalForMode: number;
+  focusCyclesCompleted: number;
+};
+
+function freshState(mode: Mode, focusCyclesCompleted: number): TimerState {
+  return {
+    mode,
+    isRunning: false,
+    deadline: null,
+    pausedRemaining: DEFAULTS[mode],
+    totalForMode: DEFAULTS[mode],
+    focusCyclesCompleted,
+  };
+}
+
+function loadTimerState(): TimerState {
+  if (typeof window !== "undefined") {
+    try {
+      const raw = localStorage.getItem(TIMER_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as Partial<TimerState>;
+        if (parsed.mode && DEFAULTS[parsed.mode] != null) {
+          return {
+            mode: parsed.mode,
+            isRunning: Boolean(parsed.isRunning),
+            deadline: typeof parsed.deadline === "number" ? parsed.deadline : null,
+            pausedRemaining:
+              typeof parsed.pausedRemaining === "number" ? parsed.pausedRemaining : DEFAULTS[parsed.mode],
+            totalForMode:
+              typeof parsed.totalForMode === "number" ? parsed.totalForMode : DEFAULTS[parsed.mode],
+            focusCyclesCompleted:
+              typeof parsed.focusCyclesCompleted === "number" ? parsed.focusCyclesCompleted : 0,
+          };
+        }
+      }
+    } catch { /* ignore */ }
+  }
+  return freshState("focus", 0);
+}
+
+function saveTimerState(s: TimerState) {
+  try { localStorage.setItem(TIMER_KEY, JSON.stringify(s)); }
+  catch { /* ignore */ }
+}
+
+function remainingFor(state: TimerState, nowMs: number): number {
+  if (state.isRunning && state.deadline != null) {
+    return Math.max(0, Math.ceil((state.deadline - nowMs) / 1000));
+  }
+  return Math.max(0, state.pausedRemaining);
+}
 
 export function PomodoroApp() {
-  const [mode, setMode] = useState<Mode>("focus");
-  const [remaining, setRemaining] = useState(DEFAULTS.focus);
-  const [isRunning, setIsRunning] = useState(false);
+  const [timer, setTimer] = useState<TimerState>(() => loadTimerState());
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const [now, setNow] = useState(() => new Date());
   const [tasks, setTasks] = useState<Task[]>([]);
   const [newTask, setNewTask] = useState("");
-  const totalForMode = DEFAULTS[mode];
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const audioRef = useRef<AudioContext | null>(null);
+  const completionHandledRef = useRef(false);
   const { fire: fireSparkle } = useSparkle();
 
+  useEffect(() => { saveTimerState(timer); }, [timer]);
+
+  // Header clock — cosmetic display only, unrelated to the countdown itself,
+  // so a coarse 30s tick is fine here.
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 30_000);
     return () => clearInterval(t);
@@ -90,24 +170,44 @@ export function PomodoroApp() {
     } catch { /* ignore */ }
   }, []);
 
+  const { mode, isRunning, totalForMode } = timer;
+  const baseTotal = DEFAULTS[mode];
+  const remaining = remainingFor(timer, nowMs);
+
+  // Auto-advances mode on natural completion, following the classic 4-focus-
+  // sessions -> long-break cadence — a focus session completing rolls the
+  // cycle counter and picks short/long break accordingly; a break completing
+  // always returns to focus. The next mode is loaded but not auto-started,
+  // matching the existing "switch mode" behavior elsewhere in this component.
+  const advanceAfterCompletion = useCallback(() => {
+    setTimer((s) => {
+      if (s.mode === "focus") {
+        const cycles = s.focusCyclesCompleted + 1;
+        const nextMode: Mode = cycles % FOCUS_CYCLES_BEFORE_LONG_BREAK === 0 ? "long" : "short";
+        return freshState(nextMode, cycles);
+      }
+      return freshState("focus", s.focusCyclesCompleted);
+    });
+  }, []);
+
+  // Ticks once a second while running purely to trigger a re-render so
+  // `remaining` (derived from the real deadline above) updates on screen and
+  // natural completion can be detected — the displayed value never comes
+  // from this interval's own counting.
   useEffect(() => {
-    if (!isRunning) {
-      if (tickRef.current) { clearInterval(tickRef.current); tickRef.current = null; }
-      return;
-    }
-    tickRef.current = setInterval(() => {
-      setRemaining((r) => {
-        if (r <= 1) {
-          beep();
-          setIsRunning(false);
-          if (typeof document !== "undefined") document.title = "Klokrs — Dashboard";
-          return 0;
-        }
-        return r - 1;
-      });
-    }, 1000);
+    if (!isRunning) { completionHandledRef.current = false; return; }
+    tickRef.current = setInterval(() => setNowMs(Date.now()), 1000);
     return () => { if (tickRef.current) clearInterval(tickRef.current); };
-  }, [isRunning, beep]);
+  }, [isRunning]);
+
+  useEffect(() => {
+    if (!isRunning || completionHandledRef.current) return;
+    if (remaining > 0) return;
+    completionHandledRef.current = true;
+    beep();
+    if (typeof document !== "undefined") document.title = "Klokrs — Dashboard";
+    advanceAfterCompletion();
+  }, [isRunning, remaining, beep, advanceAfterCompletion]);
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -116,19 +216,52 @@ export function PomodoroApp() {
   }, [isRunning, remaining, mode]);
 
   const ringCirc = 2 * Math.PI * 44;
+  // Scaled against the mode's fixed base duration, not the +time-extended
+  // total — so the ring's 100% mark always means "the original planned
+  // length" and stays put instead of silently rescaling every time the user
+  // adds time (which previously made it look like the session was always on
+  // track, even well past its original allotment).
   const remainingRatio = useMemo(() => {
-    const scale = Math.max(totalForMode, remaining);
-    if (scale <= 0) return 0;
-    return Math.max(0, Math.min(1, remaining / scale));
-  }, [remaining, totalForMode]);
+    if (baseTotal <= 0) return 0;
+    return Math.max(0, Math.min(1, remaining / baseTotal));
+  }, [remaining, baseTotal]);
+  // Over time once *actually elapsed* time (not just total allotment,
+  // including any padding added before it was needed) exceeds the mode's
+  // original length — clicking "+10m" the instant a session starts
+  // shouldn't immediately claim you're over time; only really running past
+  // the original 25 minutes should.
+  const elapsed = totalForMode - remaining;
+  const overTimeSeconds = Math.max(0, elapsed - baseTotal);
 
   const switchMode = (m: Mode) => {
-    if (isRunning) setIsRunning(false);
-    setMode(m);
-    setRemaining(DEFAULTS[m]);
+    setTimer((s) => freshState(m, s.focusCyclesCompleted));
   };
 
-  const addSeconds = (sec: number) => setRemaining((r) => r + sec);
+  const toggleRunning = () => {
+    setTimer((s) => {
+      if (s.isRunning) {
+        // Pause: freeze whatever the real elapsed-time-derived remaining is
+        // right now, rather than trusting any in-flight tick counter.
+        return { ...s, isRunning: false, deadline: null, pausedRemaining: remainingFor(s, Date.now()) };
+      }
+      // Resume/start: anchor a fresh deadline from the current remaining.
+      const startFrom = remainingFor(s, Date.now());
+      return { ...s, isRunning: true, deadline: Date.now() + startFrom * 1000 };
+    });
+  };
+
+  const addSeconds = (sec: number) => {
+    setTimer((s) => {
+      if (s.isRunning && s.deadline != null) {
+        return { ...s, deadline: s.deadline + sec * 1000, totalForMode: s.totalForMode + sec };
+      }
+      return { ...s, pausedRemaining: s.pausedRemaining + sec, totalForMode: s.totalForMode + sec };
+    });
+  };
+
+  const resetMode = () => {
+    setTimer((s) => freshState(s.mode, s.focusCyclesCompleted));
+  };
 
   const toggleTask = (id: string) =>
     setTasks((list) => list.map((t) => (t.id === id ? { ...t, done: !t.done } : t)));
@@ -177,12 +310,13 @@ export function PomodoroApp() {
           </div>
 
           {/* Timer ring */}
-          <div className="relative w-56 h-56 sm:w-64 sm:h-64 mb-5">
+          <div className="relative w-56 h-56 sm:w-64 sm:h-64 mb-2">
             <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
               <circle cx="50" cy="50" r="44" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="3" />
               <circle
                 cx="50" cy="50" r="44" fill="none"
-                stroke="url(#ringGrad)" strokeWidth="3" strokeLinecap="round"
+                stroke={overTimeSeconds > 0 ? "#F59E0B" : "url(#ringGrad)"}
+                strokeWidth="3" strokeLinecap="round"
                 strokeDasharray={`${ringCirc * remainingRatio} ${ringCirc}`}
                 className="transition-[stroke-dasharray] duration-1000 ease-linear"
               />
@@ -201,6 +335,17 @@ export function PomodoroApp() {
                 {MODE_LABEL[mode]}
               </span>
             </div>
+          </div>
+
+          {/* Over-time indicator — a persistent, explicit signal that extra
+              time has been added beyond this mode's planned length, instead
+              of the ring silently rescaling its own 100% mark. */}
+          <div className="h-5 mb-3">
+            {overTimeSeconds > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-0.5 text-[11px] font-medium text-amber-300">
+                +{formatHms(overTimeSeconds)} over planned length
+              </span>
+            )}
           </div>
 
           {/* Add time */}
@@ -225,7 +370,7 @@ export function PomodoroApp() {
           {/* Start / Pause */}
           <button
             type="button"
-            onClick={() => setIsRunning((r) => !r)}
+            onClick={toggleRunning}
             className={`px-12 py-3 rounded-xl text-base font-semibold transition-all ${
               isRunning
                 ? "bg-white/[0.08] text-white border border-white/15 hover:bg-white/[0.12]"
@@ -234,10 +379,10 @@ export function PomodoroApp() {
           >
             {isRunning ? "Pause" : "Start"}
           </button>
-          {remaining !== totalForMode && !isRunning && (
+          {(remaining !== baseTotal || totalForMode !== baseTotal) && !isRunning && (
             <button
               type="button"
-              onClick={() => setRemaining(DEFAULTS[mode])}
+              onClick={resetMode}
               className="mt-2.5 text-sm text-white/35 hover:text-white/60 transition-colors"
             >
               Reset
