@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseForUserJwt } from "@/lib/supabase-user-client";
 
+// Bare-hostname format only: labels of 1-63 chars (no leading/trailing
+// hyphen), joined by dots, 253 chars max overall (the real DNS limit).
+// `domain` ends up rendered as text in several places (the extension popup,
+// Reports, Activity) — rejecting anything that isn't a plausible hostname
+// here closes off that entire class of stored-content issues at the one
+// place all of it enters the system, rather than trusting every downstream
+// renderer to escape it correctly.
+const DOMAIN_RE = /^(?=.{1,253}$)(?!-)[a-z0-9-]{1,63}(?<!-)(\.(?!-)[a-z0-9-]{1,63}(?<!-))*$/;
+
 export async function POST(request: NextRequest) {
   try {
     // Auth token comes from the Authorization header, not the body.
@@ -53,8 +62,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify the JWT locally — no outbound network call needed.
-    // The actual signature is validated by Supabase RLS on every DB query below.
+    if (!DOMAIN_RE.test(domain)) {
+      return NextResponse.json({ error: "Invalid domain" }, { status: 400 });
+    }
+
+    // Verify the JWT locally — no outbound network call needed. This decodes
+    // the payload but does not itself check the signature; PostgREST/GoTrue
+    // validates that as part of authenticating the RPC call below (an
+    // invalid signature is rejected with 401 before upsert_tab_session's
+    // body ever runs). upsert_tab_session is SECURITY DEFINER and bypasses
+    // RLS by design, so the sub === user_id check below is real, load-
+    // bearing authorization, not just a sanity check — and the RPC itself
+    // also independently enforces auth.uid() = p_user_id (migration 018) as
+    // defense-in-depth, in case this route is ever bypassed or the function
+    // is called directly.
     let jwtSub: string | undefined;
     try {
       const parts = auth_token.split(".");
