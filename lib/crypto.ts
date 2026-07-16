@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, randomBytes, createHash } from "crypto";
+import { createCipheriv, createDecipheriv, randomBytes, createHash, timingSafeEqual } from "crypto";
 
 // Symmetric encryption for at-rest secrets (BYOK provider keys). AES-256-GCM.
 // The key is derived from AI_KEY_ENCRYPTION_SECRET (any string) via SHA-256 so
@@ -41,4 +41,22 @@ export function decryptSecret(payload: string): string | null {
 
 export function isEncryptionConfigured(): boolean {
   return getKey() !== null;
+}
+
+// Constant-time string comparison for static shared secrets (admin password,
+// cron bearer tokens) — a plain `!==` leaks a few nanoseconds of timing
+// signal per matching byte, a real if slow side channel against a secret
+// that never rotates. Always compares the full length of both inputs and
+// never throws on a length mismatch (timingSafeEqual requires equal-length
+// buffers).
+export function safeEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) {
+    // Still burn a comparison so a wrong-length guess doesn't return faster
+    // than a wrong-content one of the right length.
+    timingSafeEqual(bufA, Buffer.alloc(bufA.length));
+    return false;
+  }
+  return timingSafeEqual(bufA, bufB);
 }

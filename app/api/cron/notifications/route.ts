@@ -5,6 +5,7 @@ import { localClockForZone } from "@/lib/timezone";
 import { migrateAnyToV5 } from "@/lib/daily-planner/storage";
 import { DEFAULT_PREFS, type KlokrsPrefs } from "@/lib/prefs";
 import type { PlannerTask } from "@/lib/daily-planner/types";
+import { safeEqual } from "@/lib/crypto";
 
 // Server-side counterpart to the extension's day-start/day-complete/task-
 // started/task-ending-soon notifications (background.js). Exists because
@@ -51,7 +52,7 @@ export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET;
   if (!secret) return NextResponse.json({ error: "CRON_SECRET not configured" }, { status: 503 });
   const auth = req.headers.get("authorization");
-  if (auth !== `Bearer ${secret}`) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!safeEqual(auth ?? "", `Bearer ${secret}`)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const admin = createAdminClient();
 
