@@ -382,6 +382,8 @@ function normalizeV5(raw: unknown): DailyPlannerV5 {
   };
 }
 
+const MAX_KNOWN_VERSION = 5;
+
 export function loadDailyPlanner(): DailyPlannerV5 {
   if (typeof window === "undefined") return defaultV5();
   try {
@@ -390,17 +392,27 @@ export function loadDailyPlanner(): DailyPlannerV5 {
     const parsed = JSON.parse(raw) as Record<string, unknown>;
     const v = parsed.v;
     let migrated: DailyPlannerV5;
+    // A `v` number higher than anything this build knows about means a
+    // newer client (a future update to this app, or another device already
+    // updated) wrote this — the shape is unrecognized, not corrupt. Render
+    // empty for now rather than crash, but explicitly skip the persist-back
+    // below so the original data isn't overwritten by this build's
+    // reconstruction of "empty" — once this client is updated it must still
+    // find the real data intact in localStorage.
+    const isUnrecognizedFutureVersion = typeof v === "number" && v > MAX_KNOWN_VERSION;
     if (v === 1) {
       migrated = migrateV1ToV5(parsed as unknown as DailyPlannerV1);
     } else if (v === 2 || v === 3 || v === 4 || v === 5) {
       migrated = normalizeV5(parsed);
+    } else if (isUnrecognizedFutureVersion) {
+      migrated = defaultV5();
     } else {
       return defaultV5();
     }
     if (!migrated.taskDump.groups.length) {
       migrated.taskDump = defaultV5().taskDump;
     }
-    if (v !== 5) {
+    if (v !== 5 && !isUnrecognizedFutureVersion) {
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
       } catch {
@@ -416,6 +428,15 @@ export function loadDailyPlanner(): DailyPlannerV5 {
 /**
  * Coerce any historical planner shape into v5. Used by the hook when adopting
  * remote data that may have been written by an older client.
+ *
+ * Returns null when `raw` carries a `v` higher than this build knows about —
+ * i.e. it was written by a newer client, not corrupted. This is a *remote*,
+ * shared row: silently falling back to defaultV5() here is what used to let
+ * an old client wipe another device's newer data and then push that empty
+ * default back over it (see callers — none of them may adopt or persist a
+ * null return; they must leave whatever they already have untouched
+ * instead). Genuinely missing/malformed data (no `v` at all) still defaults
+ * to empty, since there's nothing recoverable to protect there.
  */
 export function migrateAnyToV5(
   raw:
@@ -427,11 +448,12 @@ export function migrateAnyToV5(
     | Record<string, unknown>
     | undefined
     | null
-): DailyPlannerV5 {
+): DailyPlannerV5 | null {
   if (!raw) return defaultV5();
   const v = (raw as Record<string, unknown>).v;
   if (v === 1) return migrateV1ToV5(raw as unknown as DailyPlannerV1);
   if (v === 2 || v === 3 || v === 4 || v === 5) return normalizeV5(raw);
+  if (typeof v === "number" && v > MAX_KNOWN_VERSION) return null;
   return defaultV5();
 }
 

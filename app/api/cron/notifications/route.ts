@@ -108,8 +108,8 @@ export async function GET(req: NextRequest) {
       }
 
       // Task started / task ending soon — mirrors checkTaskNotifications().
-      if ((n.taskStarted || n.taskEndingSoon) && plannerRow?.data) {
-        const state = migrateAnyToV5(plannerRow.data);
+      const state = plannerRow?.data ? migrateAnyToV5(plannerRow.data) : null;
+      if ((n.taskStarted || n.taskEndingSoon) && state) {
         const today = state.adHocByDate[dateKey];
         const tasks: PlannerTask[] = (today?.tasks ?? []).filter(
           (t) => t.startMinutes != null && t.endMinutes != null
