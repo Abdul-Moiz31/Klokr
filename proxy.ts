@@ -3,7 +3,25 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const AUTH_ONLY_ROUTES = new Set(["/login", "/signup"]);
 
-export async function middleware(request: NextRequest) {
+// Routes that require a signed-in Supabase user. /admin is intentionally
+// excluded — it has its own independent session model (ADMIN_PASSWORD +
+// a separate hashed cookie, see lib/admin-auth.ts) enforced server-side by
+// app/admin/(protected)/layout.tsx, not Supabase auth. Redirecting it to
+// /login here would lock admins out entirely.
+const PROTECTED_PREFIXES = [
+  "/dashboard",
+  "/activity",
+  "/reports",
+  "/pomodoro",
+  "/daily-planner",
+  "/routine-templates",
+];
+
+function isProtectedPath(pathname: string) {
+  return PROTECTED_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+}
+
+export async function proxy(request: NextRequest) {
   const response = NextResponse.next();
 
   const supabase = createServerClient(
@@ -29,6 +47,15 @@ export async function middleware(request: NextRequest) {
 
   if (user && AUTH_ONLY_ROUTES.has(request.nextUrl.pathname)) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
+  // The matcher below lists these routes as protected, but nothing previously
+  // enforced that server-side — an unauthenticated request fell straight
+  // through to the page (the full shell/JS bundle got served, and only
+  // useAuthSession() on the client eventually redirected, up to ~3s later).
+  // Enforce it here too, using the same session lookup already done above.
+  if (!user && isProtectedPath(request.nextUrl.pathname)) {
+    return NextResponse.redirect(new URL("/login", request.url));
   }
 
   return response;
