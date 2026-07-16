@@ -32,6 +32,14 @@ export async function GET(request: NextRequest) {
   }
 
   const state = migrateAnyToV5(remote.data);
+  if (!state) {
+    // Written by a newer client version this build doesn't recognize — fail
+    // open the same way as "no remote row at all" rather than guessing at
+    // its shape. The extension already treats an empty ruleset as "nothing
+    // scheduled today," and will pick up real rules on its next heartbeat
+    // once this deploy is updated.
+    return NextResponse.json({ rules: [], summary: { total: 0, completed: 0 } });
+  }
   // The server's runtime timezone is never the user's, so "today" has to be
   // resolved using the caller's own offset — same x-tz-offset convention as
   // /api/today. This is what the client's own dayKey(new Date()) resolves to
