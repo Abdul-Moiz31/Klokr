@@ -177,6 +177,13 @@ export async function POST(request: NextRequest) {
     // (free tier, no region/billing gating, unlike Gemini's free tier).
     const provider  = (keyRow?.provider as Provider | undefined) ?? "groq";
     const hasOwnKey = Boolean(ownKey);
+    // A stored row that fails to decrypt (e.g. AI_KEY_ENCRYPTION_SECRET was
+    // rotated after the key was saved) silently falls through to the metered
+    // server key below — correct for not breaking the request, but the user
+    // needs to know their key stopped working rather than unknowingly
+    // burning shared quota while /api/ai-key's own status still claims
+    // "unlimited". Surfaced in the response so the client can show a banner.
+    const keyNeedsReentry = Boolean(keyRow?.encrypted_key) && !ownKey;
 
     // Fall back to a server-held key only when no BYOK is set.
     const serverKey =
@@ -259,6 +266,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       answer: answer || "I couldn't find an answer in your data.",
       provider,
+      keyNeedsReentry,
       quota: hasOwnKey || !reservation
         ? null
         : { ...quota, used: reservation.newCount, remaining: Math.max(0, quota.limit - reservation.newCount) },

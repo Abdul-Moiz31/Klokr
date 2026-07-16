@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseForUserJwt } from "@/lib/supabase-user-client";
 import { createAdminClient } from "@/lib/supabase-admin";
-import { encryptSecret, isEncryptionConfigured } from "@/lib/crypto";
+import { encryptSecret, decryptSecret, isEncryptionConfigured } from "@/lib/crypto";
 import { getQuotaStatus } from "@/lib/ai-quota";
 
 // Manage the user's bring-your-own-key (BYOK) provider key + report AI quota.
@@ -27,11 +27,21 @@ export async function GET(req: NextRequest) {
     .eq("user_id", ctx.user.id)
     .maybeSingle();
 
-  const hasOwnKey = Boolean(data?.encrypted_key);
+  // A stored row that fails to decrypt (e.g. AI_KEY_ENCRYPTION_SECRET was
+  // rotated after the key was saved) must not be reported as an active key —
+  // /api/ask silently falls back to the metered server key in that case, and
+  // this endpoint previously kept claiming "unlimited queries" from row
+  // presence alone, with no way for the user to discover their key needs
+  // re-entry. keyNeedsReentry distinguishes that case from "no key at all"
+  // so the Settings UI can show a specific, actionable message.
+  const decrypted = data?.encrypted_key ? decryptSecret(data.encrypted_key as string) : null;
+  const hasOwnKey = Boolean(decrypted);
+  const keyNeedsReentry = Boolean(data?.encrypted_key) && !decrypted;
   const quota = await getQuotaStatus(ctx.supabase, ctx.user.id, hasOwnKey);
 
   return NextResponse.json({
     hasOwnKey,
+    keyNeedsReentry,
     provider: (data?.provider as string | undefined) ?? "anthropic",
     quota,
   });
@@ -62,6 +72,26 @@ export async function POST(req: NextRequest) {
   }
   if (!key || key.length < 10) {
     return NextResponse.json({ error: "Enter a valid API key." }, { status: 400 });
+  }
+
+  // A bare length check accepted a key pasted under the wrong provider tab
+  // with no feedback until the next /api/ask call fails with a generic
+  // "AI service error" — no way to tell "your key is wrong" from "the
+  // provider is down". Each provider's key format is well-documented and
+  // stable, so a prefix check catches the common case (wrong tab, typo,
+  // pasted the wrong credential) before it's even stored.
+  const PROVIDER_KEY_PREFIX: Record<Provider, RegExp> = {
+    anthropic: /^sk-ant-/,
+    openai: /^sk-/,
+    gemini: /^AIzaSy/,
+    openrouter: /^sk-or-/,
+    groq: /^gsk_/,
+  };
+  if (!PROVIDER_KEY_PREFIX[provider].test(key)) {
+    return NextResponse.json(
+      { error: "That doesn't look like a valid key for this provider — check you copied the right one." },
+      { status: 400 }
+    );
   }
 
   const encrypted = encryptSecret(key);
