@@ -4,8 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { createClient } from "@/lib/supabase";
-import { loadPrefs } from "@/lib/prefs";
-import { localDateStr } from "@/lib/streak";
+import { loadPrefs, getLocalDateString, getLocalHour, addDaysToDateString } from "@/lib/prefs";
 import {
   fetchNotifications,
   generateNotifications,
@@ -77,15 +76,14 @@ export function NotificationBell({ userId }: Props) {
       const supabase = createClient();
       const prefs = loadPrefs();
       // Pull last 90 days of tracked totals to derive streak/goal notifications.
-      const today = new Date();
-      const from = new Date(today);
-      from.setDate(today.getDate() - 90);
+      const todayStr = getLocalDateString(prefs);
+      const fromStr = addDaysToDateString(todayStr, -90);
       const { data: rows } = await supabase
         .from("tab_sessions")
         .select("date, duration_seconds")
         .eq("user_id", userId)
-        .gte("date", localDateStr(from))
-        .lte("date", localDateStr(today))
+        .gte("date", fromStr)
+        .lte("date", todayStr)
         .gte("duration_seconds", prefs.minSessionSeconds);
 
       const map = new Map<string, number>();
@@ -93,8 +91,8 @@ export function NotificationBell({ userId }: Props) {
 
       const goalSeconds = prefs.productiveHoursThreshold * 3600;
       const fresh = [
-        ...(await generateNotifications(supabase, userId, map, goalSeconds)),
-        ...(await generateNudge(supabase, userId, map)),
+        ...(await generateNotifications(supabase, userId, map, goalSeconds, todayStr)),
+        ...(await generateNudge(supabase, userId, map, todayStr, getLocalHour(prefs))),
       ];
       if (cancelled) return;
       fireBrowserNotifs(fresh);

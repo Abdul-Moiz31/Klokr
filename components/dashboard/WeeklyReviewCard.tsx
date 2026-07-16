@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase";
-import { loadPrefs } from "@/lib/prefs";
+import { loadPrefs, getMondayDateString, addDaysToDateString } from "@/lib/prefs";
 import { getSiteName } from "@/lib/domain";
 import { useTabSessionsLive } from "@/lib/hooks/useTabSessionsLive";
 
@@ -20,25 +20,6 @@ type Review = {
   topDomain: string | null;
   goalHours: number;
 };
-
-function localDateStr(d: Date): string {
-  return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-");
-}
-
-/** Monday-start of the week containing `d` (local). */
-function getMonday(d: Date): Date {
-  const base = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  const day = base.getDay(); // 0 = Sun
-  const diff = day === 0 ? -6 : 1 - day;
-  base.setDate(base.getDate() + diff);
-  return base;
-}
-
-function addDays(d: Date, n: number): Date {
-  const next = new Date(d);
-  next.setDate(next.getDate() + n);
-  return next;
-}
 
 function fmt(seconds: number): string {
   if (seconds < 60) return `${Math.round(seconds)}s`;
@@ -57,24 +38,23 @@ export function WeeklyReviewCard({ userId }: Props) {
     let cancelled = false;
 
     void (async () => {
-      const today = new Date();
-      const thisMonday = getMonday(today);
-      const lastMonday = addDays(thisMonday, -7);
-      const thisSunday = addDays(thisMonday, 6);
+      const thisMonday = getMondayDateString(prefs);
+      const lastMonday = addDaysToDateString(thisMonday, -7);
+      const thisSunday = addDaysToDateString(thisMonday, 6);
 
       const supabase = createClient();
       const { data } = await supabase
         .from("tab_sessions")
         .select("date, domain, duration_seconds")
         .eq("user_id", userId)
-        .gte("date", localDateStr(lastMonday))
-        .lte("date", localDateStr(thisSunday));
+        .gte("date", lastMonday)
+        .lte("date", thisSunday);
 
       if (cancelled || !data) return;
 
-      const thisStart = localDateStr(thisMonday);
-      const lastStart = localDateStr(lastMonday);
-      const lastEnd = localDateStr(addDays(lastMonday, 6));
+      const thisStart = thisMonday;
+      const lastStart = lastMonday;
+      const lastEnd = addDaysToDateString(lastMonday, 6);
 
       let thisWeekSeconds = 0;
       let lastWeekSeconds = 0;
