@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { localDateStr, calcForgivingStreak } from "@/lib/streak";
+import { calcForgivingStreak } from "@/lib/streak";
 
 export type NotificationType =
   | "streak_milestone"
@@ -114,14 +114,20 @@ async function pushNewly(supabase: SupabaseClient, items: AppNotification[]): Pr
  *
  * dailyMap: date-string → tracked seconds (last 90 days)
  * goalSeconds: the user's productive-hours goal in seconds
+ * todayStr: "today" in the caller's resolved timezone (getLocalDateString(prefs))
+ *   — taken as a parameter rather than computed here so this always agrees
+ *   with whatever range the caller queried `dailyMap` from; a previous
+ *   version derived it independently via a raw `new Date()`, which could
+ *   disagree with the caller's own (timezone-resolved) "today" right around
+ *   a midnight boundary.
  */
 export async function generateNotifications(
   supabase: SupabaseClient,
   userId: string,
   dailyMap: Map<string, number>,
-  goalSeconds: number
+  goalSeconds: number,
+  todayStr: string
 ): Promise<AppNotification[]> {
-  const todayStr = localDateStr(new Date());
   const items: NewNotification[] = [];
 
   // 1. Streak milestone — fire once per milestone value reached.
@@ -149,9 +155,11 @@ export async function generateNotifications(
     });
   }
 
-  // 3. Weekly review ready — once per ISO week, on/after Sunday.
-  const now = new Date();
-  if (now.getDay() === 0) {
+  // 3. Weekly review ready — once per ISO week, on/after Sunday. Parsed as
+  // UTC noon so reading the weekday back never reinterprets todayStr against
+  // a different zone than the one it was resolved in.
+  const weekday = new Date(`${todayStr}T12:00:00Z`).getUTCDay();
+  if (weekday === 0) {
     const weekKey = todayStr; // the Sunday date identifies the week
     items.push({
       type: "weekly_review",
@@ -168,19 +176,24 @@ export async function generateNotifications(
 /**
  * Accountability nudge: if the user has an active streak but hasn't tracked
  * anything yet today (and it's past midday), gently remind them. Once per day.
+ *
+ * todayStr/localHour: "today" and the current hour in the caller's resolved
+ *   timezone (getLocalDateString(prefs)/getLocalHour(prefs)) — see
+ *   generateNotifications() above for why these are parameters, not computed
+ *   from a raw `new Date()` here.
  */
 export async function generateNudge(
   supabase: SupabaseClient,
   userId: string,
-  dailyMap: Map<string, number>
+  dailyMap: Map<string, number>,
+  todayStr: string,
+  localHour: number
 ): Promise<AppNotification[]> {
-  const todayStr = localDateStr(new Date());
-  const hour = new Date().getHours();
   const trackedToday = (dailyMap.get(todayStr) ?? 0) > 0;
   const fs = calcForgivingStreak(dailyMap, todayStr);
 
   // Only nudge if: past midday, nothing tracked today, and a streak is at stake.
-  if (hour >= 12 && !trackedToday && fs.count > 0) {
+  if (localHour >= 12 && !trackedToday && fs.count > 0) {
     return insertNew(supabase, userId, [
       {
         type: "nudge",
