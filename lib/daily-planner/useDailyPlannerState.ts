@@ -53,6 +53,15 @@ export function useDailyPlannerState() {
     const remoteVersion = (remote.data as { v?: number })?.v;
     if (remote.updated_at > localTs) {
       const migrated = migrateAnyToV5(remote.data);
+      if (!migrated) {
+        // Remote was written by a newer client version this build doesn't
+        // recognize — do not adopt it (we'd be rendering a guess) and do
+        // not persist anything back over it. Leave local state exactly as
+        // it is; once this client is updated it'll understand the shape on
+        // the next sync. This is what prevents an old client from wiping a
+        // newer device's data and pushing that emptiness back to the DB.
+        return;
+      }
       setState(migrated);
       saveDailyPlanner(migrated);
       localStorage.setItem("Klokrs_planner_synced_at", remote.updated_at);
@@ -60,9 +69,13 @@ export function useDailyPlannerState() {
         await upsertRemotePlanner(userId, migrated);
         localStorage.setItem("Klokrs_planner_synced_at", new Date().toISOString());
       }
-    } else if (remoteVersion !== 5 && localSnapshot) {
+    } else if (remoteVersion != null && remoteVersion < 5 && localSnapshot) {
       // Remote is older but we already had newer local data — still upgrade
       // the DB row to v5 with our local state so the schema converges.
+      // Deliberately `< 5`, not `!== 5`: a remote version *higher* than 5 is
+      // a newer, unrecognized shape, not one needing an upgrade — pushing
+      // local v5 data over it would destroy it the same way the branch
+      // above guards against.
       await upsertRemotePlanner(userId, localSnapshot);
       localStorage.setItem("Klokrs_planner_synced_at", new Date().toISOString());
     }
