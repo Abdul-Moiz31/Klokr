@@ -148,3 +148,16 @@ export function getSiteName(domain: string): string {
   const fam = FAMILY_BY_ROOT.get(getRootDomain(domain));
   return fam ? fam.label : fallbackName(domain);
 }
+
+// Every registrable domain that belongs to `domain`'s family, e.g.
+// "github.com" → ["github.com", "githubusercontent.com", "github.io", ...].
+// Falls back to the domain's own registrable root for uncurated brands.
+// Used to build a precise match set (exact root, or a genuine subdomain of
+// one) instead of an unanchored substring match — an unanchored `ilike`
+// against "github.com" would also match an unrelated domain that merely
+// *ends with* that string, like "evilgithub.com".
+export function getFamilyDomains(domain: string): string[] {
+  const root = getRootDomain(domain);
+  const fam = FAMILY_BY_ROOT.get(root);
+  return fam ? fam.domains : [root];
+}
