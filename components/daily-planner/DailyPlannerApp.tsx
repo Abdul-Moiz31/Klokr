@@ -617,7 +617,7 @@ export function DailyPlannerApp({ accountCreatedAt = null, userId = null }: Dail
                     {/* ── Right panel ── */}
                     <div className="flex flex-col gap-3">
 
-                      {/* Active now / Up next
+                      {/* Active now / Up next */}
                       {(activeTask ?? nextTask) && (
                         <div className="overflow-hidden rounded-xl border border-white/[0.07] bg-white/[0.02]">
                           <div className="flex items-center gap-2 border-b border-white/[0.05] px-4 py-2.5">
@@ -665,7 +665,7 @@ export function DailyPlannerApp({ accountCreatedAt = null, userId = null }: Dail
                         </div>
                       )}
 
-                      Unscheduled tasks
+                      {/* Unscheduled tasks */}
                       <UnscheduledRail
                         ref={unscheduledRailRef}
                         tasks={unscheduledTasks}
@@ -673,7 +673,7 @@ export function DailyPlannerApp({ accountCreatedAt = null, userId = null }: Dail
                         onEdit={(taskId) => setModal({ mode: "edit", taskId })}
                         onDelete={deleteTask}
                         onToggleDone={toggleTaskDone}
-                      /> */}
+                      />
                     </div>
                   </div>
                 </>
