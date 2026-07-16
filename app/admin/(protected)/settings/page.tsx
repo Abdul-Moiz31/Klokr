@@ -11,8 +11,14 @@ const ENV_VARS = [
   { key: "ADMIN_PASSWORD",            label: "Admin Password",     secret: true  },
 ];
 
-function mask(v: string) {
-  return v.length <= 8 ? "••••••••" : v.slice(0, 4) + "••••" + v.slice(-4);
+// Fully redacted, no partial reveal — ADMIN_PASSWORD is the sole credential
+// gating the entire admin surface (full user data, purge-sessions, plan
+// grants), and any character-level exposure here (screen-share, screenshot,
+// a browser extension reading the DOM) measurably shrinks its real-world
+// brute-force search space. "Configured or not" is all this diagnostics
+// table needs to convey — it doesn't need to prove which characters are set.
+function mask() {
+  return "••••••••••••";
 }
 
 export default async function SettingsPage() {
@@ -98,7 +104,7 @@ export default async function SettingsPage() {
                     <p className="font-mono text-[11px] text-white/25">{key}</p>
                   </td>
                   <td className="px-6 py-3.5 font-mono text-xs text-white/35">
-                    {set ? (secret ? mask(value!) : value) : <span className="text-red-400/60">not set</span>}
+                    {set ? (secret ? mask() : value) : <span className="text-red-400/60">not set</span>}
                   </td>
                   <td className="px-6 py-3.5">
                     {set ? (

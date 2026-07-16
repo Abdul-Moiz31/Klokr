@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { ADMIN_SESSION_COOKIE, createAdminSession } from "@/lib/admin-auth";
+import { safeEqual } from "@/lib/crypto";
 
 // Single static shared password + no lockout was brute-forceable at whatever
 // rate the network allowed. Vercel functions don't share in-process memory
@@ -8,7 +9,16 @@ import { ADMIN_SESSION_COOKIE, createAdminSession } from "@/lib/admin-auth";
 // counter — see migration 013_admin_login_rate_limit.sql.
 function clientIp(req: NextRequest): string {
   const forwarded = req.headers.get("x-forwarded-for");
-  if (forwarded) return forwarded.split(",")[0]!.trim();
+  if (forwarded) {
+    // x-forwarded-for is a hop chain where each proxy appends the IP it
+    // received the request from. A client can set the *first* entry to
+    // anything it wants (previously used here — that let an attacker mint a
+    // fresh "IP" on every request and fully evade the rate limit), but
+    // cannot control the *last* entry: that one is appended by Vercel's own
+    // edge network from the real TCP connection, so it's the trustworthy one.
+    const parts = forwarded.split(",").map((p) => p.trim()).filter(Boolean);
+    if (parts.length > 0) return parts[parts.length - 1]!;
+  }
   return req.headers.get("x-real-ip") ?? "unknown";
 }
 
@@ -42,7 +52,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (email !== adminEmail || password !== adminPassword) {
+  if (!safeEqual(email ?? "", adminEmail) || !safeEqual(password ?? "", adminPassword)) {
     return NextResponse.json({ error: "Invalid credentials." }, { status: 401 });
   }
 
