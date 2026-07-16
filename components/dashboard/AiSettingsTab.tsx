@@ -17,6 +17,11 @@ type Quota = {
 
 type KeyStatus = {
   hasOwnKey: boolean;
+  // True when a key row exists but couldn't be decrypted (e.g. the server's
+  // encryption secret was rotated after the key was saved) — distinct from
+  // "no key configured" so the user knows to re-enter it rather than
+  // wondering why they're suddenly back on the metered quota.
+  keyNeedsReentry: boolean;
   provider: Provider;
   quota: Quota;
 };
@@ -193,6 +198,15 @@ export function AiSettingsTab() {
             </div>
           ) : (
             <div className="py-3.5">
+              {status.keyNeedsReentry && (
+                <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2.5 text-xs text-amber-200">
+                  <span className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" />
+                  <span>
+                    Your saved API key couldn&apos;t be read and stopped working — you&apos;re back on the
+                    metered quota below. Re-enter your key to restore unlimited queries.
+                  </span>
+                </div>
+              )}
               <div className="flex items-center justify-between text-xs text-white/45 mb-2">
                 <span>Klokrs AI quota this month ({quota.plan} plan)</span>
                 <span className="tabular-nums font-medium text-white/60">{quota.used} / {quota.limit}</span>
