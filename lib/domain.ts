@@ -1,3 +1,5 @@
+import { getDomain } from "tldts";
+
 // Cleans up a user-typed domain entry into a bare hostname: strips any
 // protocol, path/query/hash, and a leading "www.", lowercases the result.
 // "https://www.youtube.com/watch?v=1" → "youtube.com". Used anywhere a user
@@ -15,20 +17,27 @@ export function normalizeDomainInput(raw: string): string {
 }
 
 // Returns the registrable root domain: "gist.github.com" → "github.com".
-// Handles common two-part TLDs (co.uk, com.au, etc.) and leaves plain
-// "domain.tld" untouched.
+//
+// Backed by the real Public Suffix List (via tldts) rather than a hand-
+// rolled allowlist of "two-part TLDs" — the old version only recognized a
+// handful of English-speaking-market ccTLDs (co.uk, com.au, com.br, co.in,
+// co.nz, co.za, org.uk, net.au, org.au, me.uk, gov.uk, ac.uk). Any domain on
+// a public-suffix TLD outside that set (co.jp, com.mx, co.id, and dozens
+// more) got mis-rooted to just the ccTLD itself ("example.co.jp" →
+// "co.jp"), merging every unrelated site on that ccTLD into one fake "Co Jp"
+// brand for category grouping, favicons, and display names — a systematic
+// bug for a large non-{US,UK,AU,BR,IN,NZ,ZA} audience, not an edge case.
 //
 // NOTE: this stays a pure registrable-domain function — category overrides
 // (lib/categories.ts) are keyed off it. Cross-brand grouping lives in the
 // domain-family layer below.
 export function getRootDomain(domain: string): string {
-  const parts = domain.replace(/^www\./, "").split(".");
-  if (parts.length <= 2) return parts.join(".");
-  // Two-part TLDs like co.uk, com.au, org.uk, net.au…
-  const twoPartTLDs = new Set(["co.uk","com.au","com.br","co.in","co.nz","co.za","org.uk","net.au","org.au","me.uk","gov.uk","ac.uk"]);
-  const lastTwo = parts.slice(-2).join(".");
-  if (twoPartTLDs.has(lastTwo)) return parts.slice(-3).join(".");
-  return parts.slice(-2).join(".");
+  const bare = domain.replace(/^www\./, "");
+  // tldts returns null for inputs with no recognized public suffix (bare
+  // hostnames like "localhost", intranet names, raw IPs) — fall back to the
+  // input itself rather than propagating null, matching this function's
+  // existing always-returns-a-string contract.
+  return getDomain(bare) ?? bare;
 }
 
 // ── Domain families ──────────────────────────────────────────────────────────
