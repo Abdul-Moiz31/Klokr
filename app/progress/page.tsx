@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase";
 import { AppShell } from "@/components/dashboard/AppShell";
 import { PageHeader } from "@/components/dashboard/PageHeader";
 import { Loader } from "@/components/ui/Loader";
-import { loadPrefs } from "@/lib/prefs";
+import { loadPrefs, getLocalDateString, addDaysToDateString } from "@/lib/prefs";
 import { CATEGORIES, type CategoryId } from "@/lib/categories";
 import {
   computeProgress,
@@ -686,7 +686,7 @@ export default function ProgressPage() {
   const [chartMounted, setChartMounted] = useState(false);
 
   const prefs = useMemo(() => loadPrefs(), []);
-  const todayStr = useMemo(() => localDateStr(new Date()), []);
+  const todayStr = useMemo(() => getLocalDateString(prefs), [prefs]);
 
   useEffect(() => { setChartMounted(true); }, []);
 
@@ -694,9 +694,7 @@ export default function ProgressPage() {
     if (!user) return;
     let cancelled = false;
     void (async () => {
-      const today = new Date();
-      const from = new Date(today);
-      from.setDate(today.getDate() - 90);
+      const fromStr = addDaysToDateString(todayStr, -90);
 
       const supabase = createClient();
       const [{ data }, { data: achievementRows }] = await Promise.all([
@@ -704,7 +702,7 @@ export default function ProgressPage() {
           .from("tab_sessions")
           .select("domain, duration_seconds, date")
           .eq("user_id", user.id)
-          .gte("date", localDateStr(from))
+          .gte("date", fromStr)
           .lte("date", todayStr)
           .gte("duration_seconds", prefs.minSessionSeconds),
         supabase

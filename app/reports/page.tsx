@@ -25,7 +25,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { ReportsDomainTable } from "@/components/reports/ReportsDomainTable";
 import { DomainDrilldownModal } from "@/components/reports/DomainDrilldownModal";
 import { getSiteName } from "@/lib/domain";
-import { loadPrefs, savePrefs } from "@/lib/prefs";
+import { loadPrefs, savePrefs, getLocalDateString, type KlokrsPrefs } from "@/lib/prefs";
 import {
   getCategoryForDomain,
   getCategoryStats,
@@ -73,6 +73,31 @@ function localDateStr(d: Date): string {
     String(d.getMonth() + 1).padStart(2, "0"),
     String(d.getDate()).padStart(2, "0"),
   ].join("-");
+}
+
+// Every date-navigation helper below (localDateStr, getMonday, addDays, the
+// prev/next handlers) decodes/encodes Date objects via *local* getters —
+// that's fine and self-consistent for calendar math (prev day, start of
+// week, …), but means the one Date that has to be seeded from *outside* this
+// closed local-getter system — "today" — must be resolved against the
+// user's stored prefs.timezone, not the browser's own clock, or every
+// derived value here (initial selected day, "is this the current period"
+// comparisons, the Today button) silently drifts from what the rest of the
+// dashboard considers "today" whenever the two zones differ.
+//
+// Constructing via the local Date constructor from resolveTodayDateString()'s
+// Y/M/D (rather than parsing it as a UTC instant) is deliberate: it makes
+// this anchor decode back to the exact same Y/M/D through every *local*-
+// getter-based helper in this file, regardless of what the runtime's own
+// timezone happens to be — the string is the source of truth, this Date is
+// just a vessel for feeding it into the existing local-getter calendar math.
+function dateFromDateString(dateStr: string): Date {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(y ?? 1970, (m ?? 1) - 1, d ?? 1);
+}
+
+function resolveTodayAnchor(prefs: KlokrsPrefs): Date {
+  return dateFromDateString(getLocalDateString(prefs));
 }
 
 function formatTime(s: number): string {
@@ -584,9 +609,9 @@ export default function ReportsPage() {
   const authToken = authSession?.access_token ?? null;
   const [pageLoading, setPageLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("weekly");
-  const [selectedDate, setSelectedDate] = useState(new Date());
-  const [weekStart, setWeekStart] = useState(() => getMonday(new Date()));
-  const [monthDate, setMonthDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState(() => resolveTodayAnchor(loadPrefs()));
+  const [weekStart, setWeekStart] = useState(() => getMonday(resolveTodayAnchor(loadPrefs())));
+  const [monthDate, setMonthDate] = useState(() => resolveTodayAnchor(loadPrefs()));
   const [reportData, setReportData] = useState<ReportData | null>(null);
   const [reportLoading, setReportLoading] = useState(false);
   const [hourlyData, setHourlyData] = useState<HourRow[]>([]);
@@ -628,7 +653,7 @@ export default function ReportsPage() {
   );
 
   const isAtCurrentPeriod = useMemo(() => {
-    const today = new Date();
+    const today = resolveTodayAnchor(loadPrefs());
     if (tab === "daily") return localDateStr(selectedDate) === localDateStr(today);
     if (tab === "weekly") return localDateStr(weekStart) === localDateStr(getMonday(today));
     return (
@@ -776,7 +801,7 @@ export default function ReportsPage() {
   }, [hourlyData, tab]);
 
   const jumpToCurrent = useCallback(() => {
-    const now = new Date();
+    const now = resolveTodayAnchor(loadPrefs());
     if (tab === "daily") setSelectedDate(now);
     else if (tab === "weekly") setWeekStart(getMonday(now));
     else setMonthDate(now);

@@ -10,9 +10,9 @@ import { ActivityHeatmap, type DayStat } from "@/components/activity/ActivityHea
 import { DayReportModal } from "@/components/activity/DayReportModal";
 import { DomainTable } from "@/components/dashboard/DomainTable";
 import { DomainDrilldownModal } from "@/components/reports/DomainDrilldownModal";
-import { loadPrefs } from "@/lib/prefs";
+import { loadPrefs, getLocalDateString, addDaysToDateString } from "@/lib/prefs";
 import { Loader } from "@/components/ui/Loader";
-import { calcForgivingStreak, localDateStr } from "@/lib/streak";
+import { calcForgivingStreak } from "@/lib/streak";
 
 interface TodayDomain {
   domain: string;
@@ -43,13 +43,10 @@ export default function ActivityPage() {
   const prefs = useMemo(() => loadPrefs(), []);
   const thresholdS = prefs.productiveHoursThreshold * 3600;
 
-  const today = useMemo(() => new Date(), []);
-  const todayStr = useMemo(() => localDateStr(today), [today]);
+  const todayStr = useMemo(() => getLocalDateString(prefs), [prefs]);
 
   const fetchStats = useCallback(async (userId: string) => {
-    const from = new Date(today);
-    from.setDate(today.getDate() - 90);
-    const fromStr = localDateStr(from);
+    const fromStr = addDaysToDateString(todayStr, -90);
 
     const supabase = createClient();
     const { data } = await supabase
@@ -96,7 +93,7 @@ export default function ActivityPage() {
           .sort((a, b) => b.totalSeconds - a.totalSeconds)
       );
     }
-  }, [today, todayStr]);
+  }, [todayStr, prefs.minSessionSeconds]);
 
   useEffect(() => {
     if (!user) return;
@@ -227,7 +224,12 @@ export default function ActivityPage() {
             <div>
               <h2 className="text-base font-semibold text-white/90">Today&apos;s breakdown</h2>
               <p className="mt-0.5 text-xs text-white/40">
-                {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+                {/* Anchored to todayStr (resolved timezone), not the browser's
+                    own clock — formatted with timeZone: "UTC" since todayStr
+                    is parsed at UTC noon precisely to avoid reinterpretation. */}
+                {new Date(`${todayStr}T12:00:00Z`).toLocaleDateString("en-US", {
+                  weekday: "long", month: "long", day: "numeric", timeZone: "UTC",
+                })}
               </p>
             </div>
           </div>

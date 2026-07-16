@@ -4,8 +4,8 @@ import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase";
-import { loadPrefs } from "@/lib/prefs";
-import { calcForgivingStreak, countProductiveDays, localDateStr } from "@/lib/streak";
+import { loadPrefs, getLocalDateString, addDaysToDateString } from "@/lib/prefs";
+import { calcForgivingStreak, countProductiveDays } from "@/lib/streak";
 import { useTabSessionsLive } from "@/lib/hooks/useTabSessionsLive";
 
 type Props = {
@@ -32,17 +32,15 @@ export function StreakStrip({ userId }: Props) {
     let cancelled = false;
 
     void (async () => {
-      const today = new Date();
-      const todayStr = localDateStr(today);
-      const from = new Date(today);
-      from.setDate(today.getDate() - 90);
+      const todayStr = getLocalDateString(prefs);
+      const fromStr = addDaysToDateString(todayStr, -90);
 
       const supabase = createClient();
       const { data: rows } = await supabase
         .from("tab_sessions")
         .select("date, duration_seconds")
         .eq("user_id", userId)
-        .gte("date", localDateStr(from))
+        .gte("date", fromStr)
         .lte("date", todayStr)
         .gte("duration_seconds", prefs.minSessionSeconds);
 
