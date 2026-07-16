@@ -514,22 +514,30 @@ function RecurringRuleModal({
             <p className="mt-1 text-[11px] text-white/25">Time on these sites counts toward this task&apos;s progress bar.</p>
           </Field>
 
-          {/* Blocked domains */}
-          <Field
-            label="Blocked domains (optional)"
-            tooltip="Blocked for the duration of this routine's window, regardless of the extension's always-blocked list in Settings. e.g. block youtube.com during a Reading block even if it's not on your always-blocked list."
-          >
-            <input
-              value={form.blockedDomainTags?.join(", ") ?? ""}
-              onChange={(e) => {
-                const parts = e.target.value.split(/[,;]+/).map((d) => d.trim()).filter(Boolean);
-                set({ blockedDomainTags: parts });
-              }}
-              className={inputCls}
-              placeholder="youtube.com, reddit.com"
-            />
-            <p className="mt-1 text-[11px] text-white/25">Blocked only while this routine's window is active, on every materialized instance.</p>
-          </Field>
+          {/* Blocking is enforced against a materialized instance's own
+              scheduled window. A routine with no default time lands
+              unscheduled when applied to a day (see the unscheduled rail),
+              which has no window to enforce blocking during — so this field
+              would silently save a value that can never take effect until
+              the routine has a default time (or an individual instance is
+              scheduled later on the timeline, where it can be set there). */}
+          {form.defaultStartMinutes != null && (
+            <Field
+              label="Blocked domains (optional)"
+              tooltip="Blocked for the duration of this routine's window, regardless of the extension's always-blocked list in Settings. e.g. block youtube.com during a Reading block even if it's not on your always-blocked list."
+            >
+              <input
+                value={form.blockedDomainTags?.join(", ") ?? ""}
+                onChange={(e) => {
+                  const parts = e.target.value.split(/[,;]+/).map((d) => d.trim()).filter(Boolean);
+                  set({ blockedDomainTags: parts });
+                }}
+                className={inputCls}
+                placeholder="youtube.com, reddit.com"
+              />
+              <p className="mt-1 text-[11px] text-white/25">Blocked only while this routine's window is active, on every materialized instance.</p>
+            </Field>
+          )}
 
           {/* Actions */}
           <div className="flex gap-2.5 pt-1">
