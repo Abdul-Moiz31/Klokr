@@ -397,7 +397,7 @@ function StreakCard({ p, todayStr }: { p: ProgressResult; todayStr: string }) {
               : p.streakAtRisk
                 ? "At risk — browse today to keep it"
                 : p.graceUsed
-                  ? "Active · 1 missed day forgiven"
+                  ? "Active · recent miss forgiven"
                   : "Active streak"}
           </p>
         </div>
@@ -455,13 +455,18 @@ function StreakCard({ p, todayStr }: { p: ProgressResult; todayStr: string }) {
 /* ── Records Card ─────────────────────────────────────────── */
 
 function RecordsCard({ p }: { p: ProgressResult }) {
+  // All four records are computed from the same 90-day rolling window as the
+  // rest of this page, not truly "all time" — a better day/score/streak from
+  // further back wouldn't be visible here. Previously only "Longest streak"
+  // disclosed this (in its own sub-text); the other three silently dropped
+  // an older true best with no indication, which reads as a bug ("why did my
+  // record change?") rather than a windowing choice. Disclosed once at the
+  // card level now so all four are covered consistently.
   const recs = [
     { label: "Best deep-work day",  value: fmtHm(p.records.bestDeepDaySeconds),  sub: fmtDate(p.records.bestDeepDayDate) },
     { label: "Best score",          value: String(p.records.bestScore),           sub: fmtDate(p.records.bestScoreDate) },
     { label: "Most tracked day",    value: fmtHm(p.records.bestTotalDaySeconds), sub: fmtDate(p.records.bestTotalDayDate) },
-    // Computed from the same 90-day window as the rest of this page, not
-    // truly "all time" — a longer historical streak wouldn't be visible here.
-    { label: "Longest streak",      value: `${p.records.longestStreakDays}d`,     sub: "last 90 days" },
+    { label: "Longest streak",      value: `${p.records.longestStreakDays}d`,     sub: "" },
   ];
   return (
     <motion.div
@@ -470,7 +475,7 @@ function RecordsCard({ p }: { p: ProgressResult }) {
       transition={{ duration: 0.4, delay: 0.2 }}
       className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-4"
     >
-      <p className="mb-4 text-[11px] font-semibold uppercase tracking-widest text-white/30">Personal records</p>
+      <p className="mb-4 text-[11px] font-semibold uppercase tracking-widest text-white/30">Personal records (last 90 days)</p>
       <div className="grid grid-cols-2 gap-3">
         {recs.map(r => (
           <div key={r.label} className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">

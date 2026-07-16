@@ -183,7 +183,7 @@ export default function ActivityPage() {
         <StatsCard
           title="Current streak"
           value={`${streak}d`}
-          subtitle={streak > 0 ? "days in a row (1 miss forgiven)" : "Start your streak today"}
+          subtitle={streak > 0 ? "days in a row (single misses forgiven)" : "Start your streak today"}
           tooltip="Days with tracked browsing, ending today (or yesterday if you haven't browsed yet). Forgiving: a single missed day won't break it — only two misses in a row will."
           accent={streak >= 7 ? "violet" : "neutral"}
           delay={0.1}
