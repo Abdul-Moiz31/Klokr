@@ -1,0 +1,40 @@
+name: Cron - notifications
+
+# Replaces Vercel's own cron (vercel.json) — the Hobby plan only allows
+# cron jobs that run once a day, but this endpoint (day-start/day-complete/
+# task-started/task-ending-soon push notifications) needs to be checked
+# every few minutes to catch a scheduled task's window opening or closing
+# close to when it actually happens. GitHub Actions' schedule trigger has
+# no such restriction, so it calls the same endpoint on the same cadence
+# instead. Nothing about the endpoint or its logic changes — only what
+# triggers it.
+#
+# Requires two repository secrets (Settings > Secrets and variables >
+# Actions), matching the values already set in Vercel's env vars:
+#   CRON_SECRET   - must equal the CRON_SECRET env var the route checks
+#   CRON_TARGET_URL - e.g. https://klokrs.com/api/cron/notifications
+#
+# GitHub's own docs note schedule triggers are best-effort and can be
+# delayed by a few minutes during high platform load — acceptable here
+# since a notification firing a few minutes late is a minor UX nit, not a
+# correctness issue (the route dedupes via push_notification_log either way).
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  call-cron-endpoint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call /api/cron/notifications
+        run: |
+          status=$(curl -s -o /tmp/response.txt -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.CRON_TARGET_URL }}")
+          echo "HTTP status: $status"
+          cat /tmp/response.txt
+          if [ "$status" -ge 300 ]; then
+            echo "::error::Cron endpoint returned $status"
+            exit 1
+          fi
