@@ -1,11 +1,21 @@
 import type { RecurringRule } from "./types";
 import { dayKey } from "./date";
 
-function startOfLocalDay(d: Date) {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-}
-
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+// Pure calendar-day difference between two dates' Y/M/D components, immune
+// to DST. Local midnight-to-midnight millisecond differences aren't
+// reliably an exact multiple of 24h when a DST transition falls inside the
+// range (a 23h or 25h day) — dividing by DAY_MS and flooring can silently
+// round down to the wrong week, flipping a biweekly rule's parity for that
+// week twice a year. Date.UTC() is never subject to DST, so treating each
+// date's local Y/M/D as a UTC calendar-day number sidesteps the
+// irregularity entirely — the result is always an exact integer.
+function calendarDaysBetween(a: Date, b: Date): number {
+  const aUtc = Date.UTC(a.getFullYear(), a.getMonth(), a.getDate());
+  const bUtc = Date.UTC(b.getFullYear(), b.getMonth(), b.getDate());
+  return Math.round((bUtc - aUtc) / DAY_MS);
+}
 
 /**
  * Whether this rule produces a task on the given calendar day (local).
@@ -26,11 +36,7 @@ export function ruleAppliesOnDate(rule: RecurringRule, d: Date): boolean {
       if (!rule.weekdays.includes(dow)) return false;
       const anchor = new Date(rule.biweeklyAnchor + "T12:00:00");
       if (Number.isNaN(anchor.getTime())) return false;
-      const a0 = startOfLocalDay(anchor);
-      const b0 = startOfLocalDay(d);
-      const diffDays = Math.floor(
-        (b0.getTime() - a0.getTime()) / DAY_MS
-      );
+      const diffDays = calendarDaysBetween(anchor, d);
       if (diffDays < 0) return false;
       const weekIndex = Math.floor(diffDays / 7);
       return weekIndex % 2 === 0;
