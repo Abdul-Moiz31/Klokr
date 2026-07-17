@@ -19,7 +19,8 @@ import {
 } from "./storage";
 import { suggestedRoutineTemplateKind } from "./date";
 import { ruleAppliesOnDate } from "./recurrence";
-import { fetchRemotePlanner, upsertRemotePlanner } from "@/lib/services/plannerSync";
+import { fetchRemotePlanner, upsertRemotePlanner, upsertRemotePlannerIfUnchanged } from "@/lib/services/plannerSync";
+import { mergeDailyPlannerV5 } from "./merge";
 import { getAuthUser } from "@/lib/services/userPreferences";
 import { createClient } from "@/lib/supabase";
 
@@ -133,6 +134,43 @@ export function useDailyPlannerState() {
     };
   }, [syncFromRemote]);
 
+  // Writes `dataToWrite` via the compare-and-swap RPC instead of a blind
+  // upsert — the write only lands if the remote row still matches this
+  // client's last known updated_at, which is what closes the last-write-wins
+  // race between two tabs/devices editing within the same debounce window.
+  // On conflict, merges this edit on top of the fresher remote state
+  // (mergeDailyPlannerV5 — a shallow key-level union, not a full CRDT: see
+  // its doc comment for exactly what is/isn't covered) and retries once. If
+  // that retry *also* conflicts, it's left for the next debounced save
+  // rather than chased further — retrying indefinitely under sustained
+  // concurrent editing has no real benefit and risks a livelock.
+  const performConditionalSync = useCallback(async (userId: string, dataToWrite: DailyPlannerV5) => {
+    const rawLocalTs = localStorage.getItem("Klokrs_planner_synced_at");
+    const expectedUpdatedAt = rawLocalTs && rawLocalTs !== "0" ? rawLocalTs : null;
+
+    const result = await upsertRemotePlannerIfUnchanged(userId, dataToWrite, expectedUpdatedAt);
+    if (result.ok) {
+      localStorage.setItem("Klokrs_planner_synced_at", result.updatedAt);
+      return;
+    }
+    if (!result.conflict) return; // network/RPC error — the next debounced write will retry naturally
+
+    const remoteMigrated = migrateAnyToV5(result.remote.data);
+    if (!remoteMigrated) {
+      // The conflicting row is a newer, unrecognized schema version — same
+      // "don't touch what we can't understand" rule as syncFromRemote.
+      // Leave it alone; this edit stays local until the client is updated.
+      return;
+    }
+    const merged = mergeDailyPlannerV5(dataToWrite, remoteMigrated);
+    const retry = await upsertRemotePlannerIfUnchanged(userId, merged, result.remote.updated_at);
+    if (retry.ok) {
+      setState(merged);
+      saveDailyPlanner(merged);
+      localStorage.setItem("Klokrs_planner_synced_at", retry.updatedAt);
+    }
+  }, []);
+
   // 2. On every state change: save to localStorage immediately, debounce Supabase write.
   useEffect(() => {
     if (!state) return;
@@ -149,15 +187,14 @@ export function useDailyPlannerState() {
       void (async () => {
         const user = await getAuthUser();
         if (!user) return;
-        await upsertRemotePlanner(user.id, state);
-        localStorage.setItem("Klokrs_planner_synced_at", new Date().toISOString());
+        await performConditionalSync(user.id, state);
       })();
     }, SYNC_DEBOUNCE_MS);
 
     return () => {
       if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
     };
-  }, [state]);
+  }, [state, performConditionalSync]);
 
   const update = useCallback((fn: (s: DailyPlannerV5) => DailyPlannerV5) => {
     setState((prev) => (prev ? fn(deepClone(prev)) : null));
