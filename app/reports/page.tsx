@@ -16,6 +16,7 @@ import {
 } from "recharts";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
+import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import { AppShell } from "@/components/dashboard/AppShell";
 import { PageHeader } from "@/components/dashboard/PageHeader";
@@ -901,6 +902,13 @@ export default function ReportsPage() {
         pdfCategoryStats,
         user?.email ?? ""
       );
+    } catch (err) {
+      // generatePdf() runs synchronously on the main thread and previously
+      // had no catch here — a jsPDF/autoTable failure (pathological data, a
+      // browser blocking the download) surfaced as nothing at all: the
+      // button just went idle again with no indication the export failed.
+      console.error("[reports] PDF export failed", err);
+      toast.error("Couldn't generate the PDF. Please try again.");
     } finally {
       setPdfBusy(false);
     }
