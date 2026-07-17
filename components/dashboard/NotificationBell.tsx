@@ -38,9 +38,38 @@ function timeAgo(iso: string): string {
 
 // Fire OS/browser notifications for freshly-created items, if the user granted
 // permission. Best-effort — silently no-ops when unsupported or denied.
+//
+// generateNotifications()/generateNudge() dedupe at the DB level (unique on
+// user_id+dedupe_key, INSERT ... ON CONFLICT DO NOTHING), so two tabs racing
+// to generate the same notification only ever get one row actually inserted
+// — but that's a per-row guarantee, not a same-millisecond one, and doesn't
+// stop a second tab whose own generation call also happens to win a
+// different item in the same batch. This localStorage-based lock is a cheap,
+// non-atomic (there's a small read-then-write race window, not a true
+// mutex) but effective-in-practice belt-and-suspenders: only one tab fires
+// native popups within any 5s window, so a user with several tabs open
+// doesn't get the same "3-day streak!" toast three times over.
+const NOTIF_FIRE_LOCK_KEY = "Klokrs_notif_fire_lock";
+const NOTIF_FIRE_LOCK_WINDOW_MS = 5_000;
+
+function claimBrowserNotifLock(): boolean {
+  try {
+    const now = Date.now();
+    const raw = localStorage.getItem(NOTIF_FIRE_LOCK_KEY);
+    const last = raw ? parseInt(raw, 10) : NaN;
+    if (!Number.isNaN(last) && now - last < NOTIF_FIRE_LOCK_WINDOW_MS) return false;
+    localStorage.setItem(NOTIF_FIRE_LOCK_KEY, String(now));
+    return true;
+  } catch {
+    return true; // storage unavailable — fail open, better to double-fire than never fire
+  }
+}
+
 function fireBrowserNotifs(items: AppNotification[]) {
+  if (items.length === 0) return;
   if (typeof window === "undefined" || !("Notification" in window)) return;
   if (Notification.permission !== "granted") return;
+  if (!claimBrowserNotifLock()) return;
   for (const n of items) {
     try {
       new Notification(n.title, { body: n.body, tag: n.dedupe_key, icon: "/icon.svg" });
@@ -223,6 +252,18 @@ export function NotificationBell({ userId }: Props) {
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /></svg>
                 Enable browser notifications for streaks &amp; reminders
               </button>
+            )}
+            {/* Once denied, there's no JS API to re-prompt — the browser
+                permanently suppresses Notification.requestPermission() until
+                the user changes it in their own browser settings. A
+                clickable button here would just silently do nothing, so
+                this is informational only, pointing at where to actually
+                fix it, instead of the previous dead end (no messaging at all). */}
+            {permission === "denied" && (
+              <div className="flex items-start gap-2 border-b border-white/[0.06] bg-white/[0.02] px-4 py-2.5 text-left text-xs text-white/40">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0"><circle cx="12" cy="12" r="10" /><path d="M12 8v4M12 16h.01" /></svg>
+                <span>Browser notifications are blocked. Enable them for this site in your browser&apos;s address-bar settings to get streak &amp; reminder alerts.</span>
+              </div>
             )}
 
             <div className="max-h-[22rem] overflow-y-auto">
