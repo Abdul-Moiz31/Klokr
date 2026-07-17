@@ -28,7 +28,7 @@ const fadeUp = {
 const marqueeFeatures = [
   "Productivity",
   "Time Tracking",
-  "Focus Score",
+  "Accountability Score",
   "Daily Planner",
   "AI Insights",
   "Tab Tracking",
