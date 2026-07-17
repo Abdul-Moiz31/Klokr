@@ -17,6 +17,7 @@ import { CategoryIcon } from "@/lib/daily-planner/taskIcon";
 import type { TabSession } from "@/lib/supabase";
 import {
   computeOnTaskStatsForDay,
+  isTaskNotTracked,
   type UnscheduledGap,
 } from "@/lib/daily-planner/onTask";
 import {
@@ -180,7 +181,8 @@ export function TimelineView({
         // only for tasks that haven't been classified yet (e.g. auto-complete
         // is disabled in Settings, or the window only just ended).
         const isPartial = !t.done && t.outcome === "partial";
-        const isMissed = !t.done && !t.skipped && (
+        const isNotTracked = isTaskNotTracked(t, nowMinutes);
+        const isMissed = !t.done && !t.skipped && !isNotTracked && (
           t.outcome === "missed" ||
           (t.outcome == null && nowMinutes != null && (t.endMinutes as number) <= nowMinutes)
         );
@@ -197,6 +199,7 @@ export function TimelineView({
             isActive ? "klokrs-event--active" : "",
             isPartial ? "klokrs-event--partial" : "",
             isMissed ? "klokrs-event--missed" : "",
+            isNotTracked ? "klokrs-event--not-tracked" : "",
           ].filter(Boolean),
           extendedProps: { kind: "task", task: t },
         } satisfies EventInput;
@@ -365,7 +368,15 @@ export function TimelineView({
           // live time-based guess only for tasks not yet classified (e.g.
           // auto-complete disabled, or window just ended this tick).
           const isPartial = !done && task?.outcome === "partial";
-          const isMissedFinal = !done && task != null && !task.skipped && (
+          // An untagged task was never actually measurable via tab-tracking
+          // — pickAutoCompletions() already knows this and never sets a
+          // formal outcome for it, but the live fallback below (for tasks
+          // not yet classified) used to treat "no outcome yet" as "missed"
+          // regardless of why, which meant every untagged task looked
+          // permanently missed forever. isTaskNotTracked() carves that case
+          // out into its own neutral state instead.
+          const isNotTrackedFinal = task != null && isTaskNotTracked(task, nowMinutes);
+          const isMissedFinal = !done && task != null && !task.skipped && !isNotTrackedFinal && (
             task.outcome === "missed" ||
             (task.outcome == null && windowEndedInPast)
           );
@@ -393,10 +404,17 @@ export function TimelineView({
                     e.stopPropagation();
                     onToggleDone(task!.id);
                   }}
-                  title={isPartial ? "Partial — tap to mark done" : isMissedFinal ? "Missed — tap to mark done" : undefined}
+                  title={
+                    isPartial ? "Partial — tap to mark done"
+                    : isMissedFinal ? "Missed — tap to mark done"
+                    : isNotTrackedFinal ? "Not tracked — no domains tagged on this task"
+                    : undefined
+                  }
                   className={`klokrs-event-icon-badge klokrs-event-icon-badge--${category} ${done ? "klokrs-event-icon-badge--done" : ""} ${
                     isPartial ? "klokrs-event-icon-badge--partial" : ""
                   } ${isMissedFinal ? "klokrs-event-icon-badge--missed" : ""} ${
+                    isNotTrackedFinal ? "klokrs-event-icon-badge--not-tracked" : ""
+                  } ${
                     canToggle ? "" : "klokrs-event-icon-badge--readonly"
                   }`}
                 >
@@ -412,6 +430,10 @@ export function TimelineView({
                   ) : isMissedFinal ? (
                     <svg width="9" height="9" viewBox="0 0 12 12" fill="none" aria-hidden>
                       <path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                    </svg>
+                  ) : isNotTrackedFinal ? (
+                    <svg width="9" height="9" viewBox="0 0 12 12" fill="none" aria-hidden>
+                      <path d="M2.5 6h7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                     </svg>
                   ) : (
                     <CategoryIcon category={category} size={11} />
