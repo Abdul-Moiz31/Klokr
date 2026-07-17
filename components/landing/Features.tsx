@@ -296,7 +296,7 @@ function TrackingVisual() {
   return (
     <div className="h-full min-h-[180px] rounded-xl border border-white/10 bg-[#0A0A12] p-5 flex flex-col">
       <div className="flex items-center justify-between mb-5">
-        <span className="text-white/40 text-xs">Focus Score</span>
+        <span className="text-white/40 text-xs">Accountability Score</span>
         <span className="text-cyan-400 text-xs font-semibold">92%</span>
       </div>
       <div className="flex items-end gap-2 flex-1">
