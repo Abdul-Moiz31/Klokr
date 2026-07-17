@@ -131,9 +131,20 @@ export default function DashboardPage() {
         void supabase.removeChannel(channel);
         return;
       }
-      channel.subscribe();
+      // Track whether the realtime channel is actually confirmed healthy —
+      // the poll below only does real work while it isn't, instead of
+      // unconditionally re-fetching every 30s regardless of whether
+      // realtime is already delivering updates. Worst case (realtime never
+      // confirms healthy — a blocked websocket, a dropped connection with
+      // no clean error) this is identical to the old always-poll behavior;
+      // it only becomes a no-op when realtime is genuinely working.
+      let isRealtimeHealthy = false;
+      channel.subscribe((status: string) => {
+        isRealtimeHealthy = status === "SUBSCRIBED";
+      });
 
       pollingInterval = setInterval(() => {
+        if (isRealtimeHealthy) return;
         void fetchSessions(userId);
       }, 30_000);
     })();
