@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { calcForgivingStreak } from "@/lib/streak";
+import { addDaysToDateString } from "@/lib/prefs";
 
 export type NotificationType =
   | "streak_milestone"
@@ -177,6 +178,14 @@ export async function generateNotifications(
  * Accountability nudge: if the user has an active streak but hasn't tracked
  * anything yet today (and it's past midday), gently remind them. Once per day.
  *
+ * Also fires a distinct "restart" nudge when a streak that existed as of
+ * yesterday has just broken — previously the only nudge was "keep an active
+ * streak alive", so a user who actually lost their streak got silence at
+ * exactly the moment they're most likely to churn instead of re-engage.
+ * Deliberately does NOT nudge a user who has simply never tracked anything
+ * (fs.count === 0 with no streak yesterday either) — that would be an
+ * unearned, confusing "restart" prompt for someone who never started.
+ *
  * todayStr/localHour: "today" and the current hour in the caller's resolved
  *   timezone (getLocalDateString(prefs)/getLocalHour(prefs)) — see
  *   generateNotifications() above for why these are parameters, not computed
@@ -190,10 +199,10 @@ export async function generateNudge(
   localHour: number
 ): Promise<AppNotification[]> {
   const trackedToday = (dailyMap.get(todayStr) ?? 0) > 0;
-  const fs = calcForgivingStreak(dailyMap, todayStr);
+  if (localHour < 12 || trackedToday) return [];
 
-  // Only nudge if: past midday, nothing tracked today, and a streak is at stake.
-  if (localHour >= 12 && !trackedToday && fs.count > 0) {
+  const fs = calcForgivingStreak(dailyMap, todayStr);
+  if (fs.count > 0) {
     return insertNew(supabase, userId, [
       {
         type: "nudge",
@@ -204,5 +213,20 @@ export async function generateNudge(
       },
     ]);
   }
+
+  const yesterdayStr = addDaysToDateString(todayStr, -1);
+  const hadStreakYesterday = calcForgivingStreak(dailyMap, yesterdayStr).count > 0;
+  if (hadStreakYesterday) {
+    return insertNew(supabase, userId, [
+      {
+        type: "nudge",
+        title: "Start a new streak today",
+        body: "Your streak reset — every streak starts with day one. Track something today to get going again.",
+        href: "/daily-planner",
+        dedupe_key: `nudge_restart_${todayStr}`,
+      },
+    ]);
+  }
+
   return [];
 }
