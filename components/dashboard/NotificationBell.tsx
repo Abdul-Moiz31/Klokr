@@ -134,7 +134,11 @@ export function NotificationBell({ userId }: Props) {
   // Live sync across tabs/devices: a notification generated, marked read, or
   // dismissed elsewhere (another open tab, another device) shows up here
   // without needing a reload — same Realtime + polling-fallback pattern used
-  // for tab_sessions elsewhere in the dashboard.
+  // for tab_sessions elsewhere in the dashboard. The poll only does real work
+  // while the realtime channel isn't confirmed healthy — worst case (a
+  // blocked websocket, a connection that drops without a clean error) this
+  // is identical to always polling; it only becomes a no-op once realtime is
+  // genuinely delivering updates, instead of redundantly re-fetching anyway.
   useEffect(() => {
     if (!userId) return;
     const supabase = createClient();
@@ -151,9 +155,15 @@ export function NotificationBell({ userId }: Props) {
         },
         () => void refresh()
       );
-    channel.subscribe();
+    let isRealtimeHealthy = false;
+    channel.subscribe((status: string) => {
+      isRealtimeHealthy = status === "SUBSCRIBED";
+    });
 
-    const pollingInterval = setInterval(() => void refresh(), 30_000);
+    const pollingInterval = setInterval(() => {
+      if (isRealtimeHealthy) return;
+      void refresh();
+    }, 30_000);
 
     return () => {
       clearInterval(pollingInterval);
