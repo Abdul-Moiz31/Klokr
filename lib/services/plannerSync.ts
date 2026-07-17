@@ -42,3 +42,41 @@ export async function upsertRemotePlanner(
     { onConflict: "user_id" }
   );
 }
+
+export type ConditionalUpsertResult =
+  | { ok: true; updatedAt: string }
+  | { ok: false; conflict: true; remote: RemoteRow }
+  | { ok: false; conflict: false };
+
+/**
+ * Atomic compare-and-swap write via upsert_planner_data_if_unchanged
+ * (migration 019) — the write only lands if `expectedUpdatedAt` still
+ * matches the row's real updated_at, closing the last-write-wins race a
+ * plain upsert() has (two tabs/devices writing within the same debounce
+ * window, whichever lands second silently discarding the other's edit).
+ * On conflict, the RPC returns the current row in the same round trip so
+ * the caller can merge and retry without a second fetch.
+ */
+export async function upsertRemotePlannerIfUnchanged(
+  userId: string,
+  plannerData: DailyPlannerV5,
+  expectedUpdatedAt: string | null
+): Promise<ConditionalUpsertResult> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("upsert_planner_data_if_unchanged", {
+    p_user_id: userId,
+    p_data: plannerData,
+    p_expected_updated_at: expectedUpdatedAt,
+  });
+
+  if (error) return { ok: false, conflict: false };
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) return { ok: false, conflict: false };
+
+  if (row.ok) return { ok: true, updatedAt: row.updated_at as string };
+  return {
+    ok: false,
+    conflict: true,
+    remote: { data: row.data as RemoteRow["data"], updated_at: row.updated_at as string },
+  };
+}
