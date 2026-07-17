@@ -30,6 +30,26 @@ const ZERO_STATS: OnTaskStats = {
   status: "no-activity",
 };
 
+/**
+ * True once a scheduled task's window has ended with no domain tags set —
+ * meaning it was never actually measurable via tab-tracking in the first
+ * place, not that the user failed to do it. pickAutoCompletions() already
+ * skips these tasks entirely (never sets a formal `outcome`), but several UI
+ * surfaces used to derive a *live* "missed" guess for any task with
+ * `outcome == null` past its window — which, for an untagged task, is every
+ * single one of them, forever. That conflated "we don't know" with "you
+ * didn't do it". Use this to render a distinct neutral state instead of
+ * folding untagged tasks into "missed".
+ */
+export function isTaskNotTracked(
+  task: Pick<PlannerTask, "domainTags" | "endMinutes" | "done" | "skipped" | "outcome">,
+  nowMinutes: number | null
+): boolean {
+  if (task.done || task.skipped || task.outcome != null) return false;
+  if (task.domainTags.length > 0) return false;
+  return task.endMinutes != null && nowMinutes != null && task.endMinutes <= nowMinutes;
+}
+
 function normalizeDomain(d: string): string {
   return normalizeDomainInput(d);
 }
