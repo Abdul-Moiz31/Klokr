@@ -21,7 +21,6 @@ import { useAutoCompleteTasks } from "@/lib/daily-planner/useAutoCompleteTasks";
 import { StreakStrip } from "@/components/dashboard/StreakStrip";
 import { AccountabilityCard } from "@/components/dashboard/AccountabilityCard";
 import { WeeklyReviewCard } from "@/components/dashboard/WeeklyReviewCard";
-import { FocusScoreCard } from "@/components/dashboard/FocusScoreCard";
 import { getSiteName } from "@/lib/domain";
 import type { TabSession } from "@/lib/supabase";
 
@@ -315,10 +314,6 @@ export default function DashboardPage() {
                   <StreakStrip userId={userId} />
                   <WeeklyReviewCard userId={userId} />
                   <PlanVsActualCard sessions={sessions} autoCompleteThreshold={loadPrefs().autoCompleteThreshold} />
-                  <FocusScoreCard
-                    domains={domainStats.map((d) => ({ domain: d.domain, totalSeconds: d.totalSeconds }))}
-                    goalHours={loadPrefs().productiveHoursThreshold}
-                  />
                 </div>
               )}
             </section>
