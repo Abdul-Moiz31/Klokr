@@ -902,43 +902,61 @@ function SettingsPageInner() {
     const range = getDateRange();
     if (!range) { toast.error("Please set a valid date range."); return; }
     setExporting(true);
-    const supabase = createClient();
-    const { data, error } = await supabase
-      .from("tab_sessions")
-      .select("date, domain, duration_seconds, visits")
-      .eq("user_id", user.id)
-      .gte("date", range.from)
-      .lte("date", range.to)
-      .order("date", { ascending: false })
-      .order("duration_seconds", { ascending: false });
-    setExporting(false);
-    if (error || !data) { toast.error("Export failed: " + (error?.message ?? "no data")); return; }
-    const rows = data as RawSession[];
-    if (rows.length === 0) { toast.error("No data in this range."); return; }
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("tab_sessions")
+        .select("date, domain, duration_seconds, visits")
+        .eq("user_id", user.id)
+        .gte("date", range.from)
+        .lte("date", range.to)
+        .order("date", { ascending: false })
+        .order("duration_seconds", { ascending: false });
+      if (error || !data) { toast.error("Export failed: " + (error?.message ?? "no data")); return; }
+      const rows = data as RawSession[];
+      if (rows.length === 0) { toast.error("No data in this range."); return; }
 
-    // Aggregate by date + root domain → one summary row per domain per day
-    const map = new Map<string, { date: string; domain: string; totalSeconds: number; visits: number }>();
-    for (const r of rows) {
-      const key = `${r.date}__${r.domain}`;
-      const cur = map.get(key) ?? { date: r.date, domain: r.domain, totalSeconds: 0, visits: 0 };
-      cur.totalSeconds += r.duration_seconds;
-      cur.visits += r.visits ?? 1;
-      map.set(key, cur);
+      // Aggregate by date + root domain → one summary row per domain per day
+      const map = new Map<string, { date: string; domain: string; totalSeconds: number; visits: number }>();
+      for (const r of rows) {
+        const key = `${r.date}__${r.domain}`;
+        const cur = map.get(key) ?? { date: r.date, domain: r.domain, totalSeconds: 0, visits: 0 };
+        cur.totalSeconds += r.duration_seconds;
+        cur.visits += r.visits ?? 1;
+        map.set(key, cur);
+      }
+      const summary = Array.from(map.values()).sort((a, b) =>
+        a.date < b.date ? 1 : a.date > b.date ? -1 : b.totalSeconds - a.totalSeconds
+      );
+
+      const totalSeconds = summary.reduce((s, r) => s + r.totalSeconds, 0);
+      try {
+        generateExportPdf(
+          summary,
+          range.from,
+          range.to,
+          user.email ?? "",
+          { days: new Set(summary.map((r) => r.date)).size, totalSeconds },
+          prefs.categoryOverrides,
+        );
+        toast.success(`Exported ${summary.length} rows.`);
+      } catch (err) {
+        // generateExportPdf() runs synchronously on the main thread and
+        // previously had no catch here — a jsPDF/autoTable failure surfaced
+        // as nothing at all: no error, and (since the unconditional success
+        // toast sat right after this call) sometimes no toast either, since a
+        // thrown error skips past it with zero explanation either way.
+        console.error("[settings] PDF export failed", err);
+        toast.error("Couldn't generate the PDF. Please try again.");
+      }
+    } finally {
+      // Previously cleared right after the Supabase fetch, before PDF
+      // generation (the actual main-thread-blocking, potentially-slow step)
+      // even started — the button looked idle/ready again, inviting a
+      // double-click, for the entire duration of the real work. Now covers
+      // the whole operation.
+      setExporting(false);
     }
-    const summary = Array.from(map.values()).sort((a, b) =>
-      a.date < b.date ? 1 : a.date > b.date ? -1 : b.totalSeconds - a.totalSeconds
-    );
-
-    const totalSeconds = summary.reduce((s, r) => s + r.totalSeconds, 0);
-    generateExportPdf(
-      summary,
-      range.from,
-      range.to,
-      user.email ?? "",
-      { days: new Set(summary.map((r) => r.date)).size, totalSeconds },
-      prefs.categoryOverrides,
-    );
-    toast.success(`Exported ${summary.length} rows.`);
   };
 
   const loadDiagnostics = async () => {
