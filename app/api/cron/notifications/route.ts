@@ -11,9 +11,12 @@ import { safeEqual } from "@/lib/crypto";
 // started/task-ending-soon notifications (background.js). Exists because
 // neither the extension's chrome.notifications nor the website's in-app
 // bell can reach a user with no browser window open at all — this runs on a
-// schedule (see vercel.json) regardless of whether anyone's browser is open,
-// and only ever targets users who've actually enabled push (see
-// push_subscriptions / Settings → Notifications → Push notifications).
+// schedule (see .github/workflows/cron-notifications.yml — a GitHub Actions
+// schedule trigger, not Vercel's own cron, since the Hobby plan only allows
+// once-a-day cron jobs and this needs a few-minutes cadence) regardless of
+// whether anyone's browser is open, and only ever targets users who've
+// actually enabled push (see push_subscriptions / Settings → Notifications
+// → Push notifications).
 //
 // Known limitation: a user whose prefs.timezone is still null (never set —
 // the extension/website normally auto-detects it from the browser) can't be
