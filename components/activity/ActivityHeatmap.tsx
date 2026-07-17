@@ -64,33 +64,61 @@ function getMonthLabels(weeks: string[][]): Array<{ col: number; label: string }
   return labels;
 }
 
-type Level = "empty" | "minimal" | "light" | "medium" | "heavy" | "productive";
+// 8 non-empty levels (was 5) — the old 75-99% "heavy" bucket was wide enough
+// that a near-miss day (99%) and a barely-half day (76%) rendered as the
+// exact same color, undermining the heatmap's whole "at a glance" purpose.
+// Finer near the goal line (where the distinction matters most to the
+// user), coarser lower down (where it doesn't). Colors step through
+// Tailwind's own violet scale in order, same progression logic as before,
+// just with two more stops inserted — no new/arbitrary colors introduced.
+type Level = "empty" | "minimal" | "light" | "medium" | "heavy" | "near" | "almost" | "productive";
 
 function getLevel(seconds: number, threshold: number): Level {
   if (seconds === 0) return "empty";
   const r = seconds / threshold;
   if (r >= 1) return "productive";
-  if (r >= 0.75) return "heavy";
-  if (r >= 0.5) return "medium";
-  if (r >= 0.25) return "light";
+  if (r >= 0.95) return "almost";
+  if (r >= 0.8) return "near";
+  if (r >= 0.6) return "heavy";
+  if (r >= 0.4) return "medium";
+  if (r >= 0.2) return "light";
   return "minimal";
 }
 
 const CELL_BG: Record<Level, string> = {
   empty: "bg-white/[0.04] border border-white/[0.07]",
   minimal: "bg-violet-950/70 border border-violet-900/30",
-  light: "bg-violet-800/60 border border-violet-700/30",
-  medium: "bg-violet-600/60 border border-violet-500/30",
-  heavy: "bg-violet-500/75 border border-violet-400/30",
+  light: "bg-violet-900/65 border border-violet-800/30",
+  medium: "bg-violet-800/60 border border-violet-700/30",
+  heavy: "bg-violet-700/60 border border-violet-600/30",
+  near: "bg-violet-600/65 border border-violet-500/30",
+  almost: "bg-violet-500/75 border border-violet-400/35",
   productive: "bg-gradient-to-br from-violet-500 to-cyan-400 border border-violet-400/40 shadow-[0_0_6px_rgba(124,58,237,0.35)]",
+};
+
+// Plain-language phrasing reused for the aria-label below, so a screen-reader
+// user gets the same goal-relative signal a sighted user reads from color —
+// previously the aria-label only ever announced the raw tracked time, never
+// whether that was a good day or not.
+const LEVEL_ARIA_LABEL: Record<Level, string> = {
+  empty: "no activity",
+  minimal: "under 20% of goal",
+  light: "20 to 40% of goal",
+  medium: "40 to 60% of goal",
+  heavy: "60 to 80% of goal",
+  near: "80 to 95% of goal",
+  almost: "95 to 99% of goal",
+  productive: "goal reached",
 };
 
 const LEGEND: Array<{ level: Level; label: string }> = [
   { level: "empty", label: "None" },
-  { level: "minimal", label: "<25%" },
-  { level: "light", label: "25–50%" },
-  { level: "medium", label: "50–75%" },
-  { level: "heavy", label: "75–99%" },
+  { level: "minimal", label: "<20%" },
+  { level: "light", label: "20–40%" },
+  { level: "medium", label: "40–60%" },
+  { level: "heavy", label: "60–80%" },
+  { level: "near", label: "80–95%" },
+  { level: "almost", label: "95–99%" },
   { level: "productive", label: "Goal" },
 ];
 
@@ -175,12 +203,23 @@ export function ActivityHeatmap({ stats, productiveThresholdSeconds, todayStr, b
                   const isHovered = hovered === dateStr;
                   const isBestDay = dateStr === bestDayStr;
 
+                  // Previously today's cell was exempted from `disabled` even
+                  // at 0 seconds (so it never looked dimmed), but onClick
+                  // still required seconds > 0 — a focusable, non-disabled
+                  // button that silently does nothing on click or Enter is a
+                  // dead-end for mouse and keyboard/AT users alike. disabled
+                  // now matches onClick's real condition exactly; visually
+                  // nothing changes (today at 0s already rendered as the
+                  // "empty" color either way — only the interactive
+                  // semantics were wrong).
+                  const isClickable = !isFuture && seconds > 0;
+
                   return (
                     <button
                       key={di}
                       type="button"
-                      disabled={isFuture || (seconds === 0 && dateStr !== todayStr)}
-                      onClick={() => !isFuture && seconds > 0 && onDayClick(dateStr, seconds)}
+                      disabled={!isClickable}
+                      onClick={() => isClickable && onDayClick(dateStr, seconds)}
                       onMouseEnter={() => !isFuture && setHovered(dateStr)}
                       onMouseLeave={() => setHovered(null)}
                       className={`relative h-[1.125rem] w-[1.125rem] rounded-sm transition-all duration-100 ${
@@ -190,7 +229,7 @@ export function ActivityHeatmap({ stats, productiveThresholdSeconds, todayStr, b
                       } ${isToday ? "ring-1 ring-white/40 ring-offset-[1px] ring-offset-transparent" : ""} ${
                         isBestDay ? "ring-1 ring-yellow-400/60 ring-offset-[1px] ring-offset-transparent" : ""
                       }`}
-                      aria-label={`${dateStr}: ${formatTime(seconds)}`}
+                      aria-label={`${formatFull(dateStr)}: ${formatTime(seconds)}, ${LEVEL_ARIA_LABEL[isFuture ? "empty" : level]}`}
                     />
                   );
                 })}
