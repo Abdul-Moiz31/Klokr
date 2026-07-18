@@ -14,6 +14,7 @@ import type {
 } from "./types";
 import { dayKey } from "./date";
 import { normalizeDomainInput } from "@/lib/domain";
+import { ruleAppliesOnDate } from "./recurrence";
 export { dayKey } from "./date";
 export { ruleAppliesOnDate, rulesForDate, completionKey, isRecurringDone } from "./recurrence";
 
@@ -513,31 +514,66 @@ function pushGroupTasks(
  * included regardless of whether it has domains/blockedDomains set (a task
  * with neither still deserves a start/end notification), unlike unscheduled
  * tasks below, which only ever exist here for domain-tag attribution.
+ *
+ * `now` also resolves which recurring rules apply today. A recurring
+ * routine only becomes a real entry in `adHocByDate` once the Daily Planner
+ * page has been opened that day (the injection effect in
+ * useDailyPlannerState.ts runs client-side, once per page session) — but
+ * this function is also called headlessly from /api/schedule, polled by the
+ * extension every heartbeat with no web app tab open. Without synthesizing
+ * today's still-unmaterialized recurring rules here too, a routine's
+ * blockedDomains/domains silently never reach the extension until someone
+ * happens to open klokrs.com that day, defeating "automatic, no manual
+ * toggle" blocking for anyone who doesn't.
  */
 export function buildTabTrackingRules(
   state: DailyPlannerV5,
-  todayKey: string
+  todayKey: string,
+  now: Date
 ): PlannerTaskRule[] {
   const order: PlannerTaskRule[] = [];
 
   const adHoc = state.adHocByDate[todayKey] ?? { groups: [], tasks: [] };
+  const existingTitles = new Set(adHoc.tasks.map((t) => t.title.trim().toLowerCase()));
 
   // Scheduled tasks first, in time order — matches "the thing I'm doing now".
-  const scheduled = adHoc.tasks
+  // Merges already-materialized scheduled tasks with recurring rules that
+  // apply today, have their own default schedule, and aren't already
+  // present (by title, same dedup the client-side injection uses).
+  const materializedScheduled = adHoc.tasks
     .filter((t) => !t.done && t.startMinutes != null)
-    .sort((a, b) => (a.startMinutes ?? 0) - (b.startMinutes ?? 0));
-  for (const t of scheduled) {
-    const domains = normalizeDomainList(t.domainTags);
-    const blockedDomains = normalizeDomainList(t.blockedDomainTags ?? []);
-    order.push({
+    .map((t) => ({
       taskId: t.id,
       title: t.title,
-      domains,
-      blockedDomains,
-      startMinutes: t.startMinutes,
-      endMinutes: t.endMinutes,
+      domains: normalizeDomainList(t.domainTags),
+      blockedDomains: normalizeDomainList(t.blockedDomainTags ?? []),
+      startMinutes: t.startMinutes as number,
+      endMinutes: t.endMinutes as number,
+    }));
+  const virtualScheduled = state.recurringRules
+    .filter(
+      (r) =>
+        ruleAppliesOnDate(r, now) &&
+        isFiniteSchedule(r.defaultStartMinutes) &&
+        isFiniteSchedule(r.defaultDurationMinutes) &&
+        !existingTitles.has(r.title.trim().toLowerCase())
+    )
+    .map((r) => {
+      const startMinutes = clampMinutes(r.defaultStartMinutes!);
+      const dur = Math.max(15, Math.round(r.defaultDurationMinutes!));
+      return {
+        taskId: `recurring:${r.id}`,
+        title: r.title,
+        domains: normalizeDomainList(r.domainTags),
+        blockedDomains: normalizeDomainList(r.blockedDomainTags ?? []),
+        startMinutes,
+        endMinutes: Math.min(1440, startMinutes + dur),
+      };
     });
-  }
+  const scheduled = [...materializedScheduled, ...virtualScheduled].sort(
+    (a, b) => a.startMinutes - b.startMinutes
+  );
+  order.push(...scheduled);
 
   // Unscheduled tasks within the day's plan, by group/order.
   const unscheduledDay: DayData = {
