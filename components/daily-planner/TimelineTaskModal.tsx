@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import type { PlannerTask, RoutineTemplateKind } from "@/lib/daily-planner/types";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
-import { normalizeDomainInput } from "@/lib/domain";
+import { parseDomainList, findTagBlockConflicts } from "@/lib/domain";
 import {
   MIN_DURATION_MINUTES,
   SNAP_MINUTES,
@@ -52,11 +52,8 @@ type Props = {
   onClose: () => void;
 };
 
-function splitDomains(s: string) {
-  return s
-    .split(/[,;]+/)
-    .map(normalizeDomainInput)
-    .filter(Boolean);
+function splitDomains(s: string): string[] {
+  return parseDomainList(s).domains;
 }
 
 function minutesToTimeString(m: number | null): string {
@@ -95,6 +92,20 @@ export function TimelineTaskModal({ initial, initialRange, onSave, onDelete, onC
   // Captured once on mount so we can detect "domains changed" reliably.
   const originalDomains = useMemo(() => initial?.domainTags ?? [], [initial]);
   const [pendingDraft, setPendingDraft] = useState<TimelineTaskDraft | null>(null);
+  const invalidDomains = useMemo(() => parseDomainList(domains).invalid, [domains]);
+  const invalidBlockedDomains = useMemo(() => parseDomainList(blockedDomains).invalid, [blockedDomains]);
+  const tagBlockConflicts = useMemo(
+    () => findTagBlockConflicts(splitDomains(domains), splitDomains(blockedDomains)),
+    [domains, blockedDomains]
+  );
+  // Tracks which exact conflict set the user has already clicked "Save
+  // anyway" for, so re-editing either field after that re-surfaces the
+  // warning instead of carrying the acknowledgment past a change that could
+  // introduce a new (or different) conflict — derived from render state
+  // rather than reset via an effect.
+  const [acknowledgedConflictKey, setAcknowledgedConflictKey] = useState<string | null>(null);
+  const conflictKey = tagBlockConflicts.length > 0 ? [...tagBlockConflicts].sort().join("|") : null;
+  const conflictAcknowledged = conflictKey !== null && conflictKey === acknowledgedConflictKey;
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -128,6 +139,11 @@ export function TimelineTaskModal({ initial, initialRange, onSave, onDelete, onC
       startMinutes,
       endMinutes,
     };
+
+    // A domain tagged as both tracked and blocked for this task is almost
+    // always a mistake (you'd never see time credited toward it). Hold the
+    // save until the user explicitly acknowledges it via "Save anyway".
+    if (tagBlockConflicts.length > 0 && !conflictAcknowledged) return;
 
     // A1 confirm dialog: editing an instance with template lineage and the
     // domain set has changed → ask whether to also update the template.
@@ -269,6 +285,11 @@ export function TimelineTaskModal({ initial, initialRange, onSave, onDelete, onC
               className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white/90 focus:border-violet-500/40 focus:outline-none"
               placeholder="github.com, notion.so"
             />
+            {invalidDomains.length > 0 && (
+              <p className="mt-1.5 text-xs text-amber-400/70">
+                Ignored — not a valid domain: {invalidDomains.join(", ")}
+              </p>
+            )}
           </div>
 
           {/* Blocking is enforced against this task's own scheduled window —
@@ -287,6 +308,28 @@ export function TimelineTaskModal({ initial, initialRange, onSave, onDelete, onC
                 className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white/90 focus:border-violet-500/40 focus:outline-none"
                 placeholder="youtube.com, reddit.com"
               />
+              {invalidBlockedDomains.length > 0 && (
+                <p className="mt-1.5 text-xs text-amber-400/70">
+                  Ignored — not a valid domain: {invalidBlockedDomains.join(", ")}
+                </p>
+              )}
+              {tagBlockConflicts.length > 0 && (
+                <div className="mt-1.5 rounded-lg border border-amber-500/25 bg-amber-500/5 px-2.5 py-2 text-xs text-amber-400/80">
+                  <p>
+                    Tagged for tracking <em>and</em> blocked for this task: {tagBlockConflicts.join(", ")}.
+                    Time spent there can never count toward this task&apos;s progress.
+                  </p>
+                  {!conflictAcknowledged && (
+                    <button
+                      type="button"
+                      onClick={() => setAcknowledgedConflictKey(conflictKey)}
+                      className="mt-1.5 font-medium text-amber-300 underline underline-offset-2 hover:text-amber-200"
+                    >
+                      Save anyway
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -315,7 +358,7 @@ export function TimelineTaskModal({ initial, initialRange, onSave, onDelete, onC
             <button
               type="button"
               onClick={handleSave}
-              disabled={!title.trim()}
+              disabled={!title.trim() || (tagBlockConflicts.length > 0 && !conflictAcknowledged)}
               className="rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {initial ? "Save" : "Create"}

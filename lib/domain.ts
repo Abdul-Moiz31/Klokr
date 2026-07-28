@@ -16,6 +16,53 @@ export function normalizeDomainInput(raw: string): string {
   return v;
 }
 
+// Bare-hostname format check — mirrors app/api/track/route.ts's DOMAIN_RE
+// (labels of 1-63 chars, no leading/trailing hyphen, 253 chars max overall).
+// Duplicated rather than imported: that file is server-only, this needs to
+// run client-side in every domain-list input surface (Settings' always-
+// blocked list, planner task/routine domain and blocked-domain fields) so a
+// malformed entry is caught at input time instead of being silently saved
+// as a rule that can never match anything. Keep the two in sync if either
+// changes.
+const HOSTNAME_RE = /^(?=.{1,253}$)(?!-)[a-z0-9-]{1,63}(?<!-)(\.(?!-)[a-z0-9-]{1,63}(?<!-))*$/;
+
+export type ParsedDomainList = {
+  domains: string[]; // normalized, deduped, valid-format entries, in input order
+  invalid: string[]; // raw entries that didn't look like a real hostname after normalization
+};
+
+// Splits a comma/semicolon-separated domain-list input, normalizes each
+// entry, drops empties, dedupes, and separates out anything that fails the
+// hostname-format check — used by every domain-list input surface (Settings,
+// TimelineTaskModal, RecurringRoutinesPanel) so a typo or pasted garbage
+// string is rejected at input time rather than saved as a dead rule.
+export function parseDomainList(raw: string): ParsedDomainList {
+  const seen = new Set<string>();
+  const domains: string[] = [];
+  const invalid: string[] = [];
+  for (const entry of raw.split(/[,;]+/)) {
+    const normalized = normalizeDomainInput(entry);
+    if (!normalized) continue;
+    if (!HOSTNAME_RE.test(normalized)) {
+      invalid.push(normalized);
+      continue;
+    }
+    if (seen.has(normalized)) continue;
+    seen.add(normalized);
+    domains.push(normalized);
+  }
+  return { domains, invalid };
+}
+
+// Domains present in both a task's tracked-domain list and its blocked-domain
+// list — not necessarily wrong, but almost always a mistake (a domain you're
+// tracking progress against is usually one you want open, not blocked, for
+// that same task/routine).
+export function findTagBlockConflicts(domainTags: string[], blockedDomainTags: string[]): string[] {
+  const blocked = new Set(blockedDomainTags);
+  return domainTags.filter((d) => blocked.has(d));
+}
+
 // Returns the registrable root domain: "gist.github.com" → "github.com".
 //
 // Backed by the real Public Suffix List (via tldts) rather than a hand-

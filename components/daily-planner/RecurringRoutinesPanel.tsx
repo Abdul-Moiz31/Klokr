@@ -7,7 +7,7 @@ import type {
   RoutineTemplateKind,
 } from "@/lib/daily-planner/types";
 import { dayKey } from "@/lib/daily-planner/date";
-import { normalizeDomainInput } from "@/lib/domain";
+import { parseDomainList, findTagBlockConflicts } from "@/lib/domain";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 
 const FREQ: { value: RecurrenceFrequency; label: string; hint: string }[] = [
@@ -332,13 +332,27 @@ function RecurringRuleModal({
     set({ monthDays: m });
   };
 
+  const invalidDomains = parseDomainList(form.domainTags.join(",")).invalid;
+  const invalidBlockedDomains = parseDomainList((form.blockedDomainTags ?? []).join(",")).invalid;
+  const tagBlockConflicts = findTagBlockConflicts(
+    parseDomainList(form.domainTags.join(",")).domains,
+    parseDomainList((form.blockedDomainTags ?? []).join(",")).domains
+  );
+  // Tracks which exact conflict set the user has already clicked "Save
+  // anyway" for, so re-editing either field re-surfaces the warning instead
+  // of carrying the acknowledgment past a change that could introduce a new
+  // (or different) conflict — derived from render state, no effect needed.
+  const [acknowledgedConflictKey, setAcknowledgedConflictKey] = useState<string | null>(null);
+  const conflictKey = tagBlockConflicts.length > 0 ? [...tagBlockConflicts].sort().join("|") : null;
+  const conflictAcknowledged = conflictKey !== null && conflictKey === acknowledgedConflictKey;
+
   const handleSave = () => {
     if (!form.title.trim()) return;
     if ((form.frequency === "weekly" || form.frequency === "biweekly") && form.weekdays.length === 0) return;
     if (form.frequency === "monthly" && form.monthDays.length === 0) return;
-    const normalize = (list: string[]) => list.map(normalizeDomainInput).filter(Boolean);
-    const domains = normalize(form.domainTags);
-    const blockedDomains = normalize(form.blockedDomainTags ?? []);
+    if (tagBlockConflicts.length > 0 && !conflictAcknowledged) return;
+    const domains = parseDomainList(form.domainTags.join(",")).domains;
+    const blockedDomains = parseDomainList((form.blockedDomainTags ?? []).join(",")).domains;
     onSave({
       ...form,
       title: form.title.trim(),
@@ -512,6 +526,11 @@ function RecurringRuleModal({
               placeholder="github.com, notion.so, figma.com"
             />
             <p className="mt-1 text-[11px] text-white/25">Time on these sites counts toward this task&apos;s progress bar.</p>
+            {invalidDomains.length > 0 && (
+              <p className="mt-1 text-[11px] text-amber-400/70">
+                Ignored — not a valid domain: {invalidDomains.join(", ")}
+              </p>
+            )}
           </Field>
 
           {/* Blocking is enforced against a materialized instance's own
@@ -536,6 +555,28 @@ function RecurringRuleModal({
                 placeholder="youtube.com, reddit.com"
               />
               <p className="mt-1 text-[11px] text-white/25">Blocked only while this routine's window is active, on every materialized instance.</p>
+              {invalidBlockedDomains.length > 0 && (
+                <p className="mt-1 text-[11px] text-amber-400/70">
+                  Ignored — not a valid domain: {invalidBlockedDomains.join(", ")}
+                </p>
+              )}
+              {tagBlockConflicts.length > 0 && (
+                <div className="mt-2 rounded-lg border border-amber-500/25 bg-amber-500/5 px-2.5 py-2 text-[11px] text-amber-400/80">
+                  <p>
+                    Tagged for tracking <em>and</em> blocked: {tagBlockConflicts.join(", ")}. Time
+                    spent there can never count toward this routine&apos;s progress.
+                  </p>
+                  {!conflictAcknowledged && (
+                    <button
+                      type="button"
+                      onClick={() => setAcknowledgedConflictKey(conflictKey)}
+                      className="mt-1 font-medium text-amber-300 underline underline-offset-2 hover:text-amber-200"
+                    >
+                      Save anyway
+                    </button>
+                  )}
+                </div>
+              )}
             </Field>
           )}
 
@@ -544,7 +585,8 @@ function RecurringRuleModal({
             <button
               type="button"
               onClick={handleSave}
-              className="flex-1 rounded-xl bg-violet-600 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-500"
+              disabled={tagBlockConflicts.length > 0 && !conflictAcknowledged}
+              className="flex-1 rounded-xl bg-violet-600 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {initial ? "Save changes" : "Add routine"}
             </button>
