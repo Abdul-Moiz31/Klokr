@@ -16,7 +16,7 @@ import { BillingCard } from "@/components/dashboard/BillingCard";
 import { AiSettingsTab } from "@/components/dashboard/AiSettingsTab";
 import { DEFAULT_PREFS, loadPrefs, savePrefs, resolveTimezone, type KlokrsPrefs } from "@/lib/prefs";
 import { usePushNotifications } from "@/lib/hooks/usePushNotifications";
-import { normalizeDomainInput } from "@/lib/domain";
+import { parseDomainList } from "@/lib/domain";
 import { getSiteName } from "@/lib/domain";
 import { getCategoryForDomain, getCategoryStats, CATEGORIES, hexToRgb } from "@/lib/categories";
 import type { CategoryId } from "@/lib/categories";
@@ -91,28 +91,34 @@ function DomainListField({
   placeholder?: string;
 }) {
   const [text, setText] = useState(value.join(", "));
+  const [invalid, setInvalid] = useState<string[]>([]);
   useEffect(() => setText(value.join(", ")), [value]);
 
   const commit = () => {
-    const domains = text
-      .split(/[,;]+/)
-      .map(normalizeDomainInput)
-      .filter(Boolean);
+    const { domains, invalid: bad } = parseDomainList(text);
+    setInvalid(bad);
     setText(domains.join(", "));
     onCommit(domains);
   };
 
   return (
-    <input
-      value={text}
-      onChange={(e) => setText(e.target.value)}
-      onBlur={commit}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-      }}
-      placeholder={placeholder ?? "youtube.com, reddit.com"}
-      className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/90 placeholder:text-white/30 focus:border-violet-500/40 focus:outline-none"
-    />
+    <div>
+      <input
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+        }}
+        placeholder={placeholder ?? "youtube.com, reddit.com"}
+        className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/90 placeholder:text-white/30 focus:border-violet-500/40 focus:outline-none"
+      />
+      {invalid.length > 0 && (
+        <p className="mt-1.5 text-xs text-amber-400/70">
+          Ignored — not a valid domain: {invalid.join(", ")}
+        </p>
+      )}
+    </div>
   );
 }
 
