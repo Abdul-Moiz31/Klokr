@@ -47,7 +47,12 @@ export async function GET(request: NextRequest) {
   const tzOffset = parseInt(request.headers.get("x-tz-offset") ?? "0", 10) || 0;
   const now = new Date();
   const todayKey = dayKeyForOffset(now, tzOffset);
-  const rules = buildTabTrackingRules(state, todayKey);
+  // Recurring-rule matching (ruleAppliesOnDate) reads local getDay()/getDate(),
+  // which only resolve to the caller's calendar day if this runtime's own
+  // timezone is UTC (true on Vercel) — same assumption dayKeyForOffset makes,
+  // shifted the same way so both agree on "today".
+  const localEquivalentNow = new Date(now.getTime() - tzOffset * 60_000);
+  const rules = buildTabTrackingRules(state, todayKey, localEquivalentNow);
 
   // Unlike `rules` (which drops already-done tasks), the day-complete
   // notification needs the full picture — every scheduled task today,
