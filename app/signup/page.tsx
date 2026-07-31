@@ -49,6 +49,7 @@ function SignupForm() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState("");
+  const [confirmEmailSent, setConfirmEmailSent] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const prefillEmail = searchParams.get("email") || "";
@@ -80,19 +81,23 @@ function SignupForm() {
     if (error) {
       setError(error.message);
       setLoading(false);
-    } else {
-      if (data.session) {
-        window.postMessage(
-          {
-            type: "Klokrs_AUTH",
-            token: data.session.access_token,
-            refreshToken: data.session.refresh_token,
-            userId: data.session.user.id,
-          },
-          window.location.origin
-        );
-      }
+    } else if (data.session) {
+      window.postMessage(
+        {
+          type: "Klokrs_AUTH",
+          token: data.session.access_token,
+          refreshToken: data.session.refresh_token,
+          userId: data.session.user.id,
+        },
+        window.location.origin
+      );
       router.push("/dashboard");
+    } else {
+      // No session back means the project requires email confirmation —
+      // the account exists but can't log in yet. Don't redirect to a
+      // dashboard the user has no session for; tell them to confirm first.
+      setLoading(false);
+      setConfirmEmailSent(true);
     }
   };
 
@@ -109,6 +114,18 @@ function SignupForm() {
       setGoogleLoading(false);
     }
   };
+
+  if (confirmEmailSent) {
+    return (
+      <div className="px-5 py-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-center">
+        <p className="text-emerald-400 text-sm font-medium mb-1">Check your inbox</p>
+        <p className="text-white/50 text-sm">
+          We sent a confirmation link to <span className="text-white/80">{email}</span>. Confirm your
+          email before signing in.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <>
