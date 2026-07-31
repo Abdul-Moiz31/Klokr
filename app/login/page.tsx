@@ -47,6 +47,8 @@ export default function LoginPage() {
       const msg = error.message.toLowerCase();
       if (msg.includes("banned") || msg.includes("restricted")) {
         setRestricted(true);
+      } else if (msg.includes("confirm")) {
+        setError("Please confirm your email first — check your inbox for the link we sent when you signed up.");
       } else {
         setError(error.message);
       }
