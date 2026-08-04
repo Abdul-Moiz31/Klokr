@@ -1,7 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-const AUTH_ONLY_ROUTES = new Set(["/login", "/signup"]);
-
 // Routes that require a signed-in Supabase user. /admin is intentionally
 // excluded — it has its own independent session model (ADMIN_PASSWORD +
 // a separate hashed cookie, see lib/admin-auth.ts) enforced server-side by
@@ -41,13 +39,19 @@ export async function proxy(request: NextRequest) {
   // access is enforced by Supabase RLS using the client's real token. The
   // client-side bridge (ExtensionAuthSync + useAuthSession) reconciles the
   // real session from the extension's fresh copy within a few hundred ms.
+  //
+  // Deliberately one-directional: we only redirect *away* from protected
+  // pages when there's no session cookie at all. We don't redirect *away*
+  // from /login or /signup for an already-authenticated visitor — cookie
+  // presence alone doesn't mean the cookie is still valid (e.g. a stale
+  // cookie left over from a previous account), and bouncing a visitor who
+  // is trying to sign in as a different account straight to /dashboard
+  // before they can even click "Continue with Google" is a worse failure
+  // mode than occasionally showing the login form to someone already
+  // signed in.
   const hasSessionCookie = request.cookies
     .getAll()
     .some((c) => SESSION_COOKIE_RE.test(c.name));
-
-  if (hasSessionCookie && AUTH_ONLY_ROUTES.has(request.nextUrl.pathname)) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
-  }
 
   if (!hasSessionCookie && isProtectedPath(request.nextUrl.pathname)) {
     return NextResponse.redirect(new URL("/login", request.url));
@@ -58,8 +62,6 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/login",
-    "/signup",
     "/dashboard/:path*",
     "/activity/:path*",
     "/reports/:path*",
