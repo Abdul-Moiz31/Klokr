@@ -31,6 +31,19 @@ function deepClone<T>(x: T): T {
   return JSON.parse(JSON.stringify(x)) as T;
 }
 
+// Tells the extension a planner write just landed, so it re-pulls
+// /api/schedule immediately instead of waiting for its own poll (up to 2min
+// — see Klokrs_schedule_sync in background.js). Same pattern as the
+// Klokrs_PREFS push in app/dashboard/settings/page.tsx; harmless no-op if
+// the extension isn't installed (content script just never picks it up).
+function notifyExtensionScheduleChanged() {
+  try {
+    window.postMessage({ type: "Klokrs_SCHEDULE_CHANGED" }, window.location.origin);
+  } catch {
+    /* no extension */
+  }
+}
+
 export function useDailyPlannerState() {
   const [state, setState] = useState<DailyPlannerV5 | null>(null);
   const [hydrated, setHydrated] = useState(false);
@@ -151,6 +164,7 @@ export function useDailyPlannerState() {
     const result = await upsertRemotePlannerIfUnchanged(userId, dataToWrite, expectedUpdatedAt);
     if (result.ok) {
       localStorage.setItem("Klokrs_planner_synced_at", result.updatedAt);
+      notifyExtensionScheduleChanged();
       return;
     }
     if (!result.conflict) return; // network/RPC error — the next debounced write will retry naturally
@@ -168,6 +182,7 @@ export function useDailyPlannerState() {
       setState(merged);
       saveDailyPlanner(merged);
       localStorage.setItem("Klokrs_planner_synced_at", retry.updatedAt);
+      notifyExtensionScheduleChanged();
     }
   }, []);
 
