@@ -49,7 +49,6 @@ supabase/.branches/
 *.cer
 
 # ─── Editor ──────────────────────────────────────────────────────
-.vscode/
 .idea/
 *.swp
 *.swo
